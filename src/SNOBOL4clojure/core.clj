@@ -1,15 +1,15 @@
-(ns snobol4.core
+(ns SNOBOL4clojure.core
   (:gen-class)
   (:require [clojure.zip :as z :refer [zipper root node down up right left branch? rightmost leftmost]])
   (:require [clojure.edn :as edn])
   (:require [clojure.pprint :as pp])
   (:require [clojure.string :as string])
   (:require [clojure.java.io :as io])
+  (:require [instaparse.core :as insta :refer [defparser]]); :refer-macros [defparser]]); ClojureScript
+  (:require [clojure.tools.trace :refer :all])
 ; (:require [clojure.core.matrix :refer :all])
 ; (:require [clojure.core.matrix.operators :refer :all])
-  (:require [clojure.tools.trace :refer :all])
 ; (:require [criterium.core :as criterium :refer :all])
-  (:require [instaparse.core :as insta :refer [defparser]]); :refer-macros [defparser]]); ClojureScript
   (:refer-clojure :exclude [= + - * / num])
 ; (:refer-clojure :exclude [* - + == / < <= > >= not= = min max])
 )
@@ -235,8 +235,8 @@
           (get (ns-publics ns-ref) (symbol (name N))))))
     (do (comment N)
       (if-let [user-ref  (get (ns-map *ns*)                         (symbol (name N)))] user-ref
-        (if-let [sno-ref (get (ns-map (find-ns 'snobol4.core))      (symbol (name N)))] sno-ref
-                         (get (ns-map (find-ns 'snobol4.core-test)) (symbol (name N))))))))
+        (if-let [sno-ref (get (ns-map (find-ns 'SNOBOL4clojure.core))      (symbol (name N)))] sno-ref
+                         (get (ns-map (find-ns 'SNOBOL4clojure.core-test)) (symbol (name N))))))))
 (defn $$ [N] (if-let [V (reference N)] (var-get V) ε)); (var-get (eval (list 'var N)))
 ;---- ----- -------------------------------------------- ------- -- ----- ----------------------------------------------
 (definterface &NAME (n []) (n [_]))
@@ -395,7 +395,7 @@ EXPRESSION               .     ;
 (defmethod DATATYPE "class [LLjava.lang.Object;"                  [X] "ARRAY")
 (defmethod DATATYPE "class clojure.lang.PersistentArrayMap"       [X] "TABLE"); (hash-map), {}, for SPITBOL TABLE()
 (defmethod DATATYPE "class clojure.lang.PersistentVector"         [X] "PATTERN")
-(defmethod DATATYPE "class clojure.lang.Symbol"                   [X] "NAME"); also snobol4.core.NAME in :default dispatch
+(defmethod DATATYPE "class clojure.lang.Symbol"                   [X] "NAME"); also SNOBOL4clojure.core.NAME in :default dispatch
 (defmethod DATATYPE "class clojure.lang.PersistentList"           [X] "EXPRESSION")
 (defmethod DATATYPE "class clojure.lang.PersistentList$EmptyList" [X] "EXPRESSION")
 (defmethod DATATYPE "class clojure.lang.PersistentTreeMap"        [X] "CODE"); (sorted-map), also SNOBOL4 TABLE()
@@ -404,7 +404,7 @@ EXPRESSION               .     ;
 (defmethod DATATYPE "class clojure.lang.PersistentTreeSet"        [X] "SET"); (sorted-set)
 (defmethod DATATYPE "class java.util.regex.Pattern"               [X] "REGEX")
 (defmethod DATATYPE "class java.lang.Class"                       [X] "DATA")
-(defmethod DATATYPE :default                                      [X] ((re-find #"class snobol4\.core\.(.*)" (str (class X))) 1))
+(defmethod DATATYPE :default                                      [X] ((re-find #"class SNOBOL4clojure\.core\.(.*)" (str (class X))) 1))
 ;---------------------------------------------------------------------------------------------------
 ; Synthesis (string, pattern, and object)
 (defn DUPL       [x i]); using string concat or pattern sequence
@@ -727,4 +727,8 @@ EXPRESSION               .     ;
                                (if (contains? goto :F) (recur (saddr (:F goto)))
                                                        (recur (saddr (inc (current 0)))))))))))))
 ;---------------------------------------------------------------------------------------------------
-(defn -main "SNOBOL4/Clojure." [& args])
+(defn -main "SNOBOL4/Clojure." [& args]
+		(let [BED [(POS 0) (| "B" "F" "L" "R") (| "E" "EA") (| "D" "DS") (RPOS 0)]]
+		    (? "BEADS" BED))
+)
+;---------------------------------------------------------------------------------------------------

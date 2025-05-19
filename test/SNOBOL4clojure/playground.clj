@@ -160,7 +160,7 @@ END
 		(let [V (.setDynamic (Var/create 0))]
 		  (do (var-get V); 0
 		      (with-bindings {V 42} (var-get V)))); 42
-		(find-var snobol4.core/SEQ)
+		(find-var SNOBOL4clojure.core/SEQ)
 		(var SEQ)
 		(var-get x)
 		(var-set x val)
@@ -174,10 +174,10 @@ END
 		(println x)
 		(println x)
 
-		(the-ns 'snobol4.core)
-		(ns-map 'snobol4.core)
-		(ns-aliases 'snobol4.string)
-		(ns-publics 'snobol4.core)
+		(the-ns 'SNOBOL4clojure.core)
+		(ns-map 'SNOBOL4clojure.core)
+		(ns-aliases 'SNOBOL4clojure.string)
+		(ns-publics 'SNOBOL4clojure.core)
 		(set! symbol expr)
 
 		(deftype Address [no label])

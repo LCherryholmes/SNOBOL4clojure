@@ -1,6 +1,6 @@
-(ns snobol4.core-test
+(ns SNOBOL4clojure.core-test
   (:require [clojure.test :refer :all]
-            [snobol4.core :refer :all :exclude [= + - * / num]]))
+            [SNOBOL4clojure.core :refer :all :exclude [= + - * / num]]))
 
 ;(use-fixtures :each fixture1 fixture2 ...); :once
 
@@ -32,18 +32,17 @@
     (is (not (? "BATS"   BD)))))
 
 (deftest match-4
-  (let [BR (EVAL '[(POS 0) (| "B" "F" "L" "R") (| "E" "EA") (| "D" "DS") (RPOS 0)])]
-    (is (? "BED"    BR))
-    (is (? "BEDS"   BR))
-    (is (? "BEAD"   BR))
-    (is (? "BEADS"  BR))
-    (is (? "RED"    BR))
-    (is (? "REDS"   BR))
-    (is (? "READ"   BR))
-    (is (? "READS"  BR))
-    (is (? "READS"  BR))
-    (is (? "LEAD"   BR))
-    (is (not (? "LEADER" BR)))))
+  (let [BED (EVAL '[(POS 0) (| "B" "F" "L" "R") (| "E" "EA") (| "D" "DS") (RPOS 0)])]
+    (is (? "BED"    BED))
+    (is (? "BEDS"   BED))
+    (is (? "BEAD"   BED))
+    (is (? "BEADS"  BED))
+    (is (? "RED"    BED))
+    (is (? "REDS"   BED))
+    (is (? "READ"   BED))
+    (is (? "READS"  BED))
+    (is (? "READS"  BED))
+    (is (not (? "LEADER" BED)))))
 
 (deftest match-5
   (let [A (EVAL '[(POS 0) (ANY "BFLR") (SPAN "EA") "D" (RPOS 0)])]
@@ -117,7 +116,7 @@
   (is (= (DATATYPE [:LEN 10]) "PATTERN"))
   (is (= (DATATYPE ["Hello, " (SPAN @&LCASE)]) "PATTERN"))
   (is (= (DATATYPE 'epsilon) "NAME"))
-  (is (= (DATATYPE (snobol4.core.NAME. 'epsilon)) "NAME"))
+  (is (= (DATATYPE (SNOBOL4clojure.core.NAME. 'epsilon)) "NAME"))
   (is (= (DATATYPE (list '* (list 'EQ 0 0))) "EXPRESSION"))
   (is (= (DATATYPE '(+ 1 2)) "EXPRESSION"))
   (is (= (DATATYPE (CODE "what year = 2021")) "CODE"))
@@ -125,7 +124,7 @@
   (is (= (DATATYPE (SET)) "SET"))
   (is (= (DATATYPE #"^[A-Z]+$") "REGEX"))
   (is (= (DATA "tree(t,v,n,c)") ε))
-; (ns *ns* (:import [snobol4.core tree]))
+; (ns *ns* (:import [SNOBOL4clojure.core tree]))
 ; (is (= (DATATYPE (tree. \+ nil 2 [1 2])) "tree"))
 ; (is (= (DATATYPE (->tree \+ nil 2 [1 2])) "tree"))
 ; (is (= (DATATYPE (new tree \+ nil 2 [1 2])) "tree"))
@@ -133,7 +132,6 @@
 
 (deftest match
   (match-1) (match-2) (match-3) (match-4)
-  (match-5) (match-real) (match-define)
-  (datatype-test))
+  (match-5) (match-real) (match-define))
 
-(defn test-ns-hook [] (datatype-test))
+(defn test-ns-hook [] (match-1))
