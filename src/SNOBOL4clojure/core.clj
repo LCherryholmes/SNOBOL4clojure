@@ -3,10 +3,10 @@
   (:require [clojure.zip :as z :refer [zipper root node down up right left branch? rightmost leftmost]])
   (:require [clojure.edn :as edn])
   (:require [clojure.pprint :as pp])
-  (:require [clojure.string :as string])
   (:require [clojure.java.io :as io])
-  (:require [instaparse.core :as insta :refer [defparser]]); :refer-macros [defparser]]); ClojureScript
+  (:require [clojure.string :as string])
   (:require [clojure.tools.trace :refer :all])
+  (:require [instaparse.core :as insta :refer [defparser]]); :refer-macros [defparser]]); ClojureScript
 ; (:require [clojure.core.matrix :refer :all])
 ; (:require [clojure.core.matrix.operators :refer :all])
 ; (:require [criterium.core :as criterium :refer :all])
@@ -140,6 +140,7 @@
 (def  η          ##NaN)
 (def  &ALPHABET  (atom (apply vector (map #(char %) (range 256)))))
 (def  &ANCHOR    (atom 0))
+(def  &DIGITS    "0123456789")
 (def  &DUMP      (atom 0)); 1, 2, and 3 levels
 (def  &ERRLIMIT  (atom 0))
 (def  &ERRTEXT   (atom ε))
@@ -147,14 +148,14 @@
 (def  &FTRACE    (atom 0))
 (def  &FULLLSCAN (atom 0))
 (def  &LASTNO    (atom 0))
-(def  &LCASE     (atom "abcdefghijklmnopqrstuvwxyz"))
+(def  &LCASE     "abcdefghijklmnopqrstuvwxyz")
 (def  &MAXLNGTH  (atom 4194304))
 (def  &PROFILE   (atom 0))
 (def  &TRACE     (atom 0))
 (def  &TRIM      (atom 0))
 (def  &STCOUNT   (atom 0))
 (def  &STLIMIT   (atom 2147483647))
-(def  &UCASE     (atom "ABCDEFGHIJKLMNOPQRSTUVWXYZ"))
+(def  &UCASE     "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 ;---------------------------------------------------------------------------------------------------
 ; Arrays and Tables
 (defn ARRAY      [proto] (object-array 10))
@@ -234,7 +235,7 @@
         (do (comment "ns-ref: " ns-ref)
           (get (ns-publics ns-ref) (symbol (name N))))))
     (do (comment N)
-      (if-let [user-ref  (get (ns-map *ns*)                         (symbol (name N)))] user-ref
+      (if-let [user-ref  (get (ns-map *ns*)                                (symbol (name N)))] user-ref
         (if-let [sno-ref (get (ns-map (find-ns 'SNOBOL4clojure.core))      (symbol (name N)))] sno-ref
                          (get (ns-map (find-ns 'SNOBOL4clojure.core-test)) (symbol (name N))))))))
 (defn $$ [N] (if-let [V (reference N)] (var-get V) ε)); (var-get (eval (list 'var N)))
@@ -458,15 +459,12 @@ EXPRESSION               .     ;
 (defn MATCH!   [Σ Δ Π]   (cond (string? Π) (LIT$ Σ Δ Π)
                                (seq? Π) (let [[λ & π] Π, λ ($$ λ)] (apply λ Σ Δ π))))
 ;===================================================================================================
-(defn top  [Ψ]   (last Ψ)); using vector stack, make "first" if ever using list stack
-(defn push [Ψ ζ] (if Ψ (conj Ψ ζ))); ZETA, zipper
+(defn top  [Ψ]   (last Ψ))
+(defn push [Ψ ζ] (if Ψ (conj Ψ ζ))); ZETA
 (defn pull [Ψ]   (if Ψ (if-not (empty? Ψ) (pop Ψ)))); protected pop, top is top for list or vector
 (defn 🡡 [Ω]     (top Ω))
 (defn 🡥 [Ω ζ]   (push Ω ζ))
 (defn 🡧 [Ω]     (pull Ω))
-(defn 🡧🡡 [Ω]    (top (pull Ω)))
-(defn 🡧🡥 [Ω ζ]  (push (pull Ω) ζ))
-(defn 🡧🡧 [Ω]    (pull (pull Ω)))
 (comment Ω⭳ Ω⭱ Ω↥ Ω↧ Ω⭶ Ω⭸ Ω⭷ Ω⭹)
 ;---------------------------------------------------------------------------------------------------
 (defn ζΣ   [ζ]      (if ζ (ζ 0))); SIGMA, Subject, String Start, Sequence of characters
@@ -482,15 +480,19 @@ EXPRESSION               .     ;
                       (nil?        ζ) nil
                       (nil?    (ζΠ ζ)) nil
                       (string? (ζΠ ζ)) 'LIT$
+                      (symbol? (ζΠ ζ)) (ζΠ ζ)
                       (list?   (ζΠ ζ)) (first (ζΠ ζ))
                       (seq?    (ζΠ ζ)) (first (ζΠ ζ))
                       true     (out ["lamda? " (type (ζΠ ζ)) (ζΠ ζ)])))
 ;---------------------------------------------------------------------------------------------------
-(defn ζ↓   [ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ (nth Π φ)   1           (🡥 Ψ ζ)])); call down
+(defn ζ↓  ([ζ Π]    (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ Σ Δ Π           1           Ψ])); call over
+          ([ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ (nth Π φ)   1           (🡥 Ψ ζ)])); call down
+)
 (defn ζ↑  ([ζ σ δ]  (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ))  (🡧 Ψ)])); return up scan
-          ([ζ]      (let [[Σ Δ σ δ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ))  (🡧 Ψ)]))); retun up result
+          ([ζ]      (let [[Σ Δ σ δ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ))  (🡧 Ψ)])); retun up result
+)
 (defn ζ→   [ζ]      (let [[_ _ σ δ Π φ Ψ] ζ] [σ δ σ δ Π           (inc φ)     Ψ])); proceed right
-(defn ζ←   [ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ Π           (inc φ) 			 Ψ])); receed left
+(defn ζ←   [ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ Π           (inc φ)     Ψ])); receed left
 ;---------------------------------------------------------------------------------------------------
 (defn preview
   ([action X φ] (preview action X 0 0 φ))
@@ -504,7 +506,7 @@ EXPRESSION               .     ;
         (integer? X) (str X)
          (symbol? X) (str X)
           (float? X) (str X)
-        (>= depth 3) "?"
+        (>= depth 3) "_"
          (vector? X) (str "[" (reduce str (map #(preview action %1 %2 (inc depth) 0) X (range))) "]")
            (list? X) (str "("
                        (reduce str
@@ -527,10 +529,13 @@ EXPRESSION               .     ;
             true (str " Yikes!!! " (type X))
       ))))
 ;---------------------------------------------------------------------------------------------------
-(defn animate [action λ Σ ζ]
+(defn animate [action λ Σ ζ Ω]
   (if (and Σ ζ)
     (println
-      (format "%16s %3d %16s %-9s %s"
+      (format "%2s %2s %-8s %16s %3d %16s %-9s %s"
+        (count (ζΨ ζ))
+        (count Ω)
+        (str (ζλ ζ) "/" (ζφ ζ))
         (str "\"" (apply str (take (ζΔ ζ) Σ)) "\"")
         (ζΔ ζ)
         (str "\"" (apply str (reverse (ζΣ ζ))) "\"")
@@ -545,41 +550,45 @@ EXPRESSION               .     ;
 (defn MATCH [Σ Δ Π]
   (loop [action :proceed, ζ [Σ Δ ε ε Π 1 []], Ω []]
     (let [λ (ζλ ζ)]
-      (mtrace action λ ζ Ω)
-      (comment animate action λ Σ ζ)
+      (comment mtrace action λ ζ Ω)
+      (animate action λ Σ ζ Ω)
       (case λ
         nil  (do (println)
                  (case action (:proceed :succeed) true (:recede :fail) false))
         ALT      (case action ;---------------------------------------------------------------------
                    :proceed
-                     (if (ζω ζ)    (recur :recede  (🡡 Ω) (🡧 Ω))						; no more alternatives, also, :fail (ζ↑ ζ) (🡧 Ω)
-                                   (recur :proceed (ζ↓ ζ) Ω))								; try alternate
-                   :recede         (recur :proceed (ζ← ζ) Ω)         ; try next alternate, keep left
-                   :succeed        (recur :succeed (ζ↑ ζ) (🡥 Ω ζ))			; generator suspend (return) match
-                   :fail           (recur :proceed (ζ← ζ) Ω))    			 ; generator reentry, try next
+                   (if (not (ζω ζ)) (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))   ; try an alternate
+                                    (recur :recede  (🡡 Ω) (🡧 Ω)))    ; no more alternatives
+                   :recede          (recur :proceed (ζ← ζ) Ω)         ; try next alternate, keep left
+                   :succeed         (recur :succeed (ζ↑ ζ) Ω)         ; generator suspend (return) match
+                   :fail            (recur :proceed (ζ← ζ) Ω))        ; generator reentry, try next
         SEQ      (case action ;---------------------------------------------------------------------
                    :proceed
-                     (if (ζω ζ)    (recur :succeed (ζ↑ ζ) Ω)         ; no more subsequents, succeed
-                                   (recur :proceed (ζ↓ ζ) Ω))        ; try subsequent
-                   :succeed        (recur :proceed (ζ→ ζ) Ω)         ; try next subsequent, go right
-                   :fail           (recur :recede  (🡡 Ω) (🡧 Ω)))    ; generator reentry, backtrack
-        LIT$      (case action ;--------------------------------------------------------------------
+                   (if (not (ζω ζ)) (recur :proceed (ζ↓ ζ) Ω)         ; try a subsequent
+                                    (recur :succeed (ζ↑ ζ) Ω))        ; no more subsequents, succeed
+                   :succeed         (recur :proceed (ζ→ ζ) Ω)         ; try next subsequent, go right
+                   :fail            (recur :recede  (🡡 Ω) (🡧 Ω)))    ; generator reentry, backtrack
+        LIT$     (case action ;---------------------------------------------------------------------
                    :proceed
-                   (let [[Σ Δ _ _ Π] ζ
-                             [σ δ] (LIT$ Σ Δ Π)]                     ; scan literal
-                     (if (>= δ 0)  (recur :succeed (ζ↑ ζ σ δ) Ω)     ; return match
-                                   (recur :fail    (ζ↑ ζ Σ Δ) Ω))))  ; signal failure
+                   (let [[Σ Δ _ _ Π] ζ,
+                             [σ δ]  (LIT$ Σ Δ Π)]                     ; scan literal
+                     (if (>= δ 0)   (recur :succeed (ζ↑ ζ σ δ) Ω)     ; return match
+                                    (recur :fail    (ζ↑ ζ Σ Δ) Ω))))  ; signal failure
+      ; --------------------------------------------------------------------------------------------
+        SUCCEED! (let [[Σ Δ] ζ]     (recur :succeed (ζ↑ ζ Σ Δ) Ω))    ; return epsilon match
+        FAIL!    (let [[Σ Δ] ζ]     (recur :fail    (ζ↑ ζ Σ Δ) Ω))    ; signal failure, backtrack
       ; --------------------------------------------------------------------------------------------
        (ANY$ NOTANY$ SPAN$ BREAK$ BREAKX$ POS# RPOS#)
                  (case action
                    :proceed
-                   (let [[Σ Δ _ _ Π] ζ
-                             [σ δ] (($$ λ) Σ Δ (second Π))]          ; scan with primitive pattern
-                     (if (>= δ 0)  (recur :succeed (ζ↑ ζ σ δ) Ω)     ; return match
-                                   (recur :fail    (ζ↑ ζ Σ Δ) Ω))))  ; signal failure
+                   (let [[Σ Δ _ _ Π] ζ,
+                             [σ δ]  (($$ λ) Σ Δ (second Π))]          ; scan with primitive pattern
+                     (if (>= δ 0)   (recur :succeed (ζ↑ ζ σ δ) Ω)     ; return match
+                                    (recur :fail    (ζ↑ ζ Σ Δ) Ω))))  ; signal failure
       ; --------------------------------------------------------------------------------------------
-        FAIL!                      (recur :recede  (🡡 Ω) (🡧 Ω))     ; signal failure, backtrack
-        SUCCEED! (let [[Σ Δ] ζ]    (recur :succeed (ζ↑ ζ Σ Δ) Ω))    ; return epsilon match
+        X        (case action
+                   :proceed
+                   (let [Π ($$ 'X)] (recur :proceed (ζ↓ ζ Π) Ω)))
       ; --------------------------------------------------------------------------------------------
         ARB!     nil
         BAL!     nil
@@ -638,6 +647,7 @@ EXPRESSION               .     ;
                  (let [[n & params] spec, f (symbol n)]
                    (eval (trace (list 'defn f ['& 'args] ε))) ε)))
     REPLACE  (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))
+    quote    ($$ (second op))
     Roman    ε;(apply Roman args)
 ))
 ;---------------------------------------------------------------------------------------------------
@@ -652,6 +662,7 @@ EXPRESSION               .     ;
        (string? E) E
       (integer? E) E
        (symbol? E) ($$ E)
+       (vector? E) (apply list 'SEQ (map EVAL! E))
          (list? E) (let [[op & parms] E]
                      (cond
                        (equal op '.)  (let [[P N]   parms] (INVOKE '. (EVAL! P) N))
@@ -659,9 +670,9 @@ EXPRESSION               .     ;
                        (equal op '=)  (let [[N R]   parms] (INVOKE '= N (EVAL! R)))
                        (equal op '?=) (let [[N P R] parms] (INVOKE '?= N (EVAL! P) R))
                        (equal op '&)  (let [[N]     parms] @($$ (symbol (str "&" N))))
+                       (equal op 'quote) (first parms)
                        true (let [args (apply vector (map EVAL! parms))]
                               (apply INVOKE op args))))
-       (vector? E) (apply list 'SEQ E)
               true "Yikes! What is E?")))
 ;---------------------------------------------------------------------------------------------------
 (defmacro comment? [command] (list 're-find #"^\*" command))
@@ -732,7 +743,23 @@ EXPRESSION               .     ;
                                                        (recur (saddr (inc (current 0)))))))))))))
 ;---------------------------------------------------------------------------------------------------
 (defn -main "SNOBOL4/Clojure." [& args]
-  (let [BED '(SEQ (POS# 0) (ALT "B" "R") (ALT "E" "EA") (ALT "D" "DS") (RPOS# 0))]
-    (out BED)
-    (? "READS" BED)))
-;---------------------------------------------------------------------------------------------------
+; --------------------------------------------------------------------------------------------------
+  (def BED (EVAL '[(POS 0) (| "B" "R") (| "E" "EA") (| "D" "DS") (RPOS 0)]))
+  (pp/pprint BED)
+  (? "READS" BED)
+; --------------------------------------------------------------------------------------------------
+  (def V (EVAL '(ANY &LCASE)))
+  (def I (EVAL '(SPAN &DIGITS)))
+  (def E (EVAL '(| V I ["(" 'X ")"])))
+  (def X (EVAL '(| [E "+" 'X]
+                   [E "-" 'X]
+                   [E "*" 'X]
+                   [E "/" 'X]
+                   ["+" 'X]
+                   ["-" 'X]
+                   E)))
+  (def C (EVAL '[(POS 0) 'X (RPOS 0)]))
+  (pp/pprint C)
+  (? "x+y*z" C)
+; --------------------------------------------------------------------------------------------------
+)
