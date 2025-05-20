@@ -20,7 +20,7 @@
 (defn divide     [x y] (clojure.core// x y))
 (defn equal      [x y] (clojure.core/= x y))
 (defn not-equal  [x y] (clojure.core/not= x y))
-(defn out       [item] (binding [pp/*print-right-margin* 120, pp/*print-miser-width* 100] (pp/pprint item)) item)
+(defn out       [item] (binding [pp/*print-right-margin* 2048, pp/*print-miser-width* 2000] (pp/pprint item)) item)
 ;---------------------------------------------------------------------------------------------------
 (declare RUN)
 (declare EVAL!)
@@ -459,8 +459,8 @@ EXPRESSION               .     ;
                                (seq? Π) (let [[λ & π] Π, λ ($$ λ)] (apply λ Σ Δ π))))
 ;===================================================================================================
 (defn top  [Ψ]   (last Ψ)); using vector stack, make "first" if ever using list stack
-(defn pull [Ψ]   (if Ψ (if-not (empty? Ψ) (pop Ψ)))); protected pop, top is top for list or vector
 (defn push [Ψ ζ] (if Ψ (conj Ψ ζ))); ZETA, zipper
+(defn pull [Ψ]   (if Ψ (if-not (empty? Ψ) (pop Ψ)))); protected pop, top is top for list or vector
 (defn 🡡 [Ω]     (top Ω))
 (defn 🡥 [Ω ζ]   (push Ω ζ))
 (defn 🡧 [Ω]     (pull Ω))
@@ -476,7 +476,7 @@ EXPRESSION               .     ;
 (defn ζΠ   [ζ]      (if ζ (ζ 4))); PI, Pattern Internal
 (defn ζφ   [ζ]      (if ζ (ζ 5))); phi, part internal, pattern-piece iteration
 (defn ζΨ   [ζ]      (if ζ (ζ 6))); psi, parent stack internal
-(defn ζα   [ζ]      (<= (ζφ ζ) 0)); alpha, is the beginning?
+(defn ζα   [ζ]      (<= (ζφ ζ) 1)); alpha, is the beginning?
 (defn ζω   [ζ]      (>= (ζφ ζ) (count (ζΠ ζ)))); omega, is the end?
 (defn ζλ   [ζ]      (cond; lamda, operation, function
                       (nil?        ζ) nil
@@ -485,11 +485,12 @@ EXPRESSION               .     ;
                       (list?   (ζΠ ζ)) (first (ζΠ ζ))
                       (seq?    (ζΠ ζ)) (first (ζΠ ζ))
                       true     (out ["lamda? " (type (ζΠ ζ)) (ζΠ ζ)])))
-(defn ζ↓   [ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ (nth Π φ) 1 (🡥 Ψ ζ)])); call down
-(defn ζ↑  ([ζ σ δ]  (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ)) (🡧 Ψ)])); return up scan
-          ([ζ]      (let [[Σ Δ σ δ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ)) (🡧 Ψ)]))); retun up result
-(defn ζ→   [ζ]      (let [[_ _ σ δ Π φ Ψ] ζ] [σ δ σ δ Π (inc φ) Ψ])); proceed right
-(defn ζ←   [ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ Π (inc φ) Ψ])); receed left
+;---------------------------------------------------------------------------------------------------
+(defn ζ↓   [ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ (nth Π φ)   1           (🡥 Ψ ζ)])); call down
+(defn ζ↑  ([ζ σ δ]  (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ))  (🡧 Ψ)])); return up scan
+          ([ζ]      (let [[Σ Δ σ δ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ))  (🡧 Ψ)]))); retun up result
+(defn ζ→   [ζ]      (let [[_ _ σ δ Π φ Ψ] ζ] [σ δ σ δ Π           (inc φ)     Ψ])); proceed right
+(defn ζ←   [ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ Π           (inc φ) 			 Ψ])); receed left
 ;---------------------------------------------------------------------------------------------------
 (defn preview
   ([action X φ] (preview action X 0 0 φ))
@@ -536,37 +537,39 @@ EXPRESSION               .     ;
         (str " " action)
         (preview action (ζΠ ζ) (ζφ ζ))
       ))))
+;---------------------------------------------------------------------------------------------------
 (defn mtrace  [action λ ζ Ω]
   (println (format "%-8s %2s %2s %-5s %2s %-10s %2s %-10s %s %s"
-    action (count (ζΨ ζ)) (count Ω) λ (ζΔ ζ) (apply str (ζΣ ζ)) (ζδ ζ) (apply str (ζσ ζ)) (ζφ ζ) (preview (ζΠ ζ)))))
+    action (count (ζΨ ζ)) (count Ω) λ (ζΔ ζ) (apply str (ζΣ ζ)) (ζδ ζ) (apply str (ζσ ζ)) (ζφ ζ) (preview action (ζΠ ζ) (ζφ ζ)))))
 ;---------------------------------------------------------------------------------------------------
 (defn MATCH [Σ Δ Π]
-  (loop [action :proceed, ζ [Σ Δ ε ε Π 1 []] Ω []]
+  (loop [action :proceed, ζ [Σ Δ ε ε Π 1 []], Ω []]
     (let [λ (ζλ ζ)]
-      (animate action λ Σ ζ)
+      (mtrace action λ ζ Ω)
+      (comment animate action λ Σ ζ)
       (case λ
         nil  (do (println)
                  (case action (:proceed :succeed) true (:recede :fail) false))
         ALT      (case action ;---------------------------------------------------------------------
                    :proceed
-                     (if (ζω ζ)    (recur :recede  (🡧🡡 Ω) (🡧🡧 Ω))   ; no more alternatives, also, :fail (ζ↑ ζ) (🡧 Ω)
-                                   (recur :proceed (ζ↓ ζ) (🡥 Ω ζ)))  ; try alternate
+                     (if (ζω ζ)    (recur :recede  (🡡 Ω) (🡧 Ω))						; no more alternatives, also, :fail (ζ↑ ζ) (🡧 Ω)
+                                   (recur :proceed (ζ↓ ζ) Ω))								; try alternate
                    :recede         (recur :proceed (ζ← ζ) Ω)         ; try next alternate, keep left
-                   :succeed        (recur :succeed (ζ↑ ζ) (🡧🡥 Ω ζ)) ; generator suspend (return) match
-                   :fail           (recur :recede  (🡡 Ω) (🡧 Ω)))    ; generator reentry, try next
+                   :succeed        (recur :succeed (ζ↑ ζ) (🡥 Ω ζ))			; generator suspend (return) match
+                   :fail           (recur :proceed (ζ← ζ) Ω))    			 ; generator reentry, try next
         SEQ      (case action ;---------------------------------------------------------------------
                    :proceed
                      (if (ζω ζ)    (recur :succeed (ζ↑ ζ) Ω)         ; no more subsequents, succeed
                                    (recur :proceed (ζ↓ ζ) Ω))        ; try subsequent
                    :succeed        (recur :proceed (ζ→ ζ) Ω)         ; try next subsequent, go right
                    :fail           (recur :recede  (🡡 Ω) (🡧 Ω)))    ; generator reentry, backtrack
-        LIT$      (case action ;---------------------------------------------------------------------
+        LIT$      (case action ;--------------------------------------------------------------------
                    :proceed
                    (let [[Σ Δ _ _ Π] ζ
                              [σ δ] (LIT$ Σ Δ Π)]                     ; scan literal
                      (if (>= δ 0)  (recur :succeed (ζ↑ ζ σ δ) Ω)     ; return match
                                    (recur :fail    (ζ↑ ζ Σ Δ) Ω))))  ; signal failure
-       ;--------------------------------------------------------------------------------------------
+      ; --------------------------------------------------------------------------------------------
        (ANY$ NOTANY$ SPAN$ BREAK$ BREAKX$ POS# RPOS#)
                  (case action
                    :proceed
@@ -577,6 +580,7 @@ EXPRESSION               .     ;
       ; --------------------------------------------------------------------------------------------
         FAIL!                      (recur :recede  (🡡 Ω) (🡧 Ω))     ; signal failure, backtrack
         SUCCEED! (let [[Σ Δ] ζ]    (recur :succeed (ζ↑ ζ Σ Δ) Ω))    ; return epsilon match
+      ; --------------------------------------------------------------------------------------------
         ARB!     nil
         BAL!     nil
         ARBNO!   nil
@@ -728,7 +732,7 @@ EXPRESSION               .     ;
                                                        (recur (saddr (inc (current 0)))))))))))))
 ;---------------------------------------------------------------------------------------------------
 (defn -main "SNOBOL4/Clojure." [& args]
-		(let [BED [(POS 0) (| "B" "F" "L" "R") (| "E" "EA") (| "D" "DS") (RPOS 0)]]
-		    (? "BEADS" BED))
-)
+  (let [BED '(SEQ (POS# 0) (ALT "B" "R") (ALT "E" "EA") (ALT "D" "DS") (RPOS# 0))]
+    (out BED)
+    (? "READS" BED)))
 ;---------------------------------------------------------------------------------------------------
