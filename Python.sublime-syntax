@@ -147,11 +147,12 @@ variables:
 
   snobol4_functions: |-
     (?x:
-      ε | σ | Σ | Π | π | ξ | Ω | Δ | δ | Λ | λ | θ | Ξ | ς
-    | ABORT | ANY | ARB | ARBNO | BAL | BREAK | DIFFER | FAIL
-    | FENCE | IDENT | INTEGER | LEN | NOTANY | POS | REM | RPOS
-    | RTAB | SPAN | SUCCESS | TAB
-    | S | F
+      Α | Β | Γ | Δ | Ε | Ζ | Η | Θ | Ι | Κ | Λ | Μ | Ν | Ξ | Ο | Π | Ρ | Σ     | Τ | Υ | Φ | Χ | Ψ | Ω
+    | α | β | γ | δ | ε | ζ | η | θ | ι | κ | λ | μ | ν | ξ | ο | π | ρ | σ | ς | τ | υ | φ | χ | ψ | ω
+    | Ϙ | ϙ | Ϣ | ϣ | Ϩ
+    | ABORT | ANY | ARB | ARBNO | BAL | BREAK | BREAKX | FAIL
+    | FENCE | LEN | MARB | MARBNO | NOTANY | POS | REM | RPOS
+    | RTAB | SPAN | SUCCEED | TAB
     )\b
 
   builtin_functions: |-
@@ -2457,7 +2458,7 @@ contexts:
       push: illegal-assignment
 
   nones:
-    - match: (None|_digits|_ALPHABET|_LCASE|_UCASE|_NULL|_RETURN|_FRETURN|_NRETURN|_END)\b
+    - match: (None|DIGITS|ALPHABET|LCASE|UCASE|NULL|RETURN|FRETURN|NRETURN|END)\b
       scope: constant.language.python
       push: illegal-assignment
 
