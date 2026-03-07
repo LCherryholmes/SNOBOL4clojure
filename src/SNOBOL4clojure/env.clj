@@ -74,11 +74,17 @@
                           (find-ns (symbol ns-name)))]
       (get (ns-publics ns-ref) (symbol (name N))))
     (let [sym (symbol (name N))]
+      ;; Search in priority order: current ns, core, primitives, operators,
+      ;; then all loaded SNOBOL4clojure namespaces (covers test namespaces etc.)
       (or (get (ns-map *ns*) sym)
-          (when-let [ns (find-ns 'SNOBOL4clojure.core)]      (get (ns-map ns) sym))
-          (when-let [ns (find-ns 'SNOBOL4clojure.primitives)] (get (ns-publics ns) sym))
-          (when-let [ns (find-ns 'SNOBOL4clojure.operators)]  (get (ns-publics ns) sym))
-          (when-let [ns (find-ns 'SNOBOL4clojure.core-test)]  (get (ns-map ns) sym))))))
+          (when-let [ns (find-ns 'SNOBOL4clojure.core)]       (get (ns-map ns) sym))
+          (when-let [ns (find-ns 'SNOBOL4clojure.primitives)]  (get (ns-publics ns) sym))
+          (when-let [ns (find-ns 'SNOBOL4clojure.operators)]   (get (ns-publics ns) sym))
+          ;; Fall through: search all loaded SNOBOL4clojure namespaces
+          (some (fn [ns]
+                  (when (clojure.string/starts-with? (str (ns-name ns)) "SNOBOL4clojure")
+                    (get (ns-map ns) sym)))
+                (all-ns))))))
 
 (defn $$ [N] (if-let [V (reference N)] (var-get V) ε))
 
