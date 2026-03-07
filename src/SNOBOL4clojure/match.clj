@@ -224,8 +224,43 @@
           ;; Backtracked into FENCE — refuse to retry child; fail upward
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
+        ;; ── ARB! ─────────────────────────────────────────────────────────────
+        ;; ARB — matches any string, shortest first (0 chars, then 1, 2, …).
+        ;; Uses φ as the "next retry length".
+        ;; :proceed  — match 0 chars; push self onto Ω with φ=1
+        ;; :recede   — consume φ chars if enough subject remains; push φ+1 frame
+        ARB!
+        (case action
+          :proceed
+          (recur :succeed (ζ↑ ζ (ζΣ ζ) (ζΔ ζ)) (🡥 Ω (assoc ζ 5 1)))
+          :recede
+          (let [len (ζφ ζ)
+                remaining (count (ζΣ ζ))]
+            (if (<= len remaining)
+              (recur :succeed
+                     (ζ↑ ζ (drop len (ζΣ ζ)) (clojure.core/+ (ζΔ ζ) len))
+                     (🡥 Ω (assoc ζ 5 (inc len))))
+              (recur :recede (🡡 Ω) (🡧 Ω)))))
+
+        ;; ── ARBNO! ───────────────────────────────────────────────────────────
+        ;; ARBNO(P) — zero or more repetitions of P, shortest first.
+        ;; Expands lazily to ALT[ε, SEQ[P, ARBNO(P)]] on each :proceed.
+        ;; The recursive ARBNO(P) in the SEQ ensures the engine re-expands
+        ;; on every attempted repetition, giving correct backtracking.
+        ARBNO!
+        (case action
+          :proceed
+          (let [[Σ Δ _ _ _ _ Ψ] ζ
+                P               (second (ζΠ ζ))
+                expanded        (list 'ALT "" (list 'SEQ P (ζΠ ζ)))]
+            (recur :proceed [Σ Δ Σ Δ expanded 1 (🡥 Ψ ζ)] Ω))
+          :succeed
+          (recur :succeed (ζ↑ ζ) Ω)
+          (:recede :fail)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
         ;; Not yet implemented
-        (ARB! BAL! ARBNO! ABORT!) nil))))
+        (BAL! ABORT!) nil))))
 
 ;; ── Public API ────────────────────────────────────────────────────────────────
 
