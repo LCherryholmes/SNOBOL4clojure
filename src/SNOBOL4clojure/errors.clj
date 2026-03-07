@@ -1,3 +1,6 @@
+(ns SNOBOL4clojure.errors)
+
+(def error-messages
 {
 1 "Addition left operand is not numeric"
 2 "Addition right operand is not numeric"
@@ -307,4 +310,4 @@
 327 "Calling external function – not found"
 328 "LOAD function – insufficient memory"
 329 "Requested MAXLNGTH too large"
-}
+})
