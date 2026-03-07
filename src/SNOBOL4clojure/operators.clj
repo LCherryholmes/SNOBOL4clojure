@@ -129,17 +129,35 @@
     FENCE   (first args)
     EQ      (EQ     (first args) (second args))
     NE      (NE     (first args) (second args))
+    LE      (LE     (first args) (second args))
+    LT      (LT     (first args) (second args))
+    GE      (GE     (first args) (second args))
+    GT      (GT     (first args) (second args))
     FAIL    FAIL
+    ;; Arithmetic — coerce to SNOBOL numeric type (integer if both integer, else real)
+    +       (let [ns (map num args)]
+              (if (every? #(== (Math/floor %) %) ns)
+                (long (apply clojure.core/+' ns))
+                (apply clojure.core/+ ns)))
+    -       (let [ns (map num args)]
+              (if (every? #(== (Math/floor %) %) ns)
+                (long (apply clojure.core/-' ns))
+                (apply clojure.core/- ns)))
+    *       (let [ns (map num args)]
+              (if (every? #(== (Math/floor %) %) ns)
+                (long (apply clojure.core/*' ns))
+                (apply clojure.core/* ns)))
+    /       (let [ns (map num args)
+                  result (apply clojure.core// ns)]
+              (if (== (Math/floor result) result)
+                (long result)
+                result))
     ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args
-                  io? (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
-                  ;; Eagerly evaluate arithmetic IR lists.
-                  ;; Pattern vectors are passed through as-is.
-                  val  (if (list? r)
-                         (try (eval r)
-                              (catch Exception _ r))
-                         r)]
-              (when-not io?
+                  ;; r is already evaluated by EVAL! — it's a value, not IR.
+                  ;; Convert numeric strings to numbers for consistency.
+                  val  r]
+              (when-not (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
                 (snobol-set! N val))
               ;; Special I/O variables — println on assignment
               (when (clojure.core/= N 'OUTPUT)   (println val))
@@ -152,25 +170,26 @@
                   fname   (first spec)
                   params  (subvec spec 1)
                   f-sym   (symbol fname)
+                  ;; Store fn under a private key so result slot doesn't clobber it
+                  fn-key  (symbol (str fname "__fn__"))
                   entry   (keyword fname)]
-              ;; Create a Clojure function that binds params, runs from the
-              ;; function's entry label, and returns the function-name variable.
-              (eval
-                `(defn ~f-sym [~'& ~'call-args]
-                   ;; Bind each parameter to its argument
-                   ~@(map-indexed
-                       (fn [i p]
-                         `(SNOBOL4clojure.env/snobol-set! '~(symbol p)
-                                                          (nth ~'call-args ~i ~ε)))
-                       params)
-                   ;; Clear the result variable (function name holds result)
-                   (SNOBOL4clojure.env/snobol-set! '~f-sym ~ε)
-                   ;; Run from entry label
-                   (when-let [run-fn# (ns-resolve 'SNOBOL4clojure.runtime '~'RUN)]
-                     (run-fn# ~entry))
-                   ;; Return value of function-name variable
-                   (SNOBOL4clojure.env/$$ '~f-sym)))
-              ε)
+              (letfn [(the-fn [& call-args]
+                        ;; Bind each parameter to its argument value
+                        (doseq [i (range (count params))]
+                          (snobol-set! (symbol (params i))
+                                       (nth call-args i ε)))
+                        ;; Clear the result slot (function name var holds return value)
+                        (snobol-set! f-sym ε)
+                        ;; Run from entry label
+                        (when-let [run-fn (ns-resolve 'SNOBOL4clojure.runtime 'RUN)]
+                          ((var-get run-fn) entry))
+                        ;; Return value of function-name variable
+                        (let [result ($$ f-sym)]
+                          ;; Restore fn reference so future calls work
+                          (snobol-set! f-sym the-fn)
+                          result))]
+                (snobol-set! f-sym the-fn)
+                ε))
     REPLACE (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))
     quote   ($$ (second op))
             (let [f ($$ op)]
@@ -195,7 +214,11 @@
           (equal op '=)     (let [[N R]   parms] (INVOKE '= N (EVAL! R)))
           (equal op '?=)    (let [[N P R] parms] (INVOKE '?= N (EVAL! P) R))
           (equal op '&)     (let [[N]     parms
-                                  v       ($$ (symbol (str "&" N)))]
+                                  kw-sym  (symbol (str "&" N))
+                                  ;; &-keywords are defs in env.clj; fall back to user ns
+                                  v       (or (when-let [vr (ns-resolve (find-ns 'SNOBOL4clojure.env) kw-sym)]
+                                                (var-get vr))
+                                              ($$ kw-sym))]
                               (if (instance? clojure.lang.IDeref v) @v v))
           (equal op 'quote) (first parms)
           true (let [args (apply vector (map EVAL! parms))]

@@ -56,7 +56,8 @@
   (is (Double/isNaN (num "abc"))))
 
 ;; ── $$ lookup ────────────────────────────────────────────────────────────────
-;; def must be at top level so $$ can find it via ns-map
+;; Point SNOBOL runtime at this namespace so $$ can find test vars.
+(GLOBALS *ns*)
 (def test-$$-sentinel "hello")
 (deftest test-$$
   (is (= "hello" ($$ 'test-$$-sentinel)))

@@ -167,7 +167,12 @@
         (case action
           :proceed
           (let [[Σ Δ _ _ Π] ζ
-                [σ δ]        (($$ λ) Σ Δ (second Π))]
+                prim-fn {'ANY$    ANY$    'NOTANY$ NOTANY$
+                         'SPAN$   SPAN$   'BREAK$  BREAK$
+                         'BREAKX$ BREAKX$ 'POS#    POS#
+                         'RPOS#   RPOS#   'LEN#    LEN#
+                         'TAB#    TAB#    'RTAB#   RTAB#}
+                [σ δ]        ((prim-fn λ) Σ Δ (second Π))]
             (if (>= δ 0)
               (recur :succeed (ζ↑ ζ σ δ) Ω)
               (recur :fail    (ζ↑ ζ Σ Δ) Ω))))
