@@ -1,31 +1,47 @@
 (ns SNOBOL4clojure.match
-  ;; The SNOBOL4 pattern match engine.
-  ;; An explicit iterative state machine over a 7-element frame vector:
-  ;;   [Σ Δ σ δ Π φ Ψ]
-  ;;   Σ/Δ — subject start + position on entry to this frame
-  ;;   σ/δ — subject + position as updated by scanning
-  ;;   Π   — current pattern node
-  ;;   φ   — index into Π (for ALT/SEQ child iteration)
-  ;;   Ψ   — parent frame stack
-  ;; Actions: :proceed :succeed :recede :fail
+  "The SNOBOL4 pattern match engine.
+
+  An explicit iterative state machine over a 7-element frame vector:
+    [Σ Δ σ δ Π φ Ψ]
+    Σ/Δ — subject chars + position on entry to this frame
+    σ/δ — subject chars + position as updated by scanning
+    Π   — current pattern node
+    φ   — index into Π (for ALT/SEQ child iteration)
+    Ψ   — parent frame stack
+  Actions: :proceed :succeed :recede :fail
+
+  Public API (three entry points, matching the Python/C# siblings):
+
+    SEARCH    s pat  — slide pattern across subject; return [start end] or nil
+    MATCH     s pat  — anchor at position 0;         return [start end] or nil
+    FULLMATCH s pat  — anchor at both ends;           return [start end] or nil
+
+  [start end] is a half-open span: (subs s start end) extracts the match.
+  nil means the pattern did not match.
+
+  Tracing: bind *trace* to true to enable per-step animation output."
   (:require [SNOBOL4clojure.env        :refer [ε equal out $$]]
             [SNOBOL4clojure.primitives :refer
              [LIT$ ANY$ NOTANY$ SPAN$ BREAK$ BREAKX$
               POS# RPOS# LEN# TAB# RTAB#
-              SUCCEED! FAIL! ARB! BAL! ARBNO! ABORT! err]])
+              SUCCEED! FAIL! ARB! BAL! ARBNO! ABORT!]]
+            [SNOBOL4clojure.patterns   :refer [POS RPOS]])
   (:refer-clojure :exclude [= + - * / num]))
 
+;; ── Tracing (off by default) ──────────────────────────────────────────────────
+(def ^:dynamic *trace* false)
+
 ;; ── Frame accessors ───────────────────────────────────────────────────────────
-(defn ζΣ [ζ] (if ζ (ζ 0)))  ; subject start (seq of chars)
+(defn ζΣ [ζ] (if ζ (ζ 0)))  ; subject chars on entry to this frame
 (defn ζΔ [ζ] (if ζ (ζ 1)))  ; position on entry
-(defn ζσ [ζ] (if ζ (ζ 2)))  ; subject (current, seq of chars)
+(defn ζσ [ζ] (if ζ (ζ 2)))  ; subject chars (current)
 (defn ζδ [ζ] (if ζ (ζ 3)))  ; current position
 (defn ζΠ [ζ] (if ζ (ζ 4)))  ; pattern node
 (defn ζφ [ζ] (if ζ (ζ 5)))  ; child index (1-based)
 (defn ζΨ [ζ] (if ζ (ζ 6)))  ; parent stack
 
-(defn ζα [ζ] (<= (ζφ ζ) 1))
-(defn ζω [ζ] (>= (ζφ ζ) (count (ζΠ ζ))))
+(defn- ζα [ζ] (<= (ζφ ζ) 1))
+(defn- ζω [ζ] (>= (ζφ ζ) (count (ζΠ ζ))))
 
 (defn ζλ [ζ]   ; current operation symbol
   (cond
@@ -35,29 +51,29 @@
     (symbol? (ζΠ ζ)) (ζΠ ζ)
     (list?   (ζΠ ζ)) (first (ζΠ ζ))
     (seq?    (ζΠ ζ)) (first (ζΠ ζ))
-    true     (out ["lamda? " (type (ζΠ ζ)) (ζΠ ζ)])))
+    true     (out ["ζλ? " (type (ζΠ ζ)) (ζΠ ζ)])))
 
 ;; ── Stack helpers ─────────────────────────────────────────────────────────────
-(defn top  [Ψ]   (last Ψ))
-(defn push [Ψ ζ] (if Ψ (conj Ψ ζ)))
-(defn pull [Ψ]   (if Ψ (if-not (empty? Ψ) (pop Ψ))))
-(defn 🡡 [Ω]     (top Ω))
-(defn 🡥 [Ω ζ]   (push Ω ζ))
-(defn 🡧 [Ω]     (pull Ω))
+(defn- top  [Ψ]   (last Ψ))
+(defn- push [Ψ ζ] (if Ψ (conj Ψ ζ)))
+(defn- pull [Ψ]   (if Ψ (if-not (empty? Ψ) (pop Ψ))))
+(defn- 🡡 [Ω]     (top Ω))
+(defn- 🡥 [Ω ζ]   (push Ω ζ))
+(defn- 🡧 [Ω]     (pull Ω))
 
 ;; ── Frame transitions ─────────────────────────────────────────────────────────
-(defn ζ↓
-  ([ζ Π]  (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ Σ Δ Π         1       Ψ]))   ; call over
-  ([ζ]    (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ (nth Π φ) 1       (🡥 Ψ ζ)]))) ; call down
+(defn- ζ↓
+  ([ζ Π]  (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ Σ Δ Π         1       Ψ]))
+  ([ζ]    (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ (nth Π φ) 1       (🡥 Ψ ζ)])))
 
-(defn ζ↑
-  ([ζ σ δ] (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ)) (🡧 Ψ)])) ; return up scan
-  ([ζ]     (let [[Σ Δ σ δ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ)) (🡧 Ψ)]))) ; return up result
+(defn- ζ↑
+  ([ζ σ δ] (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ)) (🡧 Ψ)]))
+  ([ζ]     (let [[Σ Δ σ δ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ)) (🡧 Ψ)])))
 
-(defn ζ→ [ζ] (let [[_ _ σ δ Π φ Ψ] ζ] [σ δ σ δ Π (inc φ) Ψ]))  ; proceed right
-(defn ζ← [ζ] (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ Π (inc φ) Ψ])) ; recede left
+(defn- ζ→ [ζ] (let [[_ _ σ δ Π φ Ψ] ζ] [σ δ σ δ Π (inc φ) Ψ]))
+(defn- ζ← [ζ] (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ Π (inc φ) Ψ]))
 
-;; ── Trace / animate ───────────────────────────────────────────────────────────
+;; ── Trace helpers ─────────────────────────────────────────────────────────────
 (defn- preview
   ([action X φ] (preview action X 0 0 φ))
   ([action X pos depth φ]
@@ -77,56 +93,63 @@
                         (map #(cond
                                 (equal %2 0) (str %1 " ")
                                 (> φ 0)
-                                  (cond
-                                    (< %2 φ) "."
-                                    (> %2 (clojure.core/+ φ 2)) "?"
-                                    (>= %2 (clojure.core/+ φ 2)) " ?"
-                                    (and (equal %2 φ) (identical? action :succeed)) "."
-                                    true (preview action %1 (dec %2) (inc depth) 0))
+                                (cond
+                                  (< %2 φ)                            "."
+                                  (> %2 (clojure.core/+ φ 2))        "?"
+                                  (>= %2 (clojure.core/+ φ 2))       " ?"
+                                  (and (equal %2 φ)
+                                       (identical? action :succeed))  "."
+                                  true (preview action %1 (dec %2) (inc depth) 0))
                                 true (preview action %1 (dec %2) (inc depth) 0))
                           X (range)))
                       ")")
        (set? X)     (str "\"" (apply str X) "\"")
        true         (str " Yikes!!! " (type X))))))
 
-(defn- animate [action Σ ζ]
-  (when (and Σ ζ)
+(defn- animate [action full-subject ζ]
+  (when (and *trace* full-subject ζ)
     (println
       (format "%2s %-8s %16s %3d %16s %-9s %s"
         (count (ζΨ ζ))
         (str (ζλ ζ) "/" (ζφ ζ))
-        (str "\"" (apply str (take (ζΔ ζ) Σ)) "\"")
+        (str "\"" (apply str (take (ζΔ ζ) full-subject)) "\"")
         (ζΔ ζ)
         (str "\"" (apply str (reverse (ζΣ ζ))) "\"")
         (str " " action)
         (preview action (ζΠ ζ) (ζφ ζ))))))
 
-;; ── MATCH ─────────────────────────────────────────────────────────────────────
-(defn MATCH [Σ Δ Π]
+;; ── Core engine ───────────────────────────────────────────────────────────────
+;; Returns [start end] on success, nil on failure.
+;; Σ       — seq of chars (remaining subject at start position)
+;; Δ       — start position (integer)
+;; Π       — pattern node
+;; start-Δ — the anchor position for the returned span start
+(defn- engine [Σ Δ Π start-Δ full-subject]
   (loop [action :proceed, ζ [Σ Δ ε ε Π 1 []], Ω []]
     (let [λ (ζλ ζ)]
-      (animate action Σ ζ)
+      (animate action full-subject ζ)
       (case λ
         nil
-        (do (println)
-            (case action (:proceed :succeed) true (:recede :fail) false))
+        (case action
+          (:proceed :succeed) [start-Δ (ζδ ζ)]
+          (:recede :fail)     nil)
 
         ALT
         (case action
           :proceed (if (not (ζω ζ))
-                     (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))  ; try an alternate
-                     (recur :recede  (🡡 Ω) (🡧 Ω)))    ; no more alternatives
-          :recede  (recur :proceed (ζ← ζ) Ω)           ; try next alternate, keep left
-          :succeed (recur :succeed (ζ↑ ζ) Ω)           ; return match
-          :fail    (recur :proceed (ζ← ζ) Ω))          ; try next
+                     (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))
+                     (recur :recede  (🡡 Ω)  (🡧 Ω)))
+          :recede  (recur :proceed (ζ← ζ) Ω)
+          :succeed (recur :succeed (ζ↑ ζ) Ω)
+          :fail    (recur :proceed (ζ← ζ) Ω))
 
         SEQ
         (case action
           :proceed (if (not (ζω ζ))
-                     (recur :proceed (ζ↓ ζ) Ω)         ; try a subsequent
-                     (recur :succeed (ζ↑ ζ) Ω))        ; all subsequents matched
-          :succeed (recur :proceed (ζ→ ζ) Ω)           ; advance to next
-          :fail    (recur :recede  (🡡 Ω) (🡧 Ω)))      ; backtrack
+                     (recur :proceed (ζ↓ ζ) Ω)
+                     (recur :succeed (ζ↑ ζ) Ω))
+          :succeed (recur :proceed (ζ→ ζ) Ω)
+          :fail    (recur :recede  (🡡 Ω) (🡧 Ω)))
 
         LIT$
         (case action
@@ -154,8 +177,43 @@
           :proceed
           (let [Π ($$ 'X)] (recur :proceed (ζ↓ ζ Π) Ω)))
 
-        ;; Not yet implemented — return nil (caller treats as failure)
-        ARB!   nil
-        BAL!   nil
-        ARBNO! nil
-        ABORT! nil))))
+        ;; Not yet implemented
+        (ARB! BAL! ARBNO! ABORT!) nil))))
+
+;; ── Public API ────────────────────────────────────────────────────────────────
+
+(defn SEARCH
+  "Slide pattern P across string S, trying each start position 0..n.
+   Returns [start end] for the first match found, nil if none.
+   (subs S start end) extracts the matched substring."
+  [S P]
+  (let [chars (seq S)
+        n     (count S)]
+    (loop [i 0]
+      (when (<= i n)
+        (let [result (engine (drop i chars) i P i S)]
+          (if result
+            result
+            (recur (inc i))))))))
+
+(defn MATCH
+  "Match pattern P against string S anchored at position 0.
+   Returns [start end] on success, nil on failure.
+   Equivalent to SEARCH with POS(0) prepended."
+  [S P]
+  (engine (seq S) 0 (list 'SEQ (POS 0) P) 0 S))
+
+(defn FULLMATCH
+  "Match pattern P against the entirety of string S (anchored both ends).
+   Returns [0 (count S)] on success, nil on failure.
+   Equivalent to SEARCH with POS(0) prepended and RPOS(0) appended."
+  [S P]
+  (engine (seq S) 0 (list 'SEQ (POS 0) P (RPOS 0)) 0 S))
+
+(defn REPLACE
+  "Match pattern P against S; if matched, replace the matched span with R.
+   Returns the new string on success, nil on failure.
+   Example: (REPLACE \"hello world\" \"world\" \"Clojure\") => \"hello Clojure\""
+  [S P R]
+  (when-let [[start end] (SEARCH S P)]
+    (str (subs S 0 start) R (subs S end))))

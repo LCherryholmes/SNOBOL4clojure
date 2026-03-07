@@ -6,7 +6,7 @@
             [SNOBOL4clojure.env       :refer
              [ε η equal not-equal Σ+ subtract multiply divide
               ncvt scvt num $$ out reference]]
-            [SNOBOL4clojure.match     :refer [MATCH]]
+            [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH REPLACE]]
             [SNOBOL4clojure.patterns  :refer
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
               LEN POS RPOS RTAB TAB FAIL]]
@@ -54,11 +54,11 @@
 (eval (primitive 'DIFFER ε nil identity #(list 'not (list 'identical? %1 %2))))
 
 ;; ── SNOBOL4 operators ─────────────────────────────────────────────────────────
-(defn =     ([_x]       η)                      ; unary  — programmable
-            ([n x]      (list '= n x)))          ; binary — assignment
-(defn ?     ([x]        (annihilate x))          ; unary  — interrogation
-            ([s p]      (MATCH (seq s) 0 p))     ; binary — match
-            ([n s p]    (match-replace n s p)))  ; ternary — match+replace
+(defn =     ([_x]       η)                         ; unary  — programmable
+            ([n x]      (list '= n x)))             ; binary — assignment
+(defn ?     ([x]        (annihilate x))             ; unary  — interrogation
+            ([s p]      (SEARCH (str s) p))         ; binary — match, returns [start end] or nil
+            ([n s p]    (match-replace n s p)))     ; ternary — match+replace
 (defn ?=    ([n s p]    (match-replace n s p)))
 (defn &     ([_n]       nil)                     ; unary  — keyword
             ([_x _y]    η))                      ; binary — programmable
@@ -130,7 +130,7 @@
     EQ      (EQ     (first args) (second args))
     NE      (NE     (first args) (second args))
     FAIL    FAIL
-    ?       (let [[s p] args] (? (str s) p))
+    ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args]
               (if-not (list? r)
                 (eval (list 'def N r))
@@ -145,9 +145,7 @@
                   [n]     spec
                   f       (symbol n)]
               (eval (trace (list 'defn f ['& 'args] ε))) ε)
-    REPLACE (let [[s1 s2 s3] args]
-              (require '[SNOBOL4clojure.functions :refer [REPLACE]])
-              ((resolve 'SNOBOL4clojure.functions/REPLACE) s1 s2 s3))
+    REPLACE (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))
     quote   ($$ (second op))
             (let [f ($$ op)]
               (if (fn? f) (apply f args) ε))))

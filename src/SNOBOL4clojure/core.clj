@@ -75,7 +75,10 @@
 (def SUCCEED pat/SUCCEED)
 
 ;; ── Re-export match engine ────────────────────────────────────────────────────
-(def MATCH   match/MATCH)
+(def MATCH      match/MATCH)
+(def SEARCH     match/SEARCH)
+(def FULLMATCH  match/FULLMATCH)
+(def REPLACE    match/REPLACE)
 
 ;; ── Re-export operators / EVAL ────────────────────────────────────────────────
 (def =     ops/=)

@@ -1,83 +1,134 @@
 (ns SNOBOL4clojure.test-match
-  ;; Tests for the MATCH state machine in match.clj.
-  ;; Tests focus on the engine's structural mechanics: SEQ, ALT,
-  ;; anchoring, backtracking, and interaction with the frame stack.
+  ;; Tests for the MATCH engine public API: SEARCH, MATCH, FULLMATCH, REPLACE.
+  ;; These are the three entry points matching the Python/C# siblings.
+  ;; Tests also exercise the engine internals via structural patterns.
   (:require [clojure.test :refer :all]
-            [SNOBOL4clojure.match      :refer [MATCH]]
-            [SNOBOL4clojure.primitives :refer [charset]]
-            [SNOBOL4clojure.patterns   :refer [ANY SPAN POS RPOS LEN]]))
+            [SNOBOL4clojure.match    :refer [SEARCH MATCH FULLMATCH REPLACE]]
+            [SNOBOL4clojure.patterns :refer [ANY SPAN POS RPOS LEN]]))
 
-;; ── LIT$ dispatch ─────────────────────────────────────────────────────────────
+;; ── SEARCH — slides pattern across subject ────────────────────────────────────
+(deftest test-search-basic
+  (is      (SEARCH "hello world" "world"))
+  (is      (SEARCH "hello"       "hello"))
+  (is (not (SEARCH "hello"       "xyz")))
+  (is      (SEARCH "abcdef"      "cde")))  ; interior match
+
+(deftest test-search-returns-span
+  ;; SEARCH returns [start end] — a half-open span
+  (is (= [6 11] (SEARCH "hello world" "world")))
+  (is (= [0  5] (SEARCH "hello world" "hello")))
+  (is (= [2  5] (SEARCH "abcde"       "cde"))))
+
+(deftest test-search-empty-pattern
+  ;; Empty string matches at position 0
+  (is (= [0 0] (SEARCH "hello" ""))))
+
+;; ── MATCH — anchored at position 0 ───────────────────────────────────────────
+(deftest test-match-anchored
+  (is      (MATCH "hello world" "hello"))   ; prefix match
+  (is (not (MATCH "hello world" "world")))  ; not at position 0
+  (is      (MATCH "abc" "")))               ; empty always matches at 0
+
+(deftest test-match-returns-span
+  (is (= [0 5] (MATCH "hello world" "hello")))
+  (is (= [0 0] (MATCH "hello" ""))))
+
+;; ── FULLMATCH — anchored at both ends ────────────────────────────────────────
+(deftest test-fullmatch
+  (is      (FULLMATCH "hello" "hello"))
+  (is (not (FULLMATCH "hello world" "hello")))  ; trailing chars
+  (is (not (FULLMATCH "hello" "hell")))          ; trailing chars
+  (is      (FULLMATCH "" "")))
+
+(deftest test-fullmatch-returns-span
+  (is (= [0 5] (FULLMATCH "hello" "hello")))
+  (is (= [0 0] (FULLMATCH "" ""))))
+
+(deftest test-fullmatch-with-pattern
+  (let [digits (SPAN "0123456789")]
+    (is      (FULLMATCH "12345" digits))
+    (is (not (FULLMATCH "123ab" digits)))))
+
+;; ── REPLACE — match and substitute ───────────────────────────────────────────
+(deftest test-replace-basic
+  (is (= "hello Clojure" (REPLACE "hello world"  "world"   "Clojure")))
+  (is (= "Xello"         (REPLACE "hello"        "h"       "X")))
+  (is (= "hello world"   (REPLACE "hello world"  "hello"   "hello"))))
+
+(deftest test-replace-no-match
+  (is (nil? (REPLACE "hello" "xyz" "!"))))
+
+(deftest test-replace-empty
+  ;; Replacing first empty match inserts at position 0
+  (is (= "Xhello" (REPLACE "hello" "" "X"))))
+
+;; ── Literal patterns (LIT$ dispatch) ─────────────────────────────────────────
 (deftest test-literal
-  (is      (MATCH (seq "hello") 0 "hello"))
-  (is      (MATCH (seq "hello world") 0 "hello"))  ; substring match
-  (is (not (MATCH (seq "world") 0 "hello")))
-  (is      (MATCH (seq "abc")   0 "")))             ; empty pattern always matches
+  (is (SEARCH "hello"       "hel"))
+  (is (SEARCH "hello world" "hello"))
+  (is (not (SEARCH "world" "hello")))
+  (is (SEARCH "abc"   "")))
 
-;; ── SEQ (vector = sequence) ───────────────────────────────────────────────────
+;; ── SEQ (vector → sequence) ───────────────────────────────────────────────────
 (deftest test-seq
-  (is      (MATCH (seq "hello") 0 (list 'SEQ "hel" "lo")))
-  (is (not (MATCH (seq "hello") 0 (list 'SEQ "hel" "xx"))))
-  (is      (MATCH (seq "abcdef") 0 (list 'SEQ "abc" "def"))))
+  (is      (SEARCH "hello"  (list 'SEQ "hel" "lo")))
+  (is (not (SEARCH "hello"  (list 'SEQ "hel" "xx"))))
+  (is      (SEARCH "abcdef" (list 'SEQ "abc" "def"))))
 
 ;; ── ALT (alternation) ─────────────────────────────────────────────────────────
 (deftest test-alt
   (let [P (list 'ALT "cat" "dog" "bird")]
-    (is      (MATCH (seq "cat")  0 P))
-    (is      (MATCH (seq "dog")  0 P))
-    (is      (MATCH (seq "bird") 0 P))
-    (is (not (MATCH (seq "fish") 0 P)))))
+    (is      (SEARCH "cat"  P))
+    (is      (SEARCH "dog"  P))
+    (is      (SEARCH "bird" P))
+    (is (not (SEARCH "fish" P)))))
 
-;; ── Anchoring with POS#/RPOS# ─────────────────────────────────────────────────
-(deftest test-anchoring
-  ;; Full string match
+;; ── Anchoring with POS / RPOS ─────────────────────────────────────────────────
+(deftest test-fullmatch-anchoring
   (let [P (list 'SEQ (POS 0) "hello" (RPOS 0))]
-    (is      (MATCH (seq "hello")    0 P))
-    (is (not (MATCH (seq "hello!")   0 P)))
-    (is (not (MATCH (seq "  hello")  0 P))))
-  ;; Partial (unanchored) — the engine matches at position 0 only.
-  ;; Substring scanning requires ARB prefix, which is not yet implemented.
-  (is (not (MATCH (seq "say hello there") 0 "hello"))))
+    (is      (SEARCH "hello"    P))
+    (is (not (SEARCH "hello!"   P)))
+    (is (not (SEARCH "  hello"  P)))))
+
+(deftest test-search-finds-interior
+  ;; SEARCH slides — finds "hello" even with leading/trailing chars
+  (is (= [4 9] (SEARCH "say hello there" "hello"))))
 
 ;; ── Nested ALT inside SEQ ─────────────────────────────────────────────────────
 (deftest test-nested-alt-seq
-  ;; "B|F|R" followed by "E|EA" followed by "D|DS"
   (let [P (list 'SEQ
              (POS 0)
              (list 'ALT "B" "F" "R")
              (list 'ALT "E" "EA")
              (list 'ALT "D" "DS")
              (RPOS 0))]
-    (is (MATCH (seq "BED")   0 P))
-    (is (MATCH (seq "BEDS")  0 P))
-    (is (MATCH (seq "BEAD")  0 P))
-    (is (MATCH (seq "BEADS") 0 P))
-    (is (MATCH (seq "RED")   0 P))
-    (is (MATCH (seq "READS") 0 P))
-    (is (not (MATCH (seq "LEADER") 0 P)))
-    (is (not (MATCH (seq "ZED")    0 P)))))
+    (is (SEARCH "BED"   P))
+    (is (SEARCH "BEDS"  P))
+    (is (SEARCH "BEAD"  P))
+    (is (SEARCH "BEADS" P))
+    (is (SEARCH "RED"   P))
+    (is (SEARCH "READS" P))
+    (is (not (SEARCH "LEADER" P)))
+    (is (not (SEARCH "ZED"    P)))))
 
-;; ── Backtracking through ALT ──────────────────────────────────────────────────
-;; ── Backtracking through ALT ──────────────────────────────────────────────────
-;; TODO: cross-SEQ backtracking not yet implemented — once an ALT child
-;; succeeds and a later SEQ element fails, the engine does not retry the ALT.
+;; ── Backtracking ──────────────────────────────────────────────────────────────
+;; TODO: cross-SEQ backtracking not yet implemented.
 (deftest test-backtracking
-  (is (MATCH (seq "BAD")  0 (list 'SEQ (list 'ALT "BE" "B") "AD" (RPOS 0))))
-  ;; TODO: re-enable when cross-SEQ backtracking is fixed:
-  #_(is (not (MATCH (seq "BEAD") 0 (list 'SEQ (list 'ALT "BE" "B") "AD" (RPOS 0))))))
+  (is (SEARCH "BAD" (list 'SEQ (list 'ALT "BE" "B") "AD" (RPOS 0))))
+  #_(is (not (SEARCH "BEAD" (list 'SEQ (list 'ALT "BE" "B") "AD" (RPOS 0))))))
 
-;; ── ANY$ / SPAN$ dispatch ─────────────────────────────────────────────────────
+;; ── ANY / SPAN patterns ───────────────────────────────────────────────────────
 (deftest test-primitive-dispatch
   (let [vowels (ANY "aeiou")
         digits (SPAN "0123456789")]
-    (is (MATCH (seq "apple") 0 vowels))
-    (is (MATCH (seq "123")   0 digits))
-    (is (not (MATCH (seq "xyz") 0 (list 'SEQ (POS 0) vowels (RPOS 0)))))
-    (is (MATCH (seq "999")   0 (list 'SEQ (POS 0) digits (RPOS 0))))))
+    (is (SEARCH "apple" vowels))
+    (is (SEARCH "123"   digits))
+    (is (not (FULLMATCH "xyz" vowels)))
+    (is      (FULLMATCH "999" digits))))
 
-;; ── LEN matching ─────────────────────────────────────────────────────────────
+;; ── LEN ──────────────────────────────────────────────────────────────────────
 (deftest test-len-match
   (let [L3 (LEN 3)]
-    (is (MATCH (seq "abc")    0 L3))
-    (is (MATCH (seq "abcdef") 0 L3))  ; matches first 3
-    (is (not (MATCH (seq "ab")    0 (list 'SEQ (POS 0) L3 (RPOS 0)))))))
+    (is      (SEARCH "abc"    L3))
+    (is      (SEARCH "abcdef" L3))
+    (is (not (FULLMATCH "ab"  L3)))))

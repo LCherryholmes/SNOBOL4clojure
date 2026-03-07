@@ -3,7 +3,7 @@
   ;; Verifies the representation they produce AND that MATCH drives them correctly.
   (:require [clojure.test :refer :all]
             [SNOBOL4clojure.patterns :refer :all]
-            [SNOBOL4clojure.match    :refer [MATCH]]))
+            [SNOBOL4clojure.match    :refer [SEARCH MATCH FULLMATCH]]))
 
 ;; ── Constructor representation ────────────────────────────────────────────────
 (deftest test-constructors-produce-lists
@@ -32,36 +32,36 @@
 ;; ── ANY in MATCH ──────────────────────────────────────────────────────────────
 (deftest test-any-match
   (let [A (ANY "BFLR")]
-    (is      (MATCH (seq "BED")  0 A))
-    (is      (MATCH (seq "FAD")  0 A))
-    (is (not (MATCH (seq "XYZ")  0 (list 'SEQ (POS 0) A))))))
+    (is      (SEARCH "BED"  A))
+    (is      (SEARCH "FAD"  A))
+    (is (not (FULLMATCH "XYZ" A)))))
 
 ;; ── SPAN in MATCH ────────────────────────────────────────────────────────────
 (deftest test-span-match
   (let [S (SPAN "0123456789")]
-    (is      (MATCH (seq "123abc") 0 S))
-    (is (not (MATCH (seq "abc")    0 (list 'SEQ (POS 0) S (RPOS 0)))))))
+    (is      (SEARCH "123abc" S))
+    (is (not (FULLMATCH "abc" S)))))
 
 ;; ── BREAK in MATCH ───────────────────────────────────────────────────────────
 (deftest test-break-match
   (let [B (BREAK ".!?")]
-    (is (MATCH (seq "hello.world") 0 B))
+    (is (SEARCH "hello.world" B))
     ;; BREAK stops before the delimiter
-    (is (MATCH (seq "hello.world") 0 (list 'SEQ B ".")))))
+    (is (SEARCH "hello.world" (list 'SEQ B ".")))))
 
 ;; ── POS / RPOS anchoring ──────────────────────────────────────────────────────
 (deftest test-pos-rpos-match
   (let [P (list 'SEQ (POS 0) "abc" (RPOS 0))]
-    (is      (MATCH (seq "abc")  0 P))
-    (is (not (MATCH (seq "xabc") 0 P)))
-    (is (not (MATCH (seq "abcx") 0 P)))))
+    (is      (FULLMATCH "abc"  P))
+    (is (not (FULLMATCH "xabc" P)))
+    (is (not (FULLMATCH "abcx" P)))))
 
 ;; ── LEN ──────────────────────────────────────────────────────────────────────
 (deftest test-len-match
-  (is      (MATCH (seq "abcde") 0 (LEN 3)))
-  (is (not (MATCH (seq "ab")    0 (list 'SEQ (POS 0) (LEN 3) (RPOS 0))))))
+  (is      (SEARCH "abcde" (LEN 3)))
+  (is (not (FULLMATCH "ab" (LEN 3)))))
 
 ;; ── SUCCEED / FAIL ────────────────────────────────────────────────────────────
 (deftest test-succeed-fail-patterns
-  (is      (MATCH (seq "anything") 0 SUCCEED))
-  (is (not (MATCH (seq "anything") 0 FAIL))))
+  (is      (SEARCH "anything" SUCCEED))
+  (is (not (SEARCH "anything" FAIL))))
