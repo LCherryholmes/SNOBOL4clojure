@@ -2,7 +2,7 @@
   ;; Global SNOBOL4 environment: keywords, constants, data types,
   ;; utility arithmetic aliases, and the DATATYPE dispatch table.
   ;; No dependencies on other SNOBOL4clojure namespaces.
-  (:require [clojure.pprint :as pp])
+  (:require [clojure.pprint  :as pp])
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── Utility arithmetic (avoid shadowing clojure.core in this ns) ─────────────
@@ -67,26 +67,34 @@
 (defn  ncvt [x] (list 'num x))
 (defn  scvt [x] (list 'str x))
 
-;; ── Namespace variable lookup ($$ / reference) ───────────────────────────────
-(defn reference [N]
-  (if-let [ns-name (namespace N)]
-    (when-let [ns-ref (or (get (ns-aliases *ns*) (symbol ns-name))
-                          (find-ns (symbol ns-name)))]
-      (get (ns-publics ns-ref) (symbol (name N))))
-    (let [sym (symbol (name N))]
-      ;; Search in priority order: current ns, core, primitives, operators,
-      ;; then all loaded SNOBOL4clojure namespaces (covers test namespaces etc.)
-      (or (get (ns-map *ns*) sym)
-          (when-let [ns (find-ns 'SNOBOL4clojure.core)]       (get (ns-map ns) sym))
-          (when-let [ns (find-ns 'SNOBOL4clojure.primitives)]  (get (ns-publics ns) sym))
-          (when-let [ns (find-ns 'SNOBOL4clojure.operators)]   (get (ns-publics ns) sym))
-          ;; Fall through: search all loaded SNOBOL4clojure namespaces
-          (some (fn [ns]
-                  (when (clojure.string/starts-with? (str (ns-name ns)) "SNOBOL4clojure")
-                    (get (ns-map ns) sym)))
-                (all-ns))))))
+;; ── SNOBOL4 global namespace — set once by GLOBALS, used everywhere ───────────
+;; This is the direct analog of _env._g in SNOBOL4python: one authoritative
+;; namespace where all user SNOBOL4 variables live.  The runtime never searches
+;; multiple namespaces; it always interns into and resolves from this one ns.
+(def ^:private snobol-ns (atom nil))
 
-(defn $$ [N] (if-let [V (reference N)] (var-get V) ε))
+(defn GLOBALS
+  "Point the SNOBOL4 runtime at the user's namespace.
+   Call once at the top of every user script:  (GLOBALS *ns*)
+   Mirrors GLOBALS(globals()) in SNOBOL4python."
+  [ns]
+  (reset! snobol-ns ns))
+
+(defn- active-ns
+  "Return the authoritative SNOBOL4 namespace.
+   Falls back to SNOBOL4clojure.env if GLOBALS has not been called."
+  []
+  (or @snobol-ns (find-ns 'SNOBOL4clojure.env)))
+
+;; ── Variable write / read ─────────────────────────────────────────────────────
+(defn snobol-set! [sym val]
+  (intern (active-ns) sym val))
+
+(defn reference [N]
+  (ns-resolve (active-ns) (symbol (name N))))
+
+(defn $$ [N]
+  (if-let [V (reference N)] (var-get V) ε))
 
 ;; ── Arrays and Tables ─────────────────────────────────────────────────────────
 (defn ARRAY     [_proto] (object-array 10))

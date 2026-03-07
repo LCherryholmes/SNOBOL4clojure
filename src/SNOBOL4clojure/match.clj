@@ -20,7 +20,7 @@
   nil means the pattern did not match.
 
   Tracing: bind *trace* to true to enable per-step animation output."
-  (:require [SNOBOL4clojure.env        :refer [ε equal out $$]]
+  (:require [SNOBOL4clojure.env        :refer [ε equal out $$ snobol-set!]]
             [SNOBOL4clojure.primitives :refer
              [LIT$ ANY$ NOTANY$ SPAN$ BREAK$ BREAKX$
               POS# RPOS# LEN# TAB# RTAB#
@@ -176,6 +176,20 @@
         (case action
           :proceed
           (let [Π ($$ 'X)] (recur :proceed (ζ↓ ζ Π) Ω)))
+
+        CAPTURE
+        ;; (CAPTURE pattern var-symbol): match pattern, assign matched text to var
+        ;; Π = (CAPTURE P N) — on succeed, (subs subject entry-Δ current-δ) → N
+        (case action
+          :proceed
+          (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))
+          :succeed
+          (let [[_ _ var-sym] (ζΠ ζ)
+                matched-text  (subs full-subject (ζΔ ζ) (ζδ ζ))]
+            (snobol-set! var-sym matched-text)
+            (recur :succeed (ζ↑ ζ) (🡧 Ω)))
+          (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
 
         ;; Not yet implemented
         (ARB! BAL! ARBNO! ABORT!) nil))))

@@ -19,6 +19,8 @@
 ;; ── Re-export env ─────────────────────────────────────────────────────────────
 (def  ε          env/ε)
 (def  η          env/η)
+(def  GLOBALS    env/GLOBALS)
+(def  snobol-set! env/snobol-set!)
 (def  &ALPHABET  env/&ALPHABET)
 (def  &ANCHOR    env/&ANCHOR)
 (def  &DIGITS    env/&DIGITS)

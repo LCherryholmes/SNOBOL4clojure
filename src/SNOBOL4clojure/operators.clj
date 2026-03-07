@@ -5,7 +5,7 @@
   (:require [clojure.tools.trace      :refer :all]
             [SNOBOL4clojure.env       :refer
              [ε η equal not-equal Σ+ subtract multiply divide
-              ncvt scvt num $$ out reference]]
+              ncvt scvt num $$ out reference snobol-set!]]
             [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH REPLACE]]
             [SNOBOL4clojure.patterns  :refer
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
@@ -86,8 +86,8 @@
             ([x y]      (x-2 $= x y))
             ([x y & zs] (x-n $= x y zs)))
 (defn .     ([x]        (NAME. x))               ; unary  — name
-            ([x y]      (x-2 .= x y))
-            ([x y & zs] (x-n .= x y zs)))
+            ([x y]      (x-2 'CAPTURE x y))       ; binary — capture into var
+            ([x y & zs] (x-n 'CAPTURE x y zs)))
 (defn tilde ([x]        (list 'lie x))           ; unary  — negate
             ([_x _y]    η))
 (defn |     ([_x]       η)                       ; unary  — programmable
@@ -131,20 +131,46 @@
     NE      (NE     (first args) (second args))
     FAIL    FAIL
     ?       (let [[s p] args] (SEARCH (str s) p))
-    =       (let [[N r] args]
-              (if-not (list? r)
-                (eval (list 'def N r))
-                (do
-                  (eval (list 'def N))
-                  (alter-var-root (trace (reference N)) (fn [_] r))))
-              r)
+    =       (let [[N r] args
+                  io? (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
+                  ;; Eagerly evaluate arithmetic IR lists.
+                  ;; Pattern vectors are passed through as-is.
+                  val  (if (list? r)
+                         (try (eval r)
+                              (catch Exception _ r))
+                         r)]
+              (when-not io?
+                (snobol-set! N val))
+              ;; Special I/O variables — println on assignment
+              (when (clojure.core/= N 'OUTPUT)   (println val))
+              (when (clojure.core/= N 'TERMINAL) (println val))
+              val)
     ?=      (let [[n _p R] args, r (EVAL! R)]
-              (eval (trace (list 'def n r))) r)
+              (snobol-set! n (trace r)) r)
     DEFINE  (let [[proto] args
                   spec    (apply vector (re-seq #"[0-9A-Z_a-z]+" proto))
-                  [n]     spec
-                  f       (symbol n)]
-              (eval (trace (list 'defn f ['& 'args] ε))) ε)
+                  fname   (first spec)
+                  params  (subvec spec 1)
+                  f-sym   (symbol fname)
+                  entry   (keyword fname)]
+              ;; Create a Clojure function that binds params, runs from the
+              ;; function's entry label, and returns the function-name variable.
+              (eval
+                `(defn ~f-sym [~'& ~'call-args]
+                   ;; Bind each parameter to its argument
+                   ~@(map-indexed
+                       (fn [i p]
+                         `(SNOBOL4clojure.env/snobol-set! '~(symbol p)
+                                                          (nth ~'call-args ~i ~ε)))
+                       params)
+                   ;; Clear the result variable (function name holds result)
+                   (SNOBOL4clojure.env/snobol-set! '~f-sym ~ε)
+                   ;; Run from entry label
+                   (when-let [run-fn# (ns-resolve 'SNOBOL4clojure.runtime '~'RUN)]
+                     (run-fn# ~entry))
+                   ;; Return value of function-name variable
+                   (SNOBOL4clojure.env/$$ '~f-sym)))
+              ε)
     REPLACE (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))
     quote   ($$ (second op))
             (let [f ($$ op)]
@@ -168,7 +194,9 @@
           (equal op '$)     (let [[P N]   parms] (INVOKE '$ (EVAL! P) N))
           (equal op '=)     (let [[N R]   parms] (INVOKE '= N (EVAL! R)))
           (equal op '?=)    (let [[N P R] parms] (INVOKE '?= N (EVAL! P) R))
-          (equal op '&)     (let [[N]     parms] @($$ (symbol (str "&" N))))
+          (equal op '&)     (let [[N]     parms
+                                  v       ($$ (symbol (str "&" N)))]
+                              (if (instance? clojure.lang.IDeref v) @v v))
           (equal op 'quote) (first parms)
           true (let [args (apply vector (map EVAL! parms))]
                  (apply INVOKE op args))))
