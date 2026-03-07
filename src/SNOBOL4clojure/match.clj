@@ -196,6 +196,34 @@
           (:fail :recede)
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
+        ;; ── FENCE! ───────────────────────────────────────────────────────────
+        ;; FENCE(P) — match P, but if P succeeds, cut: prevent retry of P on backtrack.
+        ;; Π = (FENCE! child-pattern)  or  (FENCE!)  (bare FENCE = cut-and-abort)
+        ;; On :proceed  — descend into child; push self onto Ω as cut marker
+        ;; On :succeed  — pop cut marker from Ω, propagate success
+        ;; On :recede   — FENCE was backtracked into: refuse to retry (fail upward)
+        ;;                For bare FENCE this aborts the match entirely.
+        FENCE!
+        ;; FENCE(P): match P; if P succeeds, commit (no retry of P on backtrack).
+        ;; If P fails, FENCE itself fails (outer ALT can still try next branch).
+        ;; Bare FENCE(): succeed once, then abort on any backtrack.
+        (case action
+          :proceed
+          (let [[Σ Δ _ _ _ _ Ψ] ζ
+                child            (second (ζΠ ζ))]   ; nil for bare (FENCE!)
+            (if child
+              ;; Build child frame: set Π=child, push FENCE onto Ψ so :succeed
+              ;; returns here.  Also push FENCE onto Ω as a cut barrier.
+              (recur :proceed [Σ Δ Σ Δ child 1 (🡥 Ψ ζ)] (🡥 Ω ζ))
+              ;; Bare FENCE — succeed once; push cut barrier so :recede aborts
+              (recur :succeed (ζ↑ ζ) (🡥 Ω ζ))))
+          :succeed
+          ;; Child succeeded — consume the cut barrier, propagate success upward
+          (recur :succeed (ζ↑ ζ) (🡧 Ω))
+          (:recede :fail)
+          ;; Backtracked into FENCE — refuse to retry child; fail upward
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
         ;; Not yet implemented
         (ARB! BAL! ARBNO! ABORT!) nil))))
 

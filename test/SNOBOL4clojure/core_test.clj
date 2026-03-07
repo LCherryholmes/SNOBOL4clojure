@@ -2,6 +2,14 @@
   (:require [clojure.test :refer :all]
             [SNOBOL4clojure.core :refer :all :exclude [= + - * / num]]))
 
+;; Point the SNOBOL runtime at this namespace so that $$ resolves
+;; vars like `digits`, `epsilon`, `ROOT` etc. defined here.
+(GLOBALS *ns*)
+
+;; Re-establish GLOBALS before each test to guard against other test namespaces
+;; calling GLOBALS and changing the active namespace.
+(use-fixtures :each (fn [t] (GLOBALS (find-ns 'SNOBOL4clojure.core-test)) (t)))
+
 ;; ── match-1 : literal concatenation with alternation ─────────────────────────
 (deftest match-1
   (let [ROOT "car"
@@ -63,39 +71,39 @@
 ;; ── match-real : floating point number pattern ───────────────────────────────
 ;; Built from a SNOBOL4 source string via EVAL — exercises the full
 ;; parse -> emitter -> MATCH pipeline.
-;; Several sub-cases require FENCE + outer ALT to be fully wired.
-;; They are commented with #_ (reader-skipped) to keep CI green while visible.
+;; digits/epsilon are top-level defs so $$ can resolve them via the
+;; core-test namespace (established by the GLOBALS call above).
+(def digits  "0123456789")
+(def epsilon "")
+;; Build the pattern at load time while GLOBALS points at this namespace.
+(def real-number-pat
+  (EVAL (str "POS(0)"
+             " SPAN(digits)"
+             " (  ('.' FENCE(SPAN(digits) | epsilon) | epsilon)"
+             "    ('E' | 'e')"
+             "    ('+' | '-' | epsilon)"
+             "    SPAN(digits)"
+             " |  '.' FENCE(SPAN(digits) | epsilon)"
+             ")"
+             " RPOS(0)")))
+
 (deftest match-real
-  ;; digits/epsilon must be def'd (not let-bound) so EVAL's namespace
-  ;; lookup via $$ can resolve them when building the pattern.
-  (def digits  "0123456789")
-  (def epsilon "")
-  (let [real    (EVAL (str
-                  "POS(0)"
-                  " SPAN(digits)"
-                  " (  ('.' FENCE(SPAN(digits) | epsilon) | epsilon)"
-                  "    ('E' | 'e')"
-                  "    ('+' | '-' | epsilon)"
-                  "    SPAN(digits)"
-                  " |  '.' FENCE(SPAN(digits) | epsilon)"
-                  ")"
-                  " RPOS(0)"))]
+  (let [real real-number-pat]
     (is (? "1.618e+10" real))
-    ;; TODO: enable as FENCE + ALT interaction is fixed in the engine:
-    #_(is (? "1."        real))
-    #_(is (? "1.6"       real))
-    #_(is (? "1.61"      real))
-    #_(is (? "1.6E2"     real))
-    #_(is (? "1.6e-1"    real))
-    #_(is (? "1.61e+2"   real))
-    #_(is (? "1.618e+3"  real))
-    #_(is (not (? "1"     real)))
-    #_(is (not (? "1.6E"  real)))
-    #_(is (not (? "1.6e"  real)))
-    #_(is (not (? "1.6E-" real)))
-    #_(is (not (? "1.6e-" real)))
-    #_(is (not (? "1.6E+" real)))
-    #_(is (not (? "1.6e+" real)))))
+    (is (? "1."        real))
+    (is (? "1.6"       real))
+    (is (? "1.61"      real))
+    (is (? "1.6E2"     real))
+    (is (? "1.6e-1"    real))
+    (is (? "1.61e+2"   real))
+    (is (? "1.618e+3"  real))
+    (is (not (? "1"     real)))
+    (is (not (? "1.6E"  real)))
+    (is (not (? "1.6e"  real)))
+    (is (not (? "1.6E-" real)))
+    (is (not (? "1.6e-" real)))
+    (is (not (? "1.6E+" real)))
+    (is (not (? "1.6e+" real)))))
 
 ;; ── match-define : identifier pattern ────────────────────────────────────────
 ;; TODO: ANY(&UCASE &LCASE) — string concatenation as ANY argument inside

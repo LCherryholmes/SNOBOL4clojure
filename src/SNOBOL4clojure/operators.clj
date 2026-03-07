@@ -126,7 +126,7 @@
     BREAKX  (BREAKX (first args))
     NOTANY  (NOTANY (first args))
     SPAN    (SPAN   (first args))
-    FENCE   (first args)
+    FENCE   (if (seq args) (FENCE (first args)) (FENCE))
     EQ      (EQ     (first args) (second args))
     NE      (NE     (first args) (second args))
     LE      (LE     (first args) (second args))

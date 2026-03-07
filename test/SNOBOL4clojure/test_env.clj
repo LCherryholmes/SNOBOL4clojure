@@ -58,6 +58,7 @@
 ;; ── $$ lookup ────────────────────────────────────────────────────────────────
 ;; Point SNOBOL runtime at this namespace so $$ can find test vars.
 (GLOBALS *ns*)
+(use-fixtures :each (fn [t] (GLOBALS (find-ns 'SNOBOL4clojure.test-env)) (t)))
 (def test-$$-sentinel "hello")
 (deftest test-$$
   (is (= "hello" ($$ 'test-$$-sentinel)))
