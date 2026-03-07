@@ -132,7 +132,7 @@
   #_(is (= (DATATYPE (POS 0))   "PATTERN"))
   #_(is (= (DATATYPE (RPOS 0))  "PATTERN"))
   (is (= (DATATYPE 'epsilon)                              "NAME"))
-  (is (= (DATATYPE (SNOBOL4clojure.core.NAME. 'epsilon))  "NAME"))
+  (is (= (DATATYPE (SNOBOL4clojure.env.NAME. 'epsilon))   "NAME"))
   (is (= (DATATYPE (list '* (list 'EQ 0 0)))              "EXPRESSION"))
   (is (= (DATATYPE '(+ 1 2))                              "EXPRESSION"))
   (is (= (DATATYPE (CODE "what year = 2021"))             "CODE"))

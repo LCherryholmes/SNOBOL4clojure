@@ -1,765 +1,134 @@
 (ns SNOBOL4clojure.core
+  "SNOBOL4/Clojure — public entry point.
+   Loads all sub-namespaces and re-exports the public API via def aliases
+   so that (require '[SNOBOL4clojure.core :refer :all]) works unchanged."
   (:gen-class)
-  (:require [clojure.zip :as z :refer [zipper root node down up right left branch? rightmost leftmost]])
-  (:require [clojure.edn :as edn])
-  (:require [clojure.pprint :as pp])
-  (:require [clojure.java.io :as io])
-  (:require [clojure.string :as string])
-  (:require [clojure.tools.trace :refer :all])
-  (:require [instaparse.core :as insta :refer [defparser]]); :refer-macros [defparser]]); ClojureScript
-; (:require [clojure.core.matrix :refer :all])
-; (:require [clojure.core.matrix.operators :refer :all])
-; (:require [criterium.core :as criterium :refer :all])
-  (:refer-clojure :exclude [= + - * / num])
-; (:refer-clojure :exclude [* - + == / < <= > >= not= = min max])
-)
-;---------------------------------------------------------------------------------------------------
-(defn Σ+        ([x y] (clojure.core/+ x y)) ([x] (clojure.core/+ x)))
-(defn subtract  ([x y] (clojure.core/- x y)) ([x] (clojure.core/- x)))
-(defn multiply  ([x y] (clojure.core/* x y)) ([x] (clojure.core/* x)))
-(defn divide     [x y] (clojure.core// x y))
-(defn equal      [x y] (clojure.core/= x y))
-(defn not-equal  [x y] (clojure.core/not= x y))
-(defn out       [item] (binding [pp/*print-right-margin* 2048, pp/*print-miser-width* 2000] (pp/pprint item)) item)
-;---------------------------------------------------------------------------------------------------
-(declare RUN)
-(declare EVAL!)
-(declare INVOKE)
-(declare MATCH)
-(def grammar
-" stmt      ::=  label? body? goto? <__> <eos?>
-  label     ::=  #'[0-9A-Za-z][^ \\t\\r\\n]*'
-  body      ::=  <_> (invoking | matching | replacing | assigning)
-  goto      ::=  <_ ':' __> (jmp  |  sjmp (<__> fjmp)?  |  fjmp (<__> sjmp)?)
-  invoking  ::=  subject
-  matching  ::=  subject <_> pattern
-  replacing ::=  subject <_> pattern <_ '='> replace
-  assigning ::=  subject <_ '='> replace
- <subject>  ::=  uop
- <pattern>  ::=  (<'?' _>)? and
- <replace>  ::=  (<_> expr)?
-  jmp       ::=  target
-  sjmp      ::=  <'S'> target
-  fjmp      ::=  <'F'> target
- <target>   ::=  <'('> expr <')'>
-  comment   ::=  <'*'> #'.*' <eol>
-  control   ::=  <'-'> #'[^;\\n]*' <eos>
-  eos       ::=  '\\n' | ';'
-  eol       ::=  '\\n'
- <expr>     ::=  <__> asn <__>
-  asn       ::=  mch | mch  <_  '='  _>  asn
-  mch       ::=  and | and  <_  '?'  _>  and (<_ '=' _> and)?
-  and       ::=  alt | and  <_  '&'  _>  alt
-  alt       ::=  cat | cat (<_  '|'  _>  cat)+
-  cat       ::=  at  | at  (<_>          at)+
-  at        ::=  sum | at   <_  '@'  _>  sum
-  sum       ::=  hsh | sum  <_> '+' <_>  hsh
-                     | sum  <_> '-' <_>  hsh
-  hsh       ::=  div | hsh  <_  '#'  _>  div
-  div       ::=  mul | div  <_  '/'  _>  mul
-  mul       ::=  pct | mul  <_  '*'  _>  pct
-  pct       ::=  xp  | pct  <_  '%'  _>  xp
-  xp        ::=  cap | cap  <_> '^' <_>  xp
-                     | cap  <_> '!' <_>  xp
-                     | cap  <_> '**' <_> xp
-  cap       ::=  ttl | ttl  <_> '$' <_>  cap
-                     | ttl  <_> '.' <_>  cap
-  ttl       ::=  uop | ttl  <_  '~'  _>  uop
-  uop       ::=  ndx | '@' uop | '~' uop | '?' uop | '&' uop | '+' uop
-                     | '-' uop | '*' uop | '$' uop | '.' uop | '!' uop
-                     | '%' uop | '/' uop | '#' uop | '=' uop | '|' uop
-  ndx       ::=  itm | ndx <'<'> lst <'>'> | ndx <'['> lst <']'>
-  <itm>     ::=  I | R | S | N | grp | cnd | inv
-  <grp>     ::=  <'('> expr <')'>
-  cnd       ::=  <'('> expr <','> lst <')'>
-  inv       ::=  N <'()'>  |  N <'('> lst <')'>
-  <lst>     ::=  expr? | expr (<','> expr?)+
-  <_>       ::=  <white+>
-  <__>      ::=  <white*>
-  I         ::=  #'[0-9]+'
-  R         ::=  #'[0-9]+\\.[0-9]+'
-  S         ::=  #'\"([^\"]|\\x3B)*\"'  |  #'\\'([^\\']|\\x3B)*\\''
-  N         ::=  #'[A-Za-z][A-Z_a-z0-9\\.]*'
-  white     ::=  #'[ \\t]'
-")
-;---------------------------------------------------------------------------------------------------
-(defn emitter [ast]
-  (insta/transform
-    { :comment   (fn comment     [cmt]   [:comment cmt])
-      :control   (fn control     [ctl]   [:control ctl])
-      ;--------------------------------------------------------------------------
-      :stmt      (fn stmt        [& ss]  (apply conj ss))
-      :label     (fn label       [L]     {:label (if (re-find #"^[0-9A-Z_a-z]+$" L) (keyword L) (str L))})
-      :body      (fn body        [B]     {:body  B})
-      :invoking  (fn invoking    [S    ] S)
-      :matching  (fn matching    [S P  ] (list '? S P))
-      :replacing (fn replacing  ([S P  ] (list '?= S P 'epsilon))
-                                ([S P R] (list '?= S P R)))
-      :assigning (fn assigning  ([S    ] (list '= S 'epsilon))
-                                ([S R  ] (list '= S R)))
-      :goto      (fn goto        [& gs]  {:goto (reduce
-                                                  (fn [bs b]
-                                                   (let [key (first b) tgt (second b)]
-                                                    (assoc bs key
-                                                     (if (symbol? tgt) (keyword tgt) tgt)))) {} gs)})
-      :jmp       (fn jmp         [L]     [:G L])
-      :sjmp      (fn sjmp        [L]     [:S L])
-      :fjmp      (fn fjmp        [L]     [:F L])
-      ;--------------------------------------------------------------------------
-      :expr      (fn expr        [x] x)
-      :asn       (fn asn        ([x] x) ([x     y]  (list '= x y)))
-      :mch       (fn mch        ([x] x) ([x  y   ]  (list '? x y))
-                                        ([x  y  z]  (list '?= x y z)))
-      :and       (fn and        ([x] x) ([x     y]  (list '& x y)))
-      :alt       (fn alt        ([x] x) ([x  & ys]  (apply list '| x ys)))
-      :cat       (fn cat        ([x] x) ([x  & ys]  (apply vector x ys)))
-      :at        (fn at         ([x] x) ([x     y]  (list 'at x y)))
-      :sum       (fn sum        ([x] x) ([x  op y]  (list (symbol op) x y)))
-      :hsh       (fn hsh        ([x] x) ([x     y]  (list 'sharp x y)))
-      :div       (fn div        ([x] x) ([x     y]  (list '/ x y)))
-      :mul       (fn mul        ([x] x) ([x     y]  (list '* x y)))
-      :pct       (fn pct        ([x] x) ([x     y]  (list '% x y)))
-      :xp        (fn xp         ([x] x) ([x  op y]  (list (symbol op) x y)))
-      :cap       (fn cap        ([x] x) ([x  op y]  (list (symbol op) x y)))
-      :ttl       (fn ttl        ([x] x) ([x     y]  (list 'tilde x y)))
-      :uop       (fn uop        ([x] x) ([   op y]  (case op
-                                                      "@" (list 'at y)
-                                                      "#" (list 'sharp y)
-                                                      "~" (list 'tilde y)
-                                                          (list (symbol op) y))))
-      :ndx       (fn ndx        ([n] n) ([n  & xs]  (apply list n xs)))
-      :cnd       (fn cnd        ([x] x) ([x  & ys]  (apply vector 'comma x ys)))
-      :inv       (fn inv         [f  & xs]          (apply list f xs))
-      :N         (fn N           [n]                (symbol n))
-      :S         (fn S           [s]                (subs s 1 (subtract (count s) 1)))
-      :I         edn/read-string
-      :R         edn/read-string
-    } ast))
-;---------------------------------------------------------------------------------------------------
-(def  ε          "")
-(def  η          ##NaN)
-(def  &ALPHABET  (atom (apply vector (map #(char %) (range 256)))))
-(def  &ANCHOR    (atom 0))
-(def  &DIGITS    "0123456789")
-(def  &DUMP      (atom 0)); 1, 2, and 3 levels
-(def  &ERRLIMIT  (atom 0))
-(def  &ERRTEXT   (atom ε))
-(def  &ERRTYPE   (atom 0))
-(def  &FTRACE    (atom 0))
-(def  &FULLLSCAN (atom 0))
-(def  &LASTNO    (atom 0))
-(def  &LCASE     "abcdefghijklmnopqrstuvwxyz")
-(def  &MAXLNGTH  (atom 4194304))
-(def  &PROFILE   (atom 0))
-(def  &TRACE     (atom 0))
-(def  &TRIM      (atom 0))
-(def  &STCOUNT   (atom 0))
-(def  &STLIMIT   (atom 2147483647))
-(def  &UCASE     "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-;---------------------------------------------------------------------------------------------------
-; Arrays and Tables
-(defn ARRAY      [proto] (object-array 10))
-(defn ITEM       [])
-(defn PROTOTYPE  [])
-(defn SORT       [A])
-(defn RSORT      [A])
-(defn TABLE      [] (hash-map))
-(defn SET        [] (hash-set))
-;---------------------------------------------------------------------------------------------------
-; Function control
-(defn APPLY      [])
-(defn ARG        [])
-(defn DEFINE     [])
-(defn LOAD       [])
-(defn LOCAL      [])
-(defn OPSYN      [])
-(defn UNLOAD     [])
-;---------------------------------------------------------------------------------------------------
-; Input/output
-(def  INPUT$     (atom ε))
-(def  OUTPUT$    (atom ε))
-(def  TERMINAL$  (atom ε))
-(defn BACKSPACE  [] ε)
-(defn DETACH     [] ε)
-(defn EJECT      [] ε)
-(defn ENDFILE    [] ε)
-(defn INPUT      [] ε)
-(defn OUTPUT     [] ε)
-(defn REWIND     [] ε)
-;(defn SET        [] ε); WHoops conflict with new SET feature. Hmm?
-;---------------------------------------------------------------------------------------------------
-; Memory
-(defn CLEAR      [] ε)
-(defn COLLECT    [] ε)
-(defn DUMP       [] ε)
-;---------------------------------------------------------------------------------------------------
-; Miscellaneous
-(defn CHAR       [] ε)
-(defn CONVERT    [] ε)
-(defn DATE       [])
-(defn SIZE       [s] 0)
-(defn TIME       [])
-;---------------------------------------------------------------------------------------------------
-; Conversions
-(defn     num    [x] (cond
-                       (double? x) x
-                       (integer? x) (.doubleValue x)
-                       true (try (Double/parseDouble x)
-                              (catch NumberFormatException E ##NaN))))
-(defn     ncvt   [x] (list 'num x)); `(try (Integer. ~x) (catch Exception E (try (Float. ~x) (catch Exception E #Nan))))
-(defn     scvt   [x] (list 'str x))
-(defmacro numcvt [x] `(ncvt ~x)); `(try (Integer. ~x) (catch Exception E (try (Float. ~x) (catch Exception E #Nan))))
-(defmacro strcvt [x] `(str ~x))
-;---------------------------------------------------------------------------------------------------
-; Operators
-(defn annihilate    [x]         nil)
-(defn match-replace [n s p]     nil)
-(defn keyword-value [n]         nil)
-(defn dollar-value  [n]         nil)
-(defn dot-name      [n]        `(if (list? ~n) ~n (list 'identity ~n)))
-(defn $=            [p n])
-(defn .=            [p n])
-(defn lie           [p]        `(if (nil? ~p) ε nil))
-(defn x-2           [op x y]    (list op x y))
-(defn x-n           [op x y Ω]  (apply list (conj Ω y x op)))
-(defn n-1           [op x]      (list op (numcvt x)))
-(defn n-2           [op x y]    (list op (numcvt x) (numcvt y)))
-(defn n-n           [op x y Ω]  (apply list op (map ncvt (conj Ω y x))))
-(defmacro uneval [x]           `(if (list? ~x) ~x (list 'identity ~x)))
-;---------------------------------------------------------------------------------------------------
-(defn reference [N]
-  (if-let [ns-name (namespace N)]
-    (do (comment "ns-name: " ns-name " " N)
-      (when-let [ns-ref (or (get (ns-aliases *ns*) (symbol ns-name))
-                            (find-ns (symbol ns-name)))]
-        (do (comment "ns-ref: " ns-ref)
-          (get (ns-publics ns-ref) (symbol (name N))))))
-    (do (comment N)
-      (if-let [user-ref  (get (ns-map *ns*)                                (symbol (name N)))] user-ref
-        (if-let [sno-ref (get (ns-map (find-ns 'SNOBOL4clojure.core))      (symbol (name N)))] sno-ref
-                         (get (ns-map (find-ns 'SNOBOL4clojure.core-test)) (symbol (name N))))))))
-(defn $$ [N] (if-let [V (reference N)] (var-get V) ε)); (var-get (eval (list 'var N)))
-;---- ----- -------------------------------------------- ------- -- ----- ----------------------------------------------
-(definterface &NAME (n []) (n [_]))
-(deftype NAME [^:unsynchronized-mutable n] &NAME (n [this] n) (n [this _] (set! n _)))
-;---- ----- -------------------------------------------- ------- -- ----- ----------------------------------------------
-(defn =     ([x]        ##NaN)                   ; unary            programable
-            ([n x]      (list '= n x)))          ; binary   0 right assignment
-(defn ?     ([x]        (annihilate x))          ; unary            interrogation value annihilation
-            ([s p]      (MATCH (seq s) 0 p))     ; binary   1 right match pattern
-            ([n s p]    (match-replace n s p)))  ; tertiary 1 right match pattern then replace
-(defn ?=    ([n s p]    (match-replace n s p)))  ; tertiary 1 right match pattern then replace
-(defn &     ([n]        (keyword-value n))       ; unary            keyword
-            ([x y]      ##NaN))                  ; binary   2 left  programable
-(defn |     ([x]        ##NaN)                   ; unary            programable
-            ([x y]      (x-2 'ALT x y))          ; binary   3 right pattern, alternation
-            ([x y & zs] (x-n 'ALT x y zs)))      ; multi    3 right pattern, alternation
-(defn at    ([n]        (list 'cursor n))        ; unary            pattern, assign cursor position
-            ([x y]      ##NaN))                  ; binary   4 right programable
-(defn +     ([x]        (n-1 Σ+ x))              ; unary            addition
-            ([x y]      (n-2 Σ+ x y))            ; binary   6 left  addition
-            ([x y & zs] (n-n Σ+ x y zs)))        ; multi    6 left  addition
-(defn -     ([x]        (n-1 subtract x))        ; unary            subtraction
-            ([x y]      (n-2 subtract x y))      ; binary   6 left  subtraction
-            ([x y & zs] (n-n subtract x y zs)))  ; multi    6 left  subtraction
-(defn sharp ([x]        ##NaN)                   ; unary            programable
-            ([x y]      ##NaN))                  ; binary   7 left  programable
-(defn /     ([x]        ##NaN)                   ; unary            programable
-            ([x y]      (n-2 divide x y)))       ; binary   8 left  division
-(defn *     ([x]        (uneval x))              ; unary            defer evaluation, unevaluated expression
-            ([x y]      (n-2 multiply x y))      ; binary   9 left  multiplication
-            ([x y & zs] (n-n multiply x y zs)))  ; multi    9 left  multiplication
-(defn %     ([x]        ##NaN)                   ; unary            programable
-            ([x y]      ##NaN))                  ; binary  10 left  programable
-(defn !     ([x]        ##NaN)                   ; unary            programable
-            ([x y]      (n-2 'Math/pow x y)))    ; binary  11 right exponentiation
-(defn **    ([x y]      (n-2 'Math/pow x y)))    ; binary  11 right exponentiation
-(defn $     ([n]        ($$ n))                  ; unary            indirection
-            ([x y]      (x-2 $= x y))            ; binary  12 left  immediate assignment
-            ([x y & zs] (x-n $= x y zs)))        ; multi   12 left  immediate assignment
-(defn .     ([x]        (NAME. x))               ; unary            name
-            ([x y]      (x-2 .= x y))            ; binary  12 left  conditional assignment
-            ([x y & zs] (x-n .= x y zs)))        ; multi   12 left  conditional assignment
-(defn tilde ([x]        (list 'lie x))           ; unary            pattern, negates failure or success
-            ([x y]      ##NaN))                  ; binary  13 left  programable
-;---------------------------------------------------------------------------------------------------
-; Comparison
-(defmacro INTEGER [x])
-(defn primitive
-      [func default missing cvt condition]
-      (list 'defn func
-        (list []             missing)
-        (list ['x]           (list 'if (condition (cvt 'x) default) ε))
-        (list ['x 'y '& '_]  (list 'if (condition (cvt 'x) (cvt 'y)) ε))))
-(eval (primitive 'EQ     0   ε ncvt     #(list 'equal %1 %2))); Numeric comparison
-(eval (primitive 'NE     0 nil ncvt     #(list 'not=  %1 %2)))
-(eval (primitive 'LE     0   ε ncvt     #(list '<=    %1 %2)))
-(eval (primitive 'LT     0 nil ncvt     #(list '<     %1 %2)))
-(eval (primitive 'GE     0   ε ncvt     #(list '>=    %1 %2)))
-(eval (primitive 'GT     0 nil ncvt     #(list '>     %1 %2)))
-(eval (primitive 'LEQ    ε   ε scvt     #(list 'equal %1 %2))); String comparison
-(eval (primitive 'LNE    ε nil scvt     #(list 'not=  %1 %2)))
-(eval (primitive 'LLE    ε   ε scvt     #(list '<=    %1 %2)))
-(eval (primitive 'LLT    ε nil scvt     #(list '<     %1 %2)))
-(eval (primitive 'LGE    ε   ε scvt     #(list '>=    %1 %2)))
-(eval (primitive 'LGT    ε nil scvt     #(list '>     %1 %2)))
-(eval (primitive 'IDENT  ε   ε identity #(list 'identical? %1 %2))); Object comparison
-(eval (primitive 'DIFFER ε nil identity #(list 'not   (list 'identical? %1 %2))))
-;---- ----- -------------------------------------------- ------- -- ----- ----------------------------------------------
-; Numeric
-(defmacro SIN    []  `(defn SIN  [x] (Math/sin  ~(numcvt 'x))))
-(defmacro COS    []  `(defn COS  [x] (Math/cos  ~(numcvt 'x))))
-(defmacro TAN    []  `(defn TAN  [x] (Math/tan  ~(numcvt 'x))))
-(defmacro ASIN   []  `(defn ASIN [x] (Math/asin ~(numcvt 'x))))
-(defmacro ACOS   []  `(defn ACOS [x] (Math/acos ~(numcvt 'x))))
-(defmacro ATAN   []  `(defn ATAN [x] (Math/atan ~(numcvt 'x))))
-(defmacro EXP    []  `(defn EXP  [x] (Math/exp  ~(numcvt 'x))))
-(defmacro LN     []  `(defn LN   [x] (Math/log  ~(numcvt 'x))))
-(defmacro SQRT   []  `(defn SQRT [x] (Math/sqrt ~(numcvt 'x))))
-(defmacro REMDR  []  `(defn REMDR [x y] (clojure.core/rem ~(numcvt 'x) ~(numcvt 'y))))
-(defmacro CHOP   []  `(defn CHOP [x] (let [_x ~(numcvt 'x)] (if (< _x 0.0) (Math/ceil _x) (Math/floor _x)))))
-;---------------------------------------------------------------------------------------------------
-; Pattern match
-(defn charset    [S]      (reduce #(conj %1 %2) #{} S))
-(defn ANY        [S]      (list 'ANY$     (charset S)))
-(defn BREAK      [S]      (list 'BREAK$   (charset S)))
-(defn BREAKX     [S]      (list 'BREAKX$  (charset S)))
-(defn NOTANY     [S]      (list 'NOTANY$  (charset S)))
-(defn SPAN       [S]      (list 'SPAN$    (charset S)))
-(defn ARBNO      [P]      (list 'ARBNO!   P))
-(defn FENCE     ([]       (list 'FENCE!    )); FENCE pattern variable
-                ([P]      (list 'FENCE!   P))); FENCE pattern function
-(defn LEN        [I]      (list 'LEN#     I))
-(defn POS        [I]      (list 'POS#     I))
-(defn RPOS       [I]      (list 'RPOS#    I))
-(defn RTAB       [I]      (list 'RTAB#    I))
-(defn TAB        [I]      (list 'TAB#     I))
-(def  ARB                 (list 'ARB!      ))
-(def  BAL                 (list 'BAL!      ))
-(def  REM                 (list 'REM!      ))
-(def  ABORT               (list 'ABORT!    ))
-(def  FAIL                (list 'FAIL!     ))
-(def  SUCCEED             (list 'SUCCEED!  ))
-;---------------------------------------------------------------------------------------------------
-; Program control
-(defn EXIT       []); string or integer argument
-(defn HOST       [])
-(defn SETEXIT    [])
-(defn STOPTR     [])
-(defn TRACE      [])
-;---------------------------------------------------------------------------------------------------
-; Program-defined datatype
-(def proto-data-name  #"^([A-Za-z][0-9-.A-Z_a-z]+)\((.*)$")
-(def proto-data-field #"^([0-9-.A-Z_a-z]+)[,)](.*)$")
-(defn proto-data [S]
-  (let [[_ name rem] (re-find proto-data-name S)]
-    (loop [rem rem fields []]
-      (if (equal rem ε) [(symbol name) fields]
-        (let [[_ field rem] (re-find proto-data-field rem)]
-          (recur rem (conj fields (symbol field))))))))
-;---------------------------------------------------------------------------------------------------
-(defn DATA! [S]
-  (let [[name fields] (proto-data S)]
-    (list 'do
-      (apply list 'defprotocol (symbol (str \& name))
-        (reduce #(conj %1 (list %2 ['this] ['this '_])) [] fields))
-      (apply list 'deftype name
-        (reduce #(conj %1 (with-meta %2 {:unsynchronized-mutable true})) [] fields)
-        (symbol (str \& name))
-        (reduce
-          #(conj %1
-            (list %2 ['this] %2)
-            (list %2 ['this '_] (list 'set! %2 '_))) [] fields)))))
-(defn DATA [S] (let [data (DATA! S)] (binding [*print-meta* true] (out data)) (eval data) ε))
-(defn FIELD [])
-;---------------------------------------------------------------------------------------------------
-(comment   A=Always, U=Usually
-           S I R A T P N E C Σ ;
-    STRING . U U     A A U U   ;
-   INTEGER A . A     A A A     ;
-      REAL A U .     A A A     ;
-     ARRAY       . U         A ;
-     TABLE       A .         A ;
-   PATTERN           .         ;
-      NAME U U U     U . U U   ;
-EXPRESSION               .     ;
-      CODE                 .   ;
-   (Σ) SET       A A         . ;
-)
-;---------------------------------------------------------------------------------------------------
-(defmulti  DATATYPE (fn [X] (str (class X)))); dispatch function
-(defmethod DATATYPE "class java.lang.Character"                   [X] "STRING")
-(defmethod DATATYPE "class java.lang.String"                      [X] "STRING")
-(defmethod DATATYPE "class java.lang.Long"                        [X] "INTEGER")
-(defmethod DATATYPE "class java.lang.Double"                      [X] "REAL")
-(defmethod DATATYPE "class [Ljava.lang.Object;"                   [X] "ARRAY")
-(defmethod DATATYPE "class [LLjava.lang.Object;"                  [X] "ARRAY")
-(defmethod DATATYPE "class clojure.lang.PersistentArrayMap"       [X] "TABLE"); (hash-map), {}, for SPITBOL TABLE()
-(defmethod DATATYPE "class clojure.lang.PersistentVector"         [X] "PATTERN")
-(defmethod DATATYPE "class clojure.lang.Symbol"                   [X] "NAME"); also SNOBOL4clojure.core.NAME in :default dispatch
-(defmethod DATATYPE "class clojure.lang.PersistentList"           [X] "EXPRESSION")
-(defmethod DATATYPE "class clojure.lang.PersistentList$EmptyList" [X] "EXPRESSION")
-(defmethod DATATYPE "class clojure.lang.PersistentTreeMap"        [X] "CODE"); (sorted-map), also SNOBOL4 TABLE()
-(defmethod DATATYPE "class clojure.lang.Keyword"                  [X] "CODE")
-(defmethod DATATYPE "class clojure.lang.PersistentHashSet"        [X] "SET"); (hash-set), #{}
-(defmethod DATATYPE "class clojure.lang.PersistentTreeSet"        [X] "SET"); (sorted-set)
-(defmethod DATATYPE "class java.util.regex.Pattern"               [X] "REGEX")
-(defmethod DATATYPE "class java.lang.Class"                       [X] "DATA")
-(defmethod DATATYPE :default                                      [X] ((re-find #"class SNOBOL4clojure\.core\.(.*)" (str (class X))) 1))
-;---------------------------------------------------------------------------------------------------
-; Synthesis (string, pattern, and object)
-(defn DUPL       [x i]); using string concat or pattern sequence
-(defn LPAD       [])
-(defn REPLACE    [s1 s2 s3] ε)
-(defn REVERSE    [])
-(defn RPAD       [])
-(defn SUBSTR     [])
-(defn TRIM       [])
-(defn COPY       [x]); Object creation
-;---------------------------------------------------------------------------------------------------
-(defn LEN$$ [s len] (if (<= len 0) s (if (not (seq s)) nil (lazy-seq (cons (first s) (LEN$$ (rest s) (dec len)))))))
-;---------------------------------------------------------------------------------------------------
-; Scanners
-(defn err      [Σ Δ]     [Σ (clojure.core/- -1 Δ)])
-(defn ARB!     [Σ Δ Π]   (err nil Δ))
-(defn BAL!     [Σ Δ Π]   (err nil Δ))
-(defn ARBNO!   [Σ Δ Π]   (err nil Δ))
-(defn FENCE!   [Σ Δ Π]   (err nil Δ))
-(defn FENCE!!  [Σ Δ Π]   (err nil Δ))
-(defn BREAKX$  [Σ Δ Π]   (err nil Δ))
-(defn ABORT!   [Σ Δ Π]   (err nil Δ))
-(defn SUCCEED! [Σ Δ Π]   [Σ Δ])
-(defn FAIL!    [Σ Δ Π]   (err Σ Δ))
-(defn POS#     [Σ Δ Π]   (if (equal Δ Π)         [Σ Δ] (err Σ Δ)))
-(defn RPOS#    [Σ Δ Π]   (if (equal (count Σ) Π) [Σ Δ] (err Σ Δ)))
-(defn ANY$     [Σ Δ Π]   (if (not (seq Σ))       (err Σ Δ) (if     (contains? Π (first Σ)) [(rest Σ) (inc Δ)] (err Σ Δ))))
-(defn NOTANY$  [Σ Δ Π]   (if (not (seq Σ))       (err Σ Δ) (if-not (contains? Π (first Σ)) [(rest Σ) (inc Δ)] (err Σ Δ))))
-(defn REM!     [Σ Δ Π]   (loop [σ Σ δ Δ    ]     (if (not (seq σ))    [σ δ] (recur (rest σ) (inc δ)))))
-(defn LIT$     [Σ Δ Π]   (loop [σ Σ δ Δ π Π]     (if (not (seq π))    [σ δ]
-                                                    (if (not (seq σ)) (err σ δ)
-                                                      (if (not-equal (first σ) (first π)) (err σ δ)
-                                                        (recur (rest σ) (inc δ) (rest π)))))))
-(defn LEN#     [Σ Δ Π]   (loop [σ Σ δ Δ    ]     (if (>= δ (Σ+ Δ Π))  [σ δ] (if (not (seq σ)) (err σ δ) (recur (rest σ) (inc δ))))))
-(defn TAB#     [Σ Δ Π]   (loop [σ Σ δ Δ    ]     (if (>= δ Π)         [σ δ] (if (not (seq σ)) (err σ δ) (recur (rest σ) (inc δ))))))
-(defn RTAB#    [Σ Δ Π]   (loop [σ Σ δ Δ    ]     (if (>= (count σ) Π) [σ δ] (if (not (seq σ)) (err σ δ) (recur (rest σ) (inc δ))))))
-(defn SPAN$    [Σ Δ Π]   (loop [σ Σ δ Δ    ]     (if (not (contains? Π (first σ)))
-                                                   (if (not-equal δ Δ) [σ δ] (err σ δ))
-                                                   (recur (rest σ) (inc δ)))))
-(defn BREAK$   [Σ Δ Π]   (loop [σ Σ δ Δ    ]     (if (not (seq σ)) (err σ δ)
-                                                   (if (contains? Π (first σ)) [σ δ]
-                                                     (recur (rest σ) (inc δ))))))
-(defn ALT      [Σ Δ & Π] (loop [        π Π]     (if (not (seq π)) (err Σ Δ)
-                                                   (let [[σ δ] (MATCH Σ Δ (first π))]
-                                                     (if (>= δ 0) [σ δ]
-                                                       (recur (rest π)))))))
-(defn SEQ      [Σ Δ & Π] (loop [σ Σ δ Δ π Π]     (if (not (seq π)) [σ δ]
-                                                    (let [[σ δ] (MATCH σ δ (first π))]
-                                                      (if (< δ 0) [σ δ]
-                                                        (recur σ δ (rest π)))))))
-(defn MATCH!   [Σ Δ Π]   (cond (string? Π) (LIT$ Σ Δ Π)
-                               (seq? Π) (let [[λ & π] Π, λ ($$ λ)] (apply λ Σ Δ π))))
-;===================================================================================================
-(defn top  [Ψ]   (last Ψ))
-(defn push [Ψ ζ] (if Ψ (conj Ψ ζ))); ZETA
-(defn pull [Ψ]   (if Ψ (if-not (empty? Ψ) (pop Ψ)))); protected pop, top is top for list or vector
-(defn 🡡 [Ω]     (top Ω))
-(defn 🡥 [Ω ζ]   (push Ω ζ))
-(defn 🡧 [Ω]     (pull Ω))
-(comment Ω⭳ Ω⭱ Ω↥ Ω↧ Ω⭶ Ω⭸ Ω⭷ Ω⭹)
-;---------------------------------------------------------------------------------------------------
-(defn ζΣ   [ζ]      (if ζ (ζ 0))); SIGMA, Subject, String Start, Sequence of characters
-(defn ζΔ   [ζ]      (if ζ (ζ 1))); DELTA, start position (Difference from start)
-(defn ζσ   [ζ]      (if ζ (ζ 2))); sigma, subject, string end
-(defn ζδ   [ζ]      (if ζ (ζ 3))); delta, end position
-(defn ζΠ   [ζ]      (if ζ (ζ 4))); PI, Pattern Internal
-(defn ζφ   [ζ]      (if ζ (ζ 5))); phi, part internal, pattern-piece iteration
-(defn ζΨ   [ζ]      (if ζ (ζ 6))); psi, parent stack internal
-(defn ζα   [ζ]      (<= (ζφ ζ) 1)); alpha, is the beginning?
-(defn ζω   [ζ]      (>= (ζφ ζ) (count (ζΠ ζ)))); omega, is the end?
-(defn ζλ   [ζ]      (cond; lamda, operation, function
-                      (nil?        ζ) nil
-                      (nil?    (ζΠ ζ)) nil
-                      (string? (ζΠ ζ)) 'LIT$
-                      (symbol? (ζΠ ζ)) (ζΠ ζ)
-                      (list?   (ζΠ ζ)) (first (ζΠ ζ))
-                      (seq?    (ζΠ ζ)) (first (ζΠ ζ))
-                      true     (out ["lamda? " (type (ζΠ ζ)) (ζΠ ζ)])))
-;---------------------------------------------------------------------------------------------------
-(defn ζ↓  ([ζ Π]    (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ Σ Δ Π           1           Ψ])); call over
-          ([ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ (nth Π φ)   1           (🡥 Ψ ζ)])); call down
-)
-(defn ζ↑  ([ζ σ δ]  (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ))  (🡧 Ψ)])); return up scan
-          ([ζ]      (let [[Σ Δ σ δ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ))  (🡧 Ψ)])); retun up result
-)
-(defn ζ→   [ζ]      (let [[_ _ σ δ Π φ Ψ] ζ] [σ δ σ δ Π           (inc φ)     Ψ])); proceed right
-(defn ζ←   [ζ]      (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ Π           (inc φ)     Ψ])); receed left
-;---------------------------------------------------------------------------------------------------
-(defn preview
-  ([action X φ] (preview action X 0 0 φ))
-  ([action X pos depth φ]
-    (str
-      (if (> pos 0) " " "")
-      (cond
-            (nil? X) "nil"
-           (char? X) (str "\\" X)
-         (string? X) (str "\"" X "\"")
-        (integer? X) (str X)
-         (symbol? X) (str X)
-          (float? X) (str X)
-        (>= depth 3) "_"
-         (vector? X) (str "[" (reduce str (map #(preview action %1 %2 (inc depth) 0) X (range))) "]")
-           (list? X) (str "("
-                       (reduce str
-                         (map
-                           #(cond
-                               (equal %2 0) (str %1 " ")
-                               (> φ 0)
-                                 (cond
-                                   (< %2 φ) "."
-                                   (> %2 (Σ+ φ 2)) "?"
-                                   (>= %2 (Σ+ φ 2)) " ?"
-                                   (and (equal %2 φ) (identical? action :succeed)) "."
-                                   true (preview action %1 (dec %2) (inc depth) 0)
-                                 )
-                               true (preview action %1 (dec %2) (inc depth) 0)
-                           )
-                           X (range)))
-                       ")")
-            (set? X) (str "\"" (apply str X) "\"")
-            true (str " Yikes!!! " (type X))
-      ))))
-;---------------------------------------------------------------------------------------------------
-(defn animate [action λ Σ ζ Ω]
-  (if (and Σ ζ)
-    (println
-      (format "%2s %2s %-8s %16s %3d %16s %-9s %s"
-        (count (ζΨ ζ))
-        (count Ω)
-        (str (ζλ ζ) "/" (ζφ ζ))
-        (str "\"" (apply str (take (ζΔ ζ) Σ)) "\"")
-        (ζΔ ζ)
-        (str "\"" (apply str (reverse (ζΣ ζ))) "\"")
-        (str " " action)
-        (preview action (ζΠ ζ) (ζφ ζ))
-      ))))
-;---------------------------------------------------------------------------------------------------
-(defn mtrace  [action λ ζ Ω]
-  (println (format "%-8s %2s %2s %-5s %2s %-10s %2s %-10s %s %s"
-    action (count (ζΨ ζ)) (count Ω) λ (ζΔ ζ) (apply str (ζΣ ζ)) (ζδ ζ) (apply str (ζσ ζ)) (ζφ ζ) (preview action (ζΠ ζ) (ζφ ζ)))))
-;---------------------------------------------------------------------------------------------------
-(defn MATCH [Σ Δ Π]
-  (loop [action :proceed, ζ [Σ Δ ε ε Π 1 []], Ω []]
-    (let [λ (ζλ ζ)]
-      (comment mtrace action λ ζ Ω)
-      (animate action λ Σ ζ Ω)
-      (case λ
-        nil  (do (println)
-                 (case action (:proceed :succeed) true (:recede :fail) false))
-        ALT      (case action ;---------------------------------------------------------------------
-                   :proceed
-                   (if (not (ζω ζ)) (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))   ; try an alternate
-                                    (recur :recede  (🡡 Ω) (🡧 Ω)))    ; no more alternatives
-                   :recede          (recur :proceed (ζ← ζ) Ω)         ; try next alternate, keep left
-                   :succeed         (recur :succeed (ζ↑ ζ) Ω)         ; generator suspend (return) match
-                   :fail            (recur :proceed (ζ← ζ) Ω))        ; generator reentry, try next
-        SEQ      (case action ;---------------------------------------------------------------------
-                   :proceed
-                   (if (not (ζω ζ)) (recur :proceed (ζ↓ ζ) Ω)         ; try a subsequent
-                                    (recur :succeed (ζ↑ ζ) Ω))        ; no more subsequents, succeed
-                   :succeed         (recur :proceed (ζ→ ζ) Ω)         ; try next subsequent, go right
-                   :fail            (recur :recede  (🡡 Ω) (🡧 Ω)))    ; generator reentry, backtrack
-        LIT$     (case action ;---------------------------------------------------------------------
-                   :proceed
-                   (let [[Σ Δ _ _ Π] ζ,
-                             [σ δ]  (LIT$ Σ Δ Π)]                     ; scan literal
-                     (if (>= δ 0)   (recur :succeed (ζ↑ ζ σ δ) Ω)     ; return match
-                                    (recur :fail    (ζ↑ ζ Σ Δ) Ω))))  ; signal failure
-      ; --------------------------------------------------------------------------------------------
-        SUCCEED! (let [[Σ Δ] ζ]     (recur :succeed (ζ↑ ζ Σ Δ) Ω))    ; return epsilon match
-        FAIL!    (let [[Σ Δ] ζ]     (recur :fail    (ζ↑ ζ Σ Δ) Ω))    ; signal failure, backtrack
-      ; --------------------------------------------------------------------------------------------
-       (ANY$ NOTANY$ SPAN$ BREAK$ BREAKX$ POS# RPOS#)
-                 (case action
-                   :proceed
-                   (let [[Σ Δ _ _ Π] ζ,
-                             [σ δ]  (($$ λ) Σ Δ (second Π))]          ; scan with primitive pattern
-                     (if (>= δ 0)   (recur :succeed (ζ↑ ζ σ δ) Ω)     ; return match
-                                    (recur :fail    (ζ↑ ζ Σ Δ) Ω))))  ; signal failure
-      ; --------------------------------------------------------------------------------------------
-        X        (case action
-                   :proceed
-                   (let [Π ($$ 'X)] (recur :proceed (ζ↓ ζ Π) Ω)))
-      ; --------------------------------------------------------------------------------------------
-        ARB!     nil
-        BAL!     nil
-        ARBNO!   nil
-        ABORT!   nil
-      ))))
-;===================================================================================================
-(def  eol               #"[\n]")
-(def  eos               #"[;\n]")
-(def  skip              #"[^\n]*")
-(def  tokens            #"[^;\n]*")
-(defn re-cat [& rexes]  (re-pattern (apply str rexes)))
-(def  komment           (re-cat #"[*]" skip eol))
-(def  control           (re-cat #"[-]" tokens eos))
-(def  kode              (re-cat #"[^;\n.+*-]" tokens "(" #"\n[.+]" tokens ")*" eos))
-(def  block             (re-cat komment "|" control "|" kode "|" eol))
-(def  general-control-1 #"^-(ERRORS|EXECUTE|FAIL|OPTIMIZE|NOERRORS|NOEXECUTE|NOFAIL|NOOPTIMIZE)")
-(def  general-control-2 #"^-(CASE|COPY|INCLUDE|IN)")
-(def  listing-control-1 #"^-(EJECT|LIST|NOLIST|PRINT|NOPRINT|SINGLE|DOUBLE)")
-(def  listing-control-2 #"^-(LINE|SPACE|STITL|TITLE)")
-(def  parse-command     (insta/parser grammar :start :command))
-(def  parse-statement   (insta/parser grammar :start :stmt :total true))
-(def  parse-expression  (insta/parser grammar :start :expr))
-(defn ERROR [info]      (list 'ERROR (:line info) (:column info) (:text info)))
-;===================================================================================================
-(defn INVOKE [op & args]
-  (case op
-    |        (apply | args)
-    $        (apply $ args)
-    .        (apply . args)
-    LEN      (LEN    (first args))
-    POS      (POS    (first args))
-    RPOS     (RPOS   (first args))
-    ANY      (ANY    (first args))
-    BREAK    (BREAK  (first args))
-    BREAKX   (BREAKX (first args))
-    NOTANY   (NOTANY (first args))
-    SPAN     (SPAN   (first args))
-    FENCE    (first args)
-    EQ       (EQ (first args) (second args))
-    NE       (NE (first args) (second args))
-    FAIL     FAIL
-    ?        (let [[s p] args] (? (str s) p))
-    =        (let [[N r] args]
-               (if-not (list? r)         ; (apply 'def n r)
-                 (eval (list 'def N r))  ; (eval (list 'def n r))
-                 (do                     ; (eval (read-string (str "(def " n " '" r ")")))
-                   (eval (list 'def N))  ; use (load-string "(...) (...)") for multiple
-                   (alter-var-root (trace (reference N)) (fn [oldr] r))
-                 )
-               ) r)
-    ?=       (let [[n p R] args, r (EVAL! R)]
-               (eval (trace (list 'def n r))) r)
-    DEFINE   (let [[proto] args]
-               (let [spec (apply vector (re-seq #"[0-9A-Z_a-z]+" proto))]
-                 (let [[n & params] spec, f (symbol n)]
-                   (eval (trace (list 'defn f ['& 'args] ε))) ε)))
-    REPLACE  (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))
-    quote    ($$ (second op))
-    Roman    ε;(apply Roman args)
-))
-;---------------------------------------------------------------------------------------------------
-;(comment "Conway's game of life" : life { _ } ←{ ↑ 1 ⍵ ∨ . ∧ 3 4 = + / , -1 0 1 ∘ . ⊖  -1 0 1 ∘ . ⌽ ⊂ ⍵ } ;)
-(defn EVAL  [X] (cond (string? X) (EVAL! (first (emitter (parse-expression X)))) true (EVAL! X)))
-(defn EVAL! [E]; Needs to handle failure
-  (when E
-    (cond
-          (nil? E) E
-         (char? E) E
-        (float? E) E
-       (string? E) E
-      (integer? E) E
-       (symbol? E) ($$ E)
-       (vector? E) (apply list 'SEQ (map EVAL! E))
-         (list? E) (let [[op & parms] E]
-                     (cond
-                       (equal op '.)  (let [[P N]   parms] (INVOKE '. (EVAL! P) N))
-                       (equal op '$)  (let [[P N]   parms] (INVOKE '$ (EVAL! P) N))
-                       (equal op '=)  (let [[N R]   parms] (INVOKE '= N (EVAL! R)))
-                       (equal op '?=) (let [[N P R] parms] (INVOKE '?= N (EVAL! P) R))
-                       (equal op '&)  (let [[N]     parms] @($$ (symbol (str "&" N))))
-                       (equal op 'quote) (first parms)
-                       true (let [args (apply vector (map EVAL! parms))]
-                              (apply INVOKE op args))))
-              true "Yikes! What is E?")))
-;---------------------------------------------------------------------------------------------------
-(defmacro comment? [command] (list 're-find #"^\*" command))
-(defmacro control? [command] (list 're-find #"^\-" command))
-(defn        CODE! [S]
-  (let             [blocks (re-seq block (str S "\n"))]
-    (loop          [block blocks NO 1 CODES {} NOS {} LABELS {}]
-      (let         [command (first (first block))]
-        (cond
-              (nil? command) [CODES NOS LABELS]
-          (comment? command) (recur (rest block) NO CODES NOS LABELS)
-          (control? command) (recur (rest block) NO CODES NOS LABELS)
-               true (let [ stmt (string/replace command #"[ \t]*\r?\n[+.][ \t]*" " ")
-                           stmt (string/replace stmt #"\r?\n$" "")
-                            ast (parse-statement stmt)
-                           code (emitter ast)]
-                      (if (and (map? code) (:reason code))
-                        (recur (rest block) (inc NO) (assoc CODES NO (ERROR code)) NOS LABELS)
-                        (let [label  (:label code)
-                              body   (:body code)
-                              goto   (:goto code)
-                              key    (if label label NO)
-                              code   (reduce #(conj %1 %2) [] [body goto])
-                              nos    (if (keyword? key) (assoc NOS key NO) NOS)
-                              labels (if (keyword? key) (assoc LABELS NO key) LABELS)
-                              codes  (assoc CODES key code)]
-                          (recur (rest block) (inc NO) codes nos labels)))))))))
-;---------------------------------------------------------------------------------------------------
-(def   STNO   (atom 0))
-(def  <STNO>  (atom {}))
-(def  <LABL>  (atom {}))
-(def  <CODE>  (atom {}))
-(defn  CODE   [S] (let [C (CODE! S) start (inc @STNO) codes (C 0) nos (C 1) labels (C 2)]
-                    (loop [NO 1]
-                      (if (> NO (count codes))
-                        (if (and (@<LABL> start) (@<CODE> (@<LABL> start)))
-                          (@<LABL> start)
-                          (if (@<CODE> start) start))
-                        (do
-                          (swap! STNO inc)
-                          (if-let [label (labels NO)]
-                            (do
-                              (swap! <CODE> #(assoc % label (codes label)))
-                              (swap! <LABL> #(assoc % @STNO label))
-                              (swap! <STNO> #(assoc % label @STNO)))
-                            (swap! <CODE> #(assoc % @STNO (codes NO))))
-                          (recur (inc NO)))))))
-;---------------------------------------------------------------------------------------------------
-(defn                  RUN [at]
-  (letfn [
-    (skey [address]   (let [[no label] address] (if label label no)))
-    (saddr [at]      (cond (keyword? at) [(@<STNO> at) at]
-                           (string?  at) [(@<STNO> at) at]
-                           (integer? at) [at (@<LABL> at)]))]
-      (loop [      current (saddr at)]
-        (if-let [      key (skey current)]
-          (if-let [   stmt (@<CODE> key)]
-            (let [   ferst (first stmt)
-                    seqond (second stmt)
-                      body (if (map? ferst) seqond ferst)
-                      goto (if (map? ferst) ferst seqond)]
-                           (if (EVAL! body)
-                             (if (contains? goto :G)   (recur (saddr (:G goto)))
-                               (if (contains? goto :S) (recur (saddr (:S goto)))
-                                                       (recur (saddr (inc (current 0))))))
-                             (if (contains? goto :G)   (recur (saddr (:G goto)))
-                               (if (contains? goto :F) (recur (saddr (:F goto)))
-                                                       (recur (saddr (inc (current 0)))))))))))))
-;---------------------------------------------------------------------------------------------------
-(defn -main "SNOBOL4/Clojure." [& args]
-; --------------------------------------------------------------------------------------------------
+  (:require [clojure.pprint            :as pp]
+            [SNOBOL4clojure.env        :as env]
+            [SNOBOL4clojure.primitives :as prim]
+            [SNOBOL4clojure.match      :as match]
+            [SNOBOL4clojure.patterns   :as pat]
+            [SNOBOL4clojure.operators  :as ops]
+            [SNOBOL4clojure.functions  :as fns]
+            [SNOBOL4clojure.grammar    :as gram]
+            [SNOBOL4clojure.emitter    :as emit]
+            [SNOBOL4clojure.compiler   :as comp]
+            [SNOBOL4clojure.runtime    :as rt])
+  (:refer-clojure :exclude [= + - * / num]))
+
+;; ── Re-export env ─────────────────────────────────────────────────────────────
+(def  ε          env/ε)
+(def  η          env/η)
+(def  &ALPHABET  env/&ALPHABET)
+(def  &ANCHOR    env/&ANCHOR)
+(def  &DIGITS    env/&DIGITS)
+(def  &DUMP      env/&DUMP)
+(def  &ERRLIMIT  env/&ERRLIMIT)
+(def  &ERRTEXT   env/&ERRTEXT)
+(def  &ERRTYPE   env/&ERRTYPE)
+(def  &FTRACE    env/&FTRACE)
+(def  &FULLLSCAN env/&FULLLSCAN)
+(def  &LASTNO    env/&LASTNO)
+(def  &LCASE     env/&LCASE)
+(def  &MAXLNGTH  env/&MAXLNGTH)
+(def  &PROFILE   env/&PROFILE)
+(def  &TRACE     env/&TRACE)
+(def  &TRIM      env/&TRIM)
+(def  &STCOUNT   env/&STCOUNT)
+(def  &STLIMIT   env/&STLIMIT)
+(def  &UCASE     env/&UCASE)
+(def  INPUT$     env/INPUT$)
+(def  OUTPUT$    env/OUTPUT$)
+(def  TERMINAL$  env/TERMINAL$)
+;; deftype — import directly
+(import SNOBOL4clojure.env.NAME)
+(def DATATYPE    env/DATATYPE)
+(def ARRAY       env/ARRAY)
+(def TABLE       env/TABLE)
+(def SET         env/SET)
+(def $$          env/$$)
+(def equal       env/equal)
+(def not-equal   env/not-equal)
+(def Σ+          env/Σ+)
+(def num         env/num)
+(def out         env/out)
+(def reference   env/reference)
+
+;; ── Re-export patterns ────────────────────────────────────────────────────────
+(def ANY     pat/ANY)
+(def BREAK   pat/BREAK)
+(def BREAKX  pat/BREAKX)
+(def NOTANY  pat/NOTANY)
+(def SPAN    pat/SPAN)
+(def ARBNO   pat/ARBNO)
+(def FENCE   pat/FENCE)
+(def LEN     pat/LEN)
+(def POS     pat/POS)
+(def RPOS    pat/RPOS)
+(def RTAB    pat/RTAB)
+(def TAB     pat/TAB)
+(def ARB     pat/ARB)
+(def BAL     pat/BAL)
+(def REM     pat/REM)
+(def ABORT   pat/ABORT)
+(def FAIL    pat/FAIL)
+(def SUCCEED pat/SUCCEED)
+
+;; ── Re-export match engine ────────────────────────────────────────────────────
+(def MATCH   match/MATCH)
+
+;; ── Re-export operators / EVAL ────────────────────────────────────────────────
+(def =     ops/=)
+(def ?     ops/?)
+(def ?=    ops/?=)
+(def &     ops/&)
+(def +     ops/+)
+(def -     ops/-)
+(def *     ops/*)
+(def /     ops//)
+(def $     ops/$)
+(def .     ops/.)
+(def |     ops/|)
+(def at    ops/at)
+(def tilde ops/tilde)
+(def !     ops/!)
+(def **    ops/**)
+(def %     ops/%)
+(def sharp ops/sharp)
+(def EQ    ops/EQ)
+(def NE    ops/NE)
+(def LE    ops/LE)
+(def LT    ops/LT)
+(def GE    ops/GE)
+(def GT    ops/GT)
+(def LEQ   ops/LEQ)
+(def LNE   ops/LNE)
+(def LLE   ops/LLE)
+(def LLT   ops/LLT)
+(def LGE   ops/LGE)
+(def LGT   ops/LGT)
+(def IDENT  ops/IDENT)
+(def DIFFER ops/DIFFER)
+(def EVAL  ops/EVAL)
+(def EVAL! ops/EVAL!)
+(def INVOKE ops/INVOKE)
+
+;; ── Re-export functions ───────────────────────────────────────────────────────
+(def SIZE    fns/SIZE)
+(def REPLACE fns/REPLACE)
+(def DUPL    fns/DUPL)
+(def TRIM    fns/TRIM)
+(def REVERSE fns/REVERSE)
+(def DATA    fns/DATA)
+(def DATA!   fns/DATA!)
+
+;; ── Re-export compiler / runtime ─────────────────────────────────────────────
+(def CODE!   comp/CODE!)
+(def CODE    comp/CODE)
+(def RUN     rt/RUN)
+
+;; ── -main ─────────────────────────────────────────────────────────────────────
+(defn -main "SNOBOL4/Clojure." [& _args]
   (def BED (EVAL '[(POS 0) (| "B" "R") (| "E" "EA") (| "D" "DS") (RPOS 0)]))
   (pp/pprint BED)
-  (? "READS" BED)
-; --------------------------------------------------------------------------------------------------
-  (def V (EVAL '(ANY &LCASE)))
-  (def I (EVAL '(SPAN &DIGITS)))
-  (def E (EVAL '(| V I ["(" 'X ")"])))
-  (def X (EVAL '(| [E "+" 'X]
-                   [E "-" 'X]
-                   [E "*" 'X]
-                   [E "/" 'X]
-                   ["+" 'X]
-                   ["-" 'X]
-                   E)))
-  (def C (EVAL '[(POS 0) 'X (RPOS 0)]))
-  (pp/pprint C)
-  (? "x+y*z" C)
-; --------------------------------------------------------------------------------------------------
-)
+  (? "READS" BED))
