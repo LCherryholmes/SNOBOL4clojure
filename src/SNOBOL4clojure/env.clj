@@ -113,7 +113,14 @@
 (defmethod DATATYPE "class clojure.lang.PersistentArrayMap"       [_] "TABLE")
 (defmethod DATATYPE "class clojure.lang.PersistentVector"         [_] "PATTERN")
 (defmethod DATATYPE "class clojure.lang.Symbol"                   [_] "NAME")
-(defmethod DATATYPE "class clojure.lang.PersistentList"           [_] "EXPRESSION")
+(defmethod DATATYPE "class clojure.lang.PersistentList"           [X]
+  (if ('#{SEQ ALT CAPTURE
+          ANY$ NOTANY$ SPAN$ BREAK$ BREAKX$
+          LEN# POS# RPOS# TAB# RTAB#
+          FENCE! ARBNO! ARB! BAL! ABORT!
+          SUCCEED! FAIL! X} (first X))
+    "PATTERN"
+    "EXPRESSION"))
 (defmethod DATATYPE "class clojure.lang.PersistentList$EmptyList" [_] "EXPRESSION")
 (defmethod DATATYPE "class clojure.lang.PersistentTreeMap"        [_] "CODE")
 (defmethod DATATYPE "class clojure.lang.Keyword"                  [_] "CODE")

@@ -135,10 +135,10 @@
   (is (= (DATATYPE (TABLE))                               "TABLE"))
   (is (= (DATATYPE [:LEN 10])                             "PATTERN"))
   (is (= (DATATYPE ["Hello, " (SPAN &LCASE)])             "PATTERN"))
-  ;; TODO: naked (LEN 10) is currently EXPRESSION, not PATTERN:
-  #_(is (= (DATATYPE (LEN 10))  "PATTERN"))
-  #_(is (= (DATATYPE (POS 0))   "PATTERN"))
-  #_(is (= (DATATYPE (RPOS 0))  "PATTERN"))
+  ;; naked pattern constructors return PATTERN:
+  (is (= (DATATYPE (LEN 10))  "PATTERN"))
+  (is (= (DATATYPE (POS 0))   "PATTERN"))
+  (is (= (DATATYPE (RPOS 0))  "PATTERN"))
   (is (= (DATATYPE 'epsilon)                              "NAME"))
   (is (= (DATATYPE (SNOBOL4clojure.env.NAME. 'epsilon))   "NAME"))
   (is (= (DATATYPE (list '* (list 'EQ 0 0)))              "EXPRESSION"))
