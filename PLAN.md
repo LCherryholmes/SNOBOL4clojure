@@ -153,7 +153,8 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Session 12 | `c416b30` | 1764/3816/0 | Fix #9 (RTAB/TAB missing from INVOKE). Confirm #8/#10 fixed. Fix #6 (lowercase goto). Close #4 as by-design. 15 new regression tests. Worm-first strategy documented in PLAN.md. |
 | Session 12b | `157bac5` | 1811/3910/0 | Add t_worm_t3t5.clj — 47 tests, T3-T5 bands. All green first run. |
 | Session 12c | `fa19688` | 1865/4018/0 | Add t_worm_patterns(23), t_worm_algorithms(12), t_worm_expr_parser(19). All green. |
-| Session 13  | `(pending)` | 1865/4018/0 | Sprint 18 automation. CSNOBOL4 2.3.3 and SPITBOL v4.0f built from source and installed in container. `generator.clj` extended with: `gen-by-length` (4,705 systematic programs by source length), `gen-by-length-annotated` (with :band 0..5 metadata), `rand-statement` (random single-statement programs), `gen-error-class-programs` (div-zero/bad-goto/syntax coverage), `run-worm-batch`/`run-systematic-batch` (batch runner via harness), `corpus-record->deftest`/`emit-regression-tests` (auto-pin failures as deftests). Validated: 1,500/4,705 systematic programs run through three-oracle harness — 1,499 :pass, 1 :skip, 0 :fail. Engine is clean. No new test files added (no failures to pin). |
+| Session 13  | `b20f754` | 1865/4018/0 | Sprint 18 automation. CSNOBOL4 2.3.3 and SPITBOL v4.0f built from source and installed in container. `generator.clj` extended with: `gen-by-length` (4,705 systematic programs by source length), `gen-by-length-annotated` (with :band 0..5 metadata), `rand-statement` (random single-statement programs), `gen-error-class-programs` (div-zero/bad-goto/syntax coverage), `run-worm-batch`/`run-systematic-batch` (batch runner via harness), `corpus-record->deftest`/`emit-regression-tests` (auto-pin failures as deftests). Validated: 1,500/4,705 systematic programs run through three-oracle harness — 1,499 :pass, 1 :skip, 0 :fail. Engine is clean. No new test files added (no failures to pin). Sprint 23+ architectural vision documented in PLAN.md. |
+| Session 13b | `b30f383` | 1865/4018/0 | **Stage 23A: Pre-compiled EDN cache.** Benchmark showed CODE! (grammar+emitter) costs 10.93ms = 95% of total per-program cost. `compiler.clj` extended with: `ir->edn`/`edn->ir` (lossless serialisation), `CODE-ir` (load pre-compiled IR, skip grammar), `CODE-memo` (in-memory memoised cache), `CODE-cached` (disk-backed cache), `compile-to-file`/`load-ir`, `clear-memo!`/`memo-stats`, `precompile-corpus!`. All Stage 23A functions exported from `core.clj`. `harness.clj` and `test_helpers.clj` wired to use `CODE-memo`. **Result: 22x speedup** (12.3ms → 0.556ms per program). Test suite: 30s wall clock, down from 45s (33% faster). All validation tests pass. |
 
 **Current baseline**: 1865 tests / 4018 assertions / 0 failures
 **Last confirmed**: 2026-03-08 (session 13)
@@ -888,13 +889,13 @@ performance optimisation that must produce identical output on every test.
 
 ### Implementation Order (recommended)
 
-| Stage | Effort | Payoff | Gate condition |
-|-------|--------|--------|----------------|
-| 23A — EDN cache | 1 session | 3-5x test speed | Worm corpus complete |
-| 23B — Transpiler | 2 sessions | 5-20x runtime | EDN cache working |
-| 23C — Stack machine | 2 sessions | 2-5x + clean IR | Transpiler working |
-| 23D — JVM codegen | 3-4 sessions | 10-100x | Stack machine working |
-| 23E — Full JIT | ongoing | SPITBOL-class | All prior stages |
+| Stage | Effort | Payoff | Gate condition | Status |
+|-------|--------|--------|----------------|--------|
+| 23A — EDN cache | 1 session | 3-5x test speed | Worm corpus complete | **DONE** commit `b30f383` — actual 22x per-program, 33% suite |
+| 23B — Transpiler | 2 sessions | 5-20x runtime | EDN cache working | NEXT |
+| 23C — Stack machine | 2 sessions | 2-5x + clean IR | Transpiler working | PLANNED |
+| 23D — JVM codegen | 3-4 sessions | 10-100x | Stack machine working | PLANNED |
+| 23E — Full JIT | ongoing | SPITBOL-class | All prior stages | VISION |
 
 **Start with 23A** — it is pure mechanical work (add serialisation to existing
 IR), delivers immediate speedup to every test run, and exercises the full IR
