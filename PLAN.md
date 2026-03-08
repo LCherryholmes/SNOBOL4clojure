@@ -139,8 +139,9 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Session 11 | `555bd39` | 1749/3786/0 | Fix recursive DEFINE — `<FUNS>` registry. `fact(5)=120`. Issue #7 closed. |
 | Session 12 | `c416b30` | 1764/3816/0 | Fix #9 (RTAB/TAB missing from INVOKE). Confirm #8/#10 fixed. Fix #6 (lowercase goto). Close #4 as by-design. 15 new regression tests. Worm-first strategy documented in PLAN.md. |
 | Session 12b | `157bac5` | 1811/3910/0 | Add t_worm_t3t5.clj — 47 tests, T3-T5 bands. All green first run. |
+| Session 12c | `fa19688` | 1865/4018/0 | Add t_worm_patterns(23), t_worm_algorithms(12), t_worm_expr_parser(19). All green. |
 
-**Current baseline**: 1811 tests / 3910 assertions / 0 failures
+**Current baseline**: 1865 tests / 4018 assertions / 0 failures
 **Last confirmed**: 2026-03-08 (session 12)
 
 ### Sprint 18C (step-probe) complete
