@@ -136,9 +136,10 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Sprint 18B (catalog) | `0b5161c` | 1488/3249/0 | Catalog directory created. test_worm1000.clj split into 13 catalog files under `test/SNOBOL4clojure/catalog/`: t_assign (43), t_arith (194), t_compare (72), t_string (24), t_patterns_prim (78), t_patterns_cap (10), t_patterns_adv (11), t_goto (8), t_loops (8), t_define (16), t_table (7), t_array (7), t_convert (28), t_algorithms (11). Auto-discovered by lein (no project.clj change needed). Full suite: 1488 tests / 3249 assertions / 0 failures / 45s wall clock. Sprint 18B tasks 18B.6–18B.10 complete. |
 
 | Sprint 18B (catalog) | `(pending)` | 1488/3249/0 | Catalog migration complete — 13 files, 510 tests |
+| Session 11 | `555bd39` | 1749/3786/0 | Fix recursive DEFINE — `<FUNS>` registry. `fact(5)=120`. Issue #7 closed. |
 
-**Current baseline**: 1498 tests / 3276 assertions / 0 failures / 41s wall clock
-**Last confirmed**: 2026-03-08
+**Current baseline**: 1749 tests / 3786 assertions / 0 failures
+**Last confirmed**: 2026-03-08 (session 11)
 
 ### Sprint 18C (step-probe) complete
 
@@ -293,7 +294,7 @@ on values that came from args.
 | 4 | Charset range expansion — `ANY("A-Z")` treats `-` as literal | primitives.clj |
 | 5 | PDD field write when accessor name shadows Clojure fn (e.g. REAL) | operators.clj |
 | 6 | Goto case folding — Snobol4.Net uses lowercase `:s(label)` which fails our parser | grammar.clj |
-| 7 | DEFINE return value wrong — `square(6)` returns 5, oracle 36; function call succeeds but value is corrupted | operators.clj / runtime.clj |
+| 7 | ~~DEFINE return value wrong~~ — **FIXED** commit `555bd39`: `<FUNS>` registry decouples function closure from result-slot variable. Recursive calls (`fact(5)=120`) now work. | operators.clj / env.clj |
 | 8 | `~` negation operator broken — `~EQ(5,5)` takes S branch; oracle takes F | operators.clj |
 | 9 | RTAB/RPOS return empty string — `'hello' RTAB(0) . T` captures `""` not `"hello"` | primitives.clj |
 | 10 | Loop fallthrough wrong — `LT(I,5)` after body with I=11 loops instead of falling through | runtime.clj |
@@ -1103,10 +1104,11 @@ This is **Sprint 18C.7** — fix NAME-dereference in subscript operations.
 6. **Token-budget generator design agreed** — tokens count semantic complexity better than chars
 
 **Final state**: 1749 tests / 3786 assertions / **9 failures** (all DEFINE-related, known issue #7)
+*(Session 11: all DEFINE failures resolved. 0 failures. See commit `555bd39`.)*
 
-**Remaining failures** (all DEFINE engine bug):
+**Remaining failures at session 10 end** (all DEFINE engine bug, fixed session 11):
 - `micro_t4_define_simple_fn`, `micro_t4_define_fn_two_args`, `micro_t4_define_string_fn`
 - `micro_t4_define_with_local` (returns 5 instead of 36)
 - `micro_t4_freturn_on_failure`, `micro_t4_freturn_on_zero_div`
 - `micro_t5_recursive_factorial`
-- Plus issues 8 (~ negation), 9 (RTAB/RPOS), 10 (loop fallthrough) found but not yet fixed
+- Plus issues 8 (~ negation), 9 (RTAB/RPOS), 10 (loop fallthrough) still open
