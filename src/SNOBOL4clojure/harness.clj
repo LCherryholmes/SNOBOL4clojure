@@ -98,7 +98,8 @@
   (reset! env/<FUNS> {}))
 
 (defn run-clojure
-  "Run src through SNOBOL4clojure. Returns {:stdout :stderr :exit :thrown}."
+  "Run src through SNOBOL4clojure. Returns {:stdout :stderr :exit :thrown}.
+   Uses CODE-memo (Stage 23A) so grammar+emitter run only once per unique src."
   [src]
   (try
     (reset-runtime!)
@@ -107,7 +108,7 @@
               (deliver stdout-p
                 (with-out-str
                   (try
-                    (sno/RUN (sno/CODE src))
+                    (sno/RUN (sno/CODE-memo src))
                     (catch clojure.lang.ExceptionInfo e
                       (when-not (= (get (ex-data e) :snobol/signal) :end)
                         (throw e)))))))]

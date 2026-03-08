@@ -81,7 +81,7 @@
       (bisect-divergence src 1 100 'I #(clojure.core/= % 5))
   "
   (:require [clojure.test :refer [is]]
-            [SNOBOL4clojure.core :refer [RUN CODE]]))
+            [SNOBOL4clojure.core :refer [RUN CODE CODE-memo]]))
 
 ;; ── Low-level timed executor ───────────────────────────────────────────────────
 
@@ -98,7 +98,7 @@
                        (deliver result-p
                          (try
                            {:exit :ok
-                            :stdout (with-out-str (RUN (CODE src)))}
+                            :stdout (with-out-str (RUN (CODE-memo src)))}
                            (catch clojure.lang.ExceptionInfo e
                              (case (get (ex-data e) :snobol/signal)
                                :end       {:exit :ok :stdout ""}

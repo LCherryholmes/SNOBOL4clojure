@@ -148,9 +148,20 @@
 (def data-type-registry fns/data-type-registry)
 
 ;; ── Re-export compiler / runtime ─────────────────────────────────────────────
-(def CODE!   comp/CODE!)
-(def CODE    comp/CODE)
-(def RUN     rt/RUN)
+(def CODE!             comp/CODE!)
+(def CODE              comp/CODE)
+(def RUN               rt/RUN)
+;; Stage 23A — EDN cache
+(def ir->edn           comp/ir->edn)
+(def edn->ir           comp/edn->ir)
+(def CODE-ir           comp/CODE-ir)
+(def CODE-memo         comp/CODE-memo)
+(def CODE-cached       comp/CODE-cached)
+(def compile-to-file   comp/compile-to-file)
+(def load-ir           comp/load-ir)
+(def clear-memo!       comp/clear-memo!)
+(def memo-stats        comp/memo-stats)
+(def precompile-corpus! comp/precompile-corpus!)
 
 ;; ── -main ─────────────────────────────────────────────────────────────────────
 (defn -main "SNOBOL4/Clojure." [& _args]
