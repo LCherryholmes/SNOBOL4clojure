@@ -1,0 +1,41 @@
+* Program to exercise the "infinite" precision integer math package.
+*
+* Exercises the basic operations with a mix of small, medium, and large
+* operands.  Program is modeled on a test program used to test large
+* integer math in the Icon programming language.
+*
+-include "infinip.inc"
+
+    output(.output,6,128)
+
+    define("optest(ops,arg1s,arg2s)a,arg1,arg2,b,op,result,sign")
+
+    big = "111111111111111111111"
+    med1 = "2222222222"
+    med2 = "3333333333"
+    small = 4
+
+    optest( "+,-,*,/,REMDR,LT,EQ,",
++		 "big,-big,small,-small,",
++		 "big,-big,small,-small," )
+
+    optest( "+,-,*,/,REMDR,LT,EQ,",
++		 "big,med1,-med1,",
++		 "med1,med2,-med2,")
+							:(end)
+
+* Function to iterate through all operand combinations with all operators.
+*
+optest	ops  break(",") . op "," =			:f(return)
+	arg1 = arg1s
+a	arg1  break(",") . a "," =			:f(optest)
+	arg2 = arg2s
+b	arg2  break(",") . b "," =			:f(a)
+	gt.(size(op),1)					:s(do_fun)
+	result = eval(a " " op " " b)
+	output = eval(a) " " op " " eval(b) " = " result :(b)
+do_fun	result = apply(op,eval(a),eval(b))		:s(display)
+	result = "fail"
+display	result = ident(result) "success"
+	output = op "(" eval(a) ", " eval(b) ") = " result :(b)
+end

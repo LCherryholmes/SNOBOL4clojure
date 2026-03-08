@@ -1,0 +1,133 @@
+File README.DOC.    19-Oct-87
+
+This diskette contains text and code from the report "Artificial
+Intelligence Programming in SNOBOL4," by Michael G. Shafto.  The material
+has been compressed into an archive file to save space.
+
+************************   IMPORTANT NOTE   *****************************
+
+The original SNOBOL4 code contained in the report was designed to run
+under mainframe (360/370) Spitbol.  These programs have been converted
+to SNOBOL4+ and Macro Spitbol, and appear in both *.SNO and *.SPT versions
+on this disk.  Spitbol files must be converted to line-feed terminated
+records to operate under the Un*x version of Spitbol-68K.
+
+The SNOLISPIST package is divided into two parts -- a collection of "core"
+functions, and a library of functions that are loaded on demand.  The
+loader in the core package (SNOCORE.INC or SPITCORE.SPT) has been modified
+from the version in the report.  In particular an auxiliary file,
+SNOLIB.IDX or SPITLIB.IDX, is used to provide random access to the library
+package (SNOLIB.INC or SPITLIB.SPT).  In addition, some of the peculiarities
+of Macro Spitbol required further adjustments to the two files.  A utility
+program, BUILDLIB.SNO or BUILDLIB.SPT, is provided to build the index file,
+and should be used anytime the library file is altered.
+
+The programming techniques used in these files are worth studying -- they
+illustrate many unusual ways to use the language.  However, it is very
+clear that some of these programs run too slowly under SNOBOL4+ to be
+useful as anything other than a learning tool.  Spitbol and 32-bit
+machines, such as the 68000 are required for peak performance.
+
+*************************************************************************
+
+The following files should be present:
+
+	arc.exe		archiving utility.  For info, type "a:arc"
+	readme.doc	this file
+	shafto.arc	archived files and documents, consisting of:
+	  atn.in	sample input for augmented transition network [5k]
+	  atn.sno	augmented transition network [13k]
+	  atn.spt	 Spitbol version of the above [13k]
+	  buildlib.bat  DOS batch file to build SNOLISPIST index file [1k]
+	  buildlib.sno	program to build index file [1k]
+	  buildlib.spt   Spitbol version of the above [1k]
+	  ending.in	sample data for word ending program [1k]
+	  ending.sno	word ending program [4k]
+	  ending.spt	 Spitbol version of the above [4k]
+	  hsort.in	sample data for hsort program [1k]
+	  hsort.sno	Hoare quicksort [2k]
+	  hsort.spt	 Spitbol version of the above [2k]
+	  kalah.sno	African board game [31k] (newly commented)
+	  kalah.spt	 Spitbol version of the above [31k]
+	  readme.doc	this file [6k]
+	  report1.doc	text of Shafto report (part 1) [224k]
+	  report2.doc	text of Shafto report (part 2) [148k]
+	  sir.in	sample data for SIR program [1k]
+	  sir.sno	semantic information retrieval program [23k]
+	  sir.spt	 Spitbol version of the above [23k]
+	  snocore.inc	SNOBOL4+ core functions of SNOLISPIST [21k]
+	  snolib.idx	SNOBOL4+ index to library functions [1k]
+	  snolib.inc	SNOBOL4+ library functions of SNOLISPIST [45k]
+	  spitcore.spt	Spitbol core functions of SNOLISPIST [24k]
+	  spitlib.spt	Spitbol library functions of SNOLISPIST [44k]
+	  test.in	sample data for TEST program [1k]
+	  test.sno	test program for SNOLISPIST functions [18k]
+	  test.spt	 Spitbol version of the above [18k]
+	  wang.in	sample data for Wang's theorem prover [1k]
+	  wang.sno	Wang's algorithm for theorem proving [3k]
+	  wang.spt	 Spitbol version of the above [3k]
+
+The figures in brackets indicate the approximate amount of disk space
+needed for the unloaded files.  The files you will be most interested in
+are REPORT1.DOC amd REPORT2.DOC, which are the text of Shafto's report.
+
+The report and any or all of the files can be expanded to other floppies
+or to your hard disk.
+
+
+Hard disk systems:
+------------------
+Create the hard disk directory into which the files should be expanded, and
+make it your current directory.  Insert the source disk in drive A and enter
+the following command:
+
+	A:ARC X A:SHAFTO
+
+
+Floppy disk systems:
+--------------------
+Format two 360k floppy disks, and place one of them in drive B and the source
+disk in drive A.  Enter the following commands:
+
+	B:
+	A:ARC X A:SHAFTO REPORT1.DOC
+
+Remove the first disk from drive B, insert the second blank disk, and enter:
+
+	A:ARC X A:SHAFTO REPORT2.DOC *.SNO *.INC *.BAT *.IN *.IDX
+	A:
+
+(If you are interested in the Spitbol versions, use *.SPT instead of *.SNO
+and *.INC).
+
+
+Printing the report:
+--------------------
+The files REPORT1.DOC and REPORT2.DOC are formatted for a 10-pitch printer
+font (such as Courier), 80-column page width, and 66 lines per page.  Place
+the print head on the perforation between sheets, and copy the two files
+to the printer:
+
+	COPY REPORT1.DOC PRN
+	COPY REPORT2.DOC PRN
+
+REPORT1.DOC is 86 pages long, and is the main section of the report.
+REPORT2.DOC is 86 pages long, and consists of all of the appendices.
+
+*************************************************************************
+
+The material on this diskette may be distributed freely and without
+restrictions of any kind.
+
+The report is distributed with the kind permission of Michael G. Shafto.  A
+paper copy of the report was OCR scanned at Arizona State University by
+Mark Olsen.  The scanned report was extensively edited and corrected by
+Mark Emmer of Catspaw.  In addition, Martin Rice of the University of
+Tennessee typed in the SNOLISPIST library, which was used as a cross-check
+of the OCR-scanned material.  Thanks to all who assisted.
+
+			Catspaw, Inc.
+			P.O. Box 1123
+			Salida, Colorado 81201
+			(Voice) 303/539-3884
+			(BBS) 303/539-4830

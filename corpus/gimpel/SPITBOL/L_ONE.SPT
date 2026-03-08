@@ -1,0 +1,51 @@
+* L_ONE.spt - This is a compiler for the language L1 (Gimpel, p. 411).
+*	      It produces output in the form of assembly language
+*	      (accepted by ASM) for machine M (Gimpel, p. 407).
+*
+* As given in Gimpel, the patterns TERM and E are left recursive,
+* which is fine for SNOBOL4 with its one-character assumption and
+* quickscan heuristics.  In SPITBOL, the left recursion immediately
+* results in stack overflow.  Therefore, the patterns defining TERM
+* and E have been modified to eliminate left recursion.  This has the
+* side effect of making operators right-associative, so expressions
+* such as A = B/C/D must be written as A = (B/C)/D.
+*
+* Sample input:
+*   A = (B - C * D) / 10
+*
+-INCLUDE "push.inc"
+-INCLUDE "temp.inc"
+	DEFINE('S(NAME)')
+	DEFINE('S_(NAME)T')			:(S_END)
+S	S  =  EVAL("NULL . *S_('" NAME "')")	:(RETURN)
+S_	S_  =  .DUMMY			:($('S_' NAME))
+
+S_NEG	OUTPUT  =  ' LOADN '  POP()
+	OUTPUT  =  ' STORE '  PUSH(TEMP())	:(NRETURN)
+
+S_ADD	;S_SUB ;S_MUL ;S_DIV
+	T       =  POP()
+	OUTPUT  =  ' LOAD '  POP()
+	OUTPUT  =  ' ' NAME ' ' T
+	OUTPUT  =  ' STORE '  PUSH(TEMP())	:(NRETURN)
+
+S_ASGN	OUTPUT  =  ' LOAD '  POP()
+	OUTPUT  =  ' STORE '  POP()		:(NRETURN)
+S_END
+	LET  =  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+	DIGITS  =  '0123456789'
+	IDEN  =  (ANY(LET) (SPAN(LET DIGITS) | '')) . *PUSH()
+	INTEGER  =  SPAN(DIGITS) . *PUSH()
+	PRIMARY  =  IDEN | INTEGER | '(' *E ')'
+	FACTOR  =  PRIMARY  |  '-' PRIMARY  S('NEG')
+	TERM  =  FACTOR '*' *TERM S('MUL')  |
++	FACTOR  '/' *TERM S('DIV')  |  FACTOR
+	E   =   TERM '+' *E  S('ADD')  |
++	TERM '-' *E  S('SUB')  |  TERM
+	STMT  =  POS(0)  IDEN  '='  *E  S('ASGN')  RPOS(0)
+READ	S  =  TRIM(INPUT)			:F(END)
+REMOVE_BLANKS	S  ANY(' ' CHAR(9))  =		:S(REMOVE_BLANKS)
+	TEMP_NO    =  0
+	S   STMT				:S(READ)
+	OUTPUT  =  '***  ERROR IN '   S		:(READ)
+END

@@ -1,0 +1,51 @@
+* L_TWO.SNO - This is a compiler for the language L2 (Gimpel, p. 422).
+*	      It produces output in the form of assembly language
+*	      (accepted by ASM) for machine M (Gimpel, p. 407).
+*
+*	      It optimizes register allocation, and distinguishes
+*	      between integer and real variables.  Following FORTRAN
+*	      conventions, variables beginning with letters
+*	      I, J, K, L, M, or N are integer, all others are real.
+*	      Mixed-mode arithmetic is not defined.
+*
+* As given in Gimpel, the patterns TERM and E are left recursive,
+* which is fine for SNOBOL4 with its one-character assumption and
+* quickscan heuristics.  In SPITBOL, the left recursion immediately
+* results in stack overflow.  Therefore, the patterns defining TERM
+* and E have been modified to eliminate left recursion.  This has the
+* side effect of making operators right-associative, so expressions
+* such as A = B/C/D must be written as A = (B/C)/D.
+*
+* Sample input:
+*   if x > y then x = x + a(i+1) + z else y = x - y / z
+*
+
+	&FULLSCAN = 1
+
+-INCLUDE "pol.inc"
+-INCLUDE "tr.inc"
+-INCLUDE "tuple.inc"
+
+READ	S  =  TRIM(INPUT)			:F(END)
+*
+* Convert input to Polish form.
+*
+	S STMT				:F(ERR)
+	POLISH = POP() ","
+*
+* Convert Polish to 4-tuples
+*
+	T = TR()
+*
+* Convert 4-tuples to machine code
+*
+GENLOOP	T POS(0) (BREAKX('/') '//') . TUP =	:F(READ)
+	TUP BREAK(',') . OP ','
++	((BREAK(',') . ARG1 ',' BREAK(',') . ARG2 ','
++	  BREAKX('/') . ARG3) |
++	(BREAK('/') . ARG1 "" . ARG2 "" . ARG3)) '//'
++						 :F(ERR2)
+	TUPLE(OP,ARG1,ARG2,ARG3)		:(GENLOOP)
+ERR	OUTPUT  =  '***  ERROR IN '   S		:(READ)
+ERR2	OUTPUT	=  '***  ERROR IN '   TUP	:(READ)
+END

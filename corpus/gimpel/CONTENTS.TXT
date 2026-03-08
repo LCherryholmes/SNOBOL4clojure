@@ -1,0 +1,421 @@
+Programs from:
+
+        A L G O R I T H M S   I N   S N O B O L 4
+        -----------------------------------------
+                    by James F. Gimpel
+
+        ISBN 0-939793-01-6
+        ISBN 0-939793-00-8 (paperback)
+
+Version 1.05
+
+(c) Copyright 1976 Bell Telephone Laboratories, Inc.
+
+(c) Copyright 1986, 1998 Catspaw, Inc.
+
+Program material provided courtesy of Dr. James F. Gimpel.
+
+Permission to distribute these programs was obtained by
+Catspaw, Inc. from James F. Gimpel and AT&T Bell Laboratories.
+
+Catspaw, Inc. grants permission to make and distribute verbatim
+copies of these programs provided the copyright notice and this
+permission notice are preserved on all copies.
+
+Catspaw, Inc. further grants permission to incorporate these 
+programs and functions into programs you are developing for any
+commercial or non-commercial purpose.
+
+Catspaw, Inc.
+P.O. Box 1123
+Salida, CO 81201
+719-539-3884
+support@SNOBOL4.com
+ftp://ftp.SNOBOL4.com
+http://www.SNOBOL4.com
+
+
+
+
+
+
+
+              T A B L E   O F   C O N T E N T S
+            +++++++++++++++++++++++++++++++++++++
+
+Alphabetic listing of programs in directories \SNOBOL4,
+\SPITBOL (and \COMMON in some distributions).
+
+Alphabet listing:
+-----------------
+
+ Name         Chapter  Description
+ ===========  =======  =====================================
+
+ --- Data Files ---
+ POKER.IN     17.7     Rules text file for POKER.SNO
+ RPOEM.IN     16.9     Random poetry data
+ RSEASON.IN   16.10    Baseball data for RSEASON simulation
+ RSTORY.IN    16.11    Data file for RSTORY program
+
+ --- Complete Programs ---  (.SPT extension in \SPITBOL)
+ ASM.SNO      18.1     Assembler for a simple machine
+ BCD_EBCD.SNO  2.2     BCD code to EBCDIC code
+ INFINIP.SNO  15.3     Infinite precision arithmetic
+ L_ONE.SNO    18.2     Compiler for simple language 1
+ L_TWO.SNO    18.2     Compiler for simple language 2
+ POKER.SNO    17.7     Optimal poker
+ RPOEM.SNO    16.9     Random poetry generation
+ RSEASON.SNO  16.10    Baseball simulation
+ RSTORY.SNO   16.11    Random story generation
+ STONE.SNO    17.3     Pile of stones game
+
+ --- Functions ---
+ AGT.INC       3.13    Alphabetic comparison
+ AI.INC        4.6     Array subscripting
+ AOPA.INC      4.4     Array operators
+ ARC.INC      15.8     Inverse trigonometric functions
+ ASM360.INC    8.12    Matching OS/360 assembler input
+
+ BAL.INC       8.3     Matching balanced strings (also BALX.INC)
+ BALREV.INC    3.8     Balanced reversals
+ BASE10.INC    2.5     Arbitrary base to base 10
+ BASEB.INC     2.4     Base 10 to arbitrary base
+ BLANKS.INC   18.3     Blank removal in Fortran
+ BLEND.INC     3.7     Blending two strings
+ BNORM.INC    10.1     Backspace normalization
+ BREAKX.INC    8.2     BREAK with rematch
+ BRKREM.INC    8.1     BREAK or match to end of string
+ BSORT.INC    13.1     Bubble sort
+
+ CARDPAK.INC  17.5     Functions for card playing
+ CATA.INC      4.8     Array concatenation
+ CH.INC        2.7     Hexidecimal to character string
+ COMB.INC     15.1     Combinations
+ COPYL.INC     5.8     Copying a list
+ COUNT.INC     3.4     Count substring occurrences
+ CRACK.INC     4.1     Convert string to array
+
+ DAY.INC       2.8     Day of week from date
+ DECOMB.INC   15.2     Combinatorial number system
+ DEXP.INC     14.1     Defining an expression
+ DEXTERN.INC  14.2     Dynamically loadable functions
+ DIFF.INC      3.10    Set difference
+
+ FASTBAL.INC   8.4     Matching balanced string
+ FIND.INC      4.5     Array searching
+ FLD.INC       5.9     Obtaining the field of a structure
+ FLOOR.INC    15.4     Numeric floor function
+ FORTPUT.INC   9.8     Output Fortran source
+ FORTREAD.INC  9.2     Read Fortran source
+ FPROFILE.INC 11.6     Execution frequency profile
+ FRSORT.INC   13.5     Frequency sort
+ FTRACE.INC   14.3     Self-defined function tracing
+
+ GPM.INC      18.8     General purpose macro processor
+
+ HEX.INC       2.6     Character string to hexidecimal
+ HSORT.INC    13.2     Hoare's Quicksort
+ HYPHENAT.INC 10.7     Hyphenation
+
+ IMAGE.INC    10.8     Determining the printed page
+ INFINIP.INC  15.3     Infinite precision arithmetic
+ INORM.INC    10.2     Image normalization
+ INSERT.INC   13.8     Tree sort
+ INSERTB.INC  13.10    Backwards insertion sort
+ INSULATE.INC 14.4     Change universe at function crossings
+ IP.INC       12.6     Inverting a permutation
+
+ LAST.INC      5.4     Retrieve the last item of a list
+ LEXGT.INC     3.12    Lexical comparison
+ LIKE.INC      8.8     Matching a similar string
+ LINE.INC     10.3     Line extraction
+ LINEARIZ.INC 13.9     Linearize a tree
+ LOG.INC      15.9     Logarithms
+ LPAD.INC      3.2     Left padding
+ LPERM.INC    12.5     Lexicographic permutations
+ LPROG.INC    11.5     Determine length of program
+ LSORT.INC    13.3     Linked list sort
+
+ MDY.INC       2.9     Month, day, year from day number
+ MFREAD.INC    9.6     Multi-file reading
+ MINP.INC     10.6     Minimum print width
+ MSORT.INC    13.4     Merged array sort
+
+ NOT.INC       8.5     Pattern complementation
+
+ ONCE.INC      8.6     Picking off the first alternative
+ ONEWAY.INC   16.4     Oneway ciphers
+ OR.INC        8.10    Speeding up alternation
+ ORSORT.INC    8.10    Sort before calling OR()
+ ORBREAK.INC   8.10    Adjunct to use BREAKX with OR or ORSORT
+ ORVISUAL.INC  8.10    Produce OR as string rather than pattern
+ ORDER.INC     3.1     Ordering the characters of a string
+
+ PAD.INC      10.4     Padding with blanks
+ PARAGRAP.INC  9.3     Reading text
+ PEEL.INC      9.9     Peeling off SNOBOL4 source segments
+ PERM.INC     12.2     Trotter's algorithm
+ PERMS.INC    12.3     String permutations
+ PERMUTAT.INC 12.1     Determining the Ith permutation
+ PHRASE.INC   17.1     Gaming phrases
+ PHRASES.INC  17.1     Text for gaming phrases
+ PHYSICAL.INC 14.6     Arithmetic on physical quantities
+ PLI_STMT.INC  8.11    Matching a PL/I statement
+ POKEV.INC    17.6     Poker evaluation function
+ POL.INC      18.4     Converting to Polish notation
+ PUSH.INC      5.5     Stack manipulation - Push, Pop, Top
+ PUT.INC       9.7     Outputting lines
+
+ QUEST.INC    17.2     Gaming dialogue
+ QUOTE.INC     3.16    String quoting
+
+ RAISE.INC    15.10    Raising to powers
+ RAMM.INC     16.2     A more random generator
+ RANDOM.INC   16.1     A random number generator
+ RCHAR.INC    16.5     Random characters (in context)
+ READ.INC      9.1     Pattern-based reading
+ READL.INC     5.1     Read a list
+ READRL.INC    5.2     Read a list in reverse
+ REDEFINE.INC 14.5     Large-scale redefinition
+ REORDER.INC  12.4     Permutations with repeated elements
+ REPL.INC      3.15    String replacement
+ RESOLUTI.INC 11.1     Determining the clock resolution
+ REVERSE.INC   3.6     Reversing a string
+ REVL.INC      5.3     Reverse a list
+ ROMAN.INC     2.3     Arabic to Roman
+ ROTATER.INC   3.5     Rotating a string
+ RPAD.INC      3.3     Right padding
+ RPERMUTE.INC 16.3     Randomly permuted strings
+ RPOEM.IN     16.9     Random poetry data
+ RPOEM.SNO    16.9     Random poetry generation
+ RSEASON.INC  16.10    Baseball simulation
+ RSEASON.SNO  16.10    Baseball simulation program
+ RSELECT.INC  16.7     Random selection (with weights)
+ RSENTENC.INC 16.8     Random sentence generation
+ RWORD.INC    16.6     Random words
+
+ SEQ.INC       4.3     Sequencing through arrays
+ SKIM.INC      3.11    Skimming off unique characters
+ SNOPUT.INC    9.10    Outputting SNOBOL4 source
+ SNOREAD.INC   9.4     Read SNOBOL4 source
+ SPACING.INC  10.5     Measuring the print width
+ SPELL.INC     2.10    Spelled out form of an integer
+ SQRT.INC     15.6     Finding the square root
+ SSORT.INC    13.7     Quick and dirty insertion sort
+ STACK.INC    14.8     Multiple stacks
+ STATEF.INC   14.7     State-function definition
+ STRINGOU.INC  4.2     Converting arrays to strings
+ SUBSTR.INC    3.9     Substringing
+ SWAP.INC      3.14    Swapping variable values
+ SYSTEM.INC   11.3     Determining the processor
+
+ TEMP.INC     18.2     Provide temporary variable
+ TEST.INC      8.7     Trouble-free pattern predicates
+ TICTACTO.INC 17.4     Tick-tack-toe
+ TIMEGC.INC   11.4     Time the garbage collector
+ TIMER.INC    11.2     Timing program sections
+ TPROFILE.INC 11.7     Obtaining a time profile
+ TR.INC       18.6     Polish to an intermediate form
+ TREE.INC     18.5     A pattern to match a tree
+ TREEREAD.INC  9.5     Reading trees
+ TRIG.INC     15.7     Trigonometric functions
+ TRUNC.INC     4.7     Array truncation
+ TSORT.INC    13.6     A tournament (and table) sort
+ TUPLE.INC    18.7     Code generation from 4-tuples
+
+ UPLO.INC      2.1     Upper-case to lower case
+
+ VISIT.INC     5.10    Visiting nodes of a list
+
+
+
+
+
+
+
+
+Chapter listing:
+----------------
+
+ Name         Chapter  Description
+ ===========  =======  =====================================
+
+ --- Conversions, Chapter 2 ---
+ UPLO.INC      2.1     Upper-case to lower case
+ BCD_EBCD.SNO  2.2     BCD code to EBCDIC code
+ ROMAN.INC     2.3     Arabic to Roman
+ BASEB.INC     2.4     Base 10 to arbitrary base
+ BASE10.INC    2.5     Arbitrary base to base 10
+ HEX.INC       2.6     Character string to hexidecimal
+ CH.INC        2.7     Hexidecimal to character string
+ DAY.INC       2.8     Day of week from date
+ MDY.INC       2.9     Month, day, year from day number
+ SPELL.INC     2.10    Spelled out form of an integer
+
+ --- Basic String Functions, Chapter 3 ---
+ ORDER.INC     3.1     Ordering the characters of a string
+ LPAD.INC      3.2     Left padding
+ RPAD.INC      3.3     Right padding
+ COUNT.INC     3.4     Count substring occurrences
+ ROTATER.INC   3.5     Rotating a string
+ REVERSE.INC   3.6     Reversing a string
+ BLEND.INC     3.7     Blending two strings
+ BALREV.INC    3.8     Balanced reversals
+ SUBSTR.INC    3.9     Substringing
+ DIFF.INC      3.10    Set difference
+ SKIM.INC      3.11    Skimming off unique characters
+ LEXGT.INC     3.12    Lexical comparison
+ AGT.INC       3.13    Alphabetic comparison
+ SWAP.INC      3.14    Swapping variable values
+ REPL.INC      3.15    String replacement
+ QUOTE.INC     3.16    String quoting
+
+ --- Basic Array Functions, Chapter 4 ---
+ CRACK.INC     4.1     Convert string to array
+ STRINGOU.INC  4.2     Converting arrays to strings
+ SEQ.INC       4.3     Sequencing through arrays
+ AOPA.INC      4.4     Array operators
+ FIND.INC      4.5     Array searching
+ AI.INC        4.6     Array subscripting
+ TRUNC.INC     4.7     Array truncation
+ CATA.INC      4.8     Array concatenation
+
+ --- Basic List Processing, Chapter 5 ---
+ READL.INC     5.1     Read a list
+ READRL.INC    5.2     Read a list in reverse
+ REVL.INC      5.3     Reverse a list
+ LAST.INC      5.4     Retrieve the last item of a list
+ PUSH.INC      5.5     Stack manipulation - Push, Pop, Top
+ COPYL.INC     5.8     Copying a list
+ FLD.INC       5.9     Obtaining the field of a structure
+ VISIT.INC     5.10    Visiting nodes of a list
+
+ --- Pattern Construction, Chapter 8 ---
+ BRKREM.INC    8.1     BREAK or match to end of string
+ BREAKX.INC    8.2     BREAK with rematch
+ BAL.INC       8.3     Matching balanced strings (also BALX.INC)
+ FASTBAL.INC   8.4     Matching balanced string
+ NOT.INC       8.5     Pattern complementation
+ ONCE.INC      8.6     Picking off the first alternative
+ TEST.INC      8.7     Trouble-free pattern predicates
+ LIKE.INC      8.8     Matching a similar string
+ OR.INC        8.10    Speeding up alternation
+ ORSORT.INC    8.10    Sort before calling OR()
+ ORBREAK.INC   8.10    Adjunct to use BREAKX with OR or ORSORT
+ ORVISUAL.INC  8.10    Produce OR as string rather than pattern
+ PLI_STMT.INC  8.11    Matching a PL/I statement
+ ASM360.INC    8.12    Matching OS/360 assembler input
+
+ --- Input/Output, Chapter 9 ---
+ READ.INC      9.1     Pattern-based reading
+ FORTREAD.INC  9.2     Read Fortran source
+ PARAGRAP.INC  9.3     Reading text
+ SNOREAD.INC   9.4     Read SNOBOL4 source
+ TREEREAD.INC  9.5     Reading trees
+ MFREAD.INC    9.6     Multi-file reading
+ PUT.INC       9.7     Outputting lines
+ FORTPUT.INC   9.8     Output Fortran source
+ PEEL.INC      9.9     Peeling off SNOBOL4 source segments
+ SNOPUT.INC    9.10    Outputting SNOBOL4 source
+
+ --- Paragraph Formatting, Chapter 10 ---
+ BNORM.INC    10.1     Backspace normalization
+ INORM.INC    10.2     Image normalization
+ LINE.INC     10.3     Line extraction
+ PAD.INC      10.4     Padding with blanks
+ SPACING.INC  10.5     Measuring the print width
+ MINP.INC     10.6     Minimum print width
+ HYPHENAT.INC 10.7     Hyphenation
+ IMAGE.INC    10.8     Determining the printed page
+
+ --- Implementation and Timing, Chapter 11 ---
+ RESOLUTI.INC 11.1     Determining the clock resolution
+ TIMER.INC    11.2     Timing program sections
+ SYSTEM.INC   11.3     Determining the processor
+ TIMEGC.INC   11.4     Time the garbage collector
+ LPROG.INC    11.5     Determine length of program
+ FPROFILE.INC 11.6     Execution frequency profile
+ TPROFILE.INC 11.7     Obtaining a time profile
+
+ --- Permutations, Chapter 12 ---
+ PERMUTAT.INC 12.1     Determining the Ith permutation
+ PERM.INC     12.2     Trotter's algorithm
+ PERMS.INC    12.3     String permutations
+ REORDER.INC  12.4     Permutations with repeated elements
+ LPERM.INC    12.5     Lexicographic permutations
+ IP.INC       12.6     Inverting a permutation
+
+ --- Sorting, Chapter 13 ---
+ BSORT.INC    13.1     Bubble sort
+ HSORT.INC    13.2     Hoare's Quicksort
+ LSORT.INC    13.3     Linked list sort
+ MSORT.INC    13.4     Merged array sort
+ FRSORT.INC   13.5     Frequency sort
+ TSORT.INC    13.6     A tournament (and table) sort
+ SSORT.INC    13.7     Quick and dirty insertion sort
+ INSERT.INC   13.8     Tree sort
+ LINEARIZ.INC 13.9     Linearize a tree
+ INSERTB.INC  13.10    Backwards insertion sort
+
+ --- Function Functions, Chapter 14 ---
+ DEXP.INC     14.1     Defining an expression
+ DEXTERN.INC  14.2     Dynamically loadable functions
+ FTRACE.INC   14.3     Self-defined function tracing
+ INSULATE.INC 14.4     Change universe at function crossings
+ REDEFINE.INC 14.5     Large-scale redefinition
+ PHYSICAL.INC 14.6     Arithmetic on physical quantities
+ STATEF.INC   14.7     State-function definition
+ STACK.INC    14.8     Multiple stacks
+
+ --- Numbers, Chapter 15 ---
+ COMB.INC     15.1     Combinations
+ DECOMB.INC   15.2     Combinatorial number system
+ INFINIP.INC  15.3     Infinite precision arithmetic
+ FLOOR.INC    15.4     Numeric floor function
+ SQRT.INC     15.6     Finding the square root
+ TRIG.INC     15.7     Trigonometric functions
+ ARC.INC      15.8     Inverse trigonometric functions
+ LOG.INC      15.9     Logarithms
+ RAISE.INC    15.10    Raising to powers
+
+ --- Stochastic Strings, Chapter 16 ---
+ RANDOM.INC   16.1     A random number generator
+ RAMM.INC     16.2     A more random generator
+ RPERMUTE.INC 16.3     Randomly permuted strings
+ ONEWAY.INC   16.4     Oneway ciphers
+ RCHAR.INC    16.5     Random characters (in context)
+ RWORD.INC    16.6     Random words
+ RSELECT.INC  16.7     Random selection (with weights)
+ RSENTENC.INC 16.8     Random sentence generation
+ RPOEM.IN     16.9     Random poetry data
+ RPOEM.SNO    16.9     Random poetry generation
+ RSEASON.IN   16.10    Baseball data for RSEASON simulation
+ RSEASON.INC  16.10    Baseball simulation
+ RSEASON.SNO  16.10    Baseball simulation program
+ RSTORY.IN    16.11    Data file for RSTORY program
+ RSTORY.SNO   16.11    Random story generation
+
+ --- Games, Chapter 17 ---
+ PHRASE.INC   17.1     Gaming phrases
+ PHRASES.INC  17.1     Text for gaming phrases
+ QUEST.INC    17.2     Gaming dialogue
+ STONE.SNO    17.3     Pile of stones game
+ TICTACTO.INC 17.4     Tick-tack-toe
+ CARDPAK.INC  17.5     Functions for card playing
+ POKEV.INC    17.6     Poker evaluation function
+ POKER.IN     17.7     Rules text file for POKER.SNO
+ POKER.SNO    17.7     Optimal poker
+
+ ASM.SNO      18.1     Assembler for a simple machine
+ L_ONE.SNO    18.2     Compiler for simple language 1
+ L_TWO.SNO    18.2     Compiler for simple language 2
+ TEMP.INC     18.2     Provide temporary variable
+ BLANKS.INC   18.3     Blank removal in Fortran
+ POL.INC      18.4     Converting to Polish notation
+ TREE.INC     18.5     A pattern to match a tree
+ TR.INC       18.6     Polish to an intermediate form
+ TUPLE.INC    18.7     Code generation from 4-tuples
+ GPM.INC      18.8     General purpose macro processor
+
+

@@ -1,0 +1,84 @@
+*  HSORT.SNO - SNOBOL4+ Version
+*
+*  C.A.R. Hoare's Quicksort algorithm
+*
+* Sort array A according to predicate P.
+*
+* Demonstration only:  Remember that SNOBOL4 has a built-in SORT function.
+*
+* P(A<I>,A<J>) true for all I < J.
+*
+* Possible values of P:
+*     .LE, .GE, .LLE, .LGE.  Use LE and GE for numeric sort, LLE and LGE
+*      for lexical sort.
+*
+* DO NOT USE:
+*     .LT, .GT, .LLT, .LGT
+*
+*  To run with sample data:
+*  SNOBOL4 HSORT /I:HSORT
+*
+ DEFINE('HSORT(A,I,N,P)J,K,C')
+ DEFINE('HSORT.KO(V1,V2)')
+ DEFINE('HSORT.OK(V1,V2)')
+ DEFINE('HSORT.SWAP(I1,I2)T')              :(HSORT.END)
+*
+HSORT
+      GT(N - I,  1)                        :S(HSORT1)
+      GE(I, N)                             :S(RETURN)
+      (HSORT.KO(A<I>,A<N>)   HSORT.SWAP(I,N))
+         :(RETURN)
+*
+HSORT1
+      C = A<(I + N) / 2>
+      J = I - 1
+      K = N + 1
+*
+HSORT2   J = J + 1
+      HSORT.OK(C,A<J>)                     :F(HSORT2)
+HSORT3   K = K - 1
+      HSORT.OK(A<K>,C)                     :F(HSORT3)
+*
+      (LT(J,K)    HSORT.SWAP(J,K))         :S(HSORT2)
+*
+      HSORT(A, I, K, P)
+      HSORT(A, K + 1, N, P)                :(RETURN)
+*
+HSORT.SWAP  T = A<I1> ; A<I1> = A<I2> ; A<I2> = T     :(RETURN)
+*
+HSORT.OK      APPLY(P,V1,V2)               :S(RETURN)F(FRETURN)
+*
+HSORT.KO      APPLY(P,V1,V2)               :S(FRETURN)F(RETURN)
+*
+HSORT.END
+*
+*
+* Begin main program *****
+*
+*
+      &TRIM = 1
+
+* Make two passes through input file -- First to count the number of lines
+* in the file to allocate an array of the correct size, second pass to read
+* in the values.
+
+      N = 0
+COUNT
+      N = ?INPUT   N + 1      :S(COUNT)
+*
+      A = ARRAY(N)
+      REWIND( 5 )
+      I = 0
+INPUT.LOOP
+      I = LT(I,N) I + 1       :F(INPUT.LOOP.END)
+      A<I> = INPUT            :(INPUT.LOOP)
+INPUT.LOOP.END
+*
+   HSORT(A,1,N, .LLE)
+*
+      I = 0
+OUTPUT.LOOP
+      I = LT(I,N) I + 1       :F(OUTPUT.LOOP.END)
+      OUTPUT = LPAD(I,5) ".   " A<I>    :(OUTPUT.LOOP)
+OUTPUT.LOOP.END
+END

@@ -1,0 +1,33 @@
+*	BUILDLIB.SPT
+*
+*	Build index to functions in spitlib.spt to file spitlib.idx.
+*
+*	Uses the ability of latest version of Spitbol-68K to return
+*	file position from SET function.  If your Spitbol does
+*	not have this feature, you will have to modify the program
+*	to count characters in each line read, plus 1 for line-feed
+*	at end of each line on Un*x systems.
+*
+
+	&TRIM = 1
+	&ANCHOR = 1
+	INPUT(.IN,1,'spitlib.spt')	:F(ERROR)
+	OUTPUT(.OUT,2,'spitlib.idx')	:F(ERROR)
+
+	UCASE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+	PAT = (ANY(UCASE) (BREAK(' ' CHAR(9)) | REM)) . LABEL
+* Scan for starting label, noting file position preceeding label.
+*
+LOOP	FILE_POS = SET(1,0,1)
+	LINE = IN				:F(END)
+	LINE ? PAT				:F(LOOP)
+
+* Found the start of a function.  Record it.
+	OUT = LABEL ',' FILE_POS
+
+* Scan for end of function
+	END_PAT = LABEL '.END'
+LOOP2	LINE = IN				:F(END)
+	LINE ? END_PAT				:F(LOOP2)S(LOOP)
+
+END

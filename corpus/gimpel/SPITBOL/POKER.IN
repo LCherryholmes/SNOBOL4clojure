@@ -1,0 +1,10 @@
+Cold-hand five-card poker between two players with nothing wild.
+
+In cold-hand poker, each player enters an "ante" into the pot and is
+dealt a hand (best thought of as a number in the range (0,1)) and the
+players take turns betting, checking, calling, raising and folding.
+Briefly, checking and betting are done when the pot contains equal
+contributions from both players (such as at the start or after a check).
+Calling, raising and folding are done when it is up to one of the players
+to equalize the pot.  If he calls, there is a showdown.  A raise is a call
+followed by a bet.

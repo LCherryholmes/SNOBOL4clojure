@@ -1,0 +1,5676 @@
+
+
+
+
+
+
+
+                                     APPENDIX F
+
+            This is an alphabetical listing of all the SNOLISPIST
+          functions, with detailed descriptions, examples, and references.
+
+            Core functions are marked with an asterisk (*).
+
+            The following abbreviations are used to indicate the datatype
+          of arguments to the functions:
+
+            S       'STRING'
+
+            L       'CONS' (i.e., list)
+
+            N       'NUMERIC' ('REAL', 'DREAL', or 'INTEGER')
+
+            NAME    'NAME'
+
+            A       'ARRAY'
+
+            X       any
+
+
+
+
+
+          +-----------------------------+
+          | ABS(N)                      |
+          +-----------------------------+
+
+            Returns -N if N is negative; otherwise N.
+
+            General Categories: Arithmetic function
+
+            Example: ABS( -9.345567) returns 9.345567
+
+            Comments: N may be integer, real, or double precision.  String
+               to numeric conversion, if necessary, is handled
+               automatically.
+
+            References:
+               Charniak et al. (1980), 301.
+               MTS LISP Manual, 26.
+               Shapiro (1979), 148.
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 87 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | ACOS(N)                     |
+          +-----------------------------+
+
+            Returns the inverse cosine of N, -1 <= N <= 1.  The result is
+               in radians.
+
+            General Categories: Arithmetic function
+
+            Example: ACOS(-DIV(1,6)) returns 1.7382444060158.
+
+            References:
+               Gimpel (1976), 336.
+
+
+
+
+
+          +-----------------------------+
+          | ADD(N1,N2)                  |
+          +-----------------------------+
+
+            Returns N1 + N2.
+
+            General Categories: Arithmetic function
+
+            Example: ADD(3.7,19.4) returns 23.1.
+
+             Comments: Any combination of numeric datatypes is legal.
+               "Mixed mode" errors are not a problem.  Note that ADD is
+               strictly binary.  See PLUS for a similar function which
+               takes a list argument.
+
+            References:
+               MTS LISP Manual, 26.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 88 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | ADD1(N)                     |
+          +-----------------------------+
+
+            Returns N + 1.
+
+            General Categories: Arithmetic function
+
+            Example: ADD1(17) returns 18.
+
+            Comments: The value of the argument N is not changed.
+
+            References:
+               Charniak et al. (1980), 301.
+               MTS LISP Manual, 26.
+               Shapiro (1979), 148.
+
+
+
+
+
+          +-----------------------------+
+          | ADDPROP(NAME,X,S)           |
+          +-----------------------------+
+
+            Returns the (entire) altered property list of NAME.
+
+            General Categories: List composition
+               List search
+               Property-list function
+
+            Side Effects: May alter the property list of NAME.
+
+            Example: ADDPROP( .DOG, 4, 'LEGS') will search the property
+               list of .DOG for the indicator 'LEGS'.  If 'LEGS' is not
+               found, then ('LEGS' ~ 4 ~ NIL) will be CONSed onto the
+               property list.  If 'LEGS' is found, then its associated list
+               of values is searched for 4.  If 4 is found, nothing
+               happens.  Otherwise, 4 is added to the list of values (all
+               the other values remain).
+                 If X is NIL, and if S is already an indicator on the
+               property list, then nothing changes.  If X is NIL and S is
+               not an indicator, then (S ~ NIL) is added to the property
+               list.
+
+            References:
+               Charniak et al. (1980), 302.
+               MTS LISP Manual, 25.
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 89 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | APPEND(L)                   |
+          +-----------------------------+
+
+            Returns a list consisting of the top-level elements of CAR(L),
+               followed by the top-level elements of CADR(L), followed by
+               the top-level elements of CADDR(L), etc.
+
+            General Categories: List composition
+
+            Example:  Suppose L1 = #'(A B)',
+                              L2 = #'(C D E)', and
+                              L3 = #'"(F G (H I))'.
+                      Then APPEND(L1 ~ L2 ~ L3 ~ NIL) returns
+                     ('A' ~ 'B' ~ 'C' ~ 'D' ~ 'E' ~ 'F' ~ 'G' ~ ('H' ~
+                      'I' ~ NIL) ~ NIL).
+
+            Comments: APPEND takes one argument, which must be a list of
+               lists, ending with NIL.
+
+            References: Charniak et al. (1980), 302.
+               MTS LISP Manual, 20 (CONC, not APPEND!).
+               Schank & Riesbeck (1981), 54.
+               Shapiro (1979), 148.
+
+
+
+
+
+          +-----------------------------+
+          | ASIN(N)                     |
+          +-----------------------------+
+
+            Returns the inverse sine of N, -1 <= N <= 1.  The result is in
+               radians.
+
+            General Categories: Arithmetic function
+
+            Example: ASIN(DIV(1,SQRT(2)) returns 0.78539816339773.
+
+            References: Gimpel (1976), 334.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 90 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | ASSOC(X,L)                  |
+          +-----------------------------+
+
+            Returns the tail of L, beginning with the first top-level
+               element whose CAR is EQUAL to X.  If no such element of L is
+               found, ASSOC returns NIL.
+
+            General Categories: List decomposition
+               List search
+
+            Example:  Suppose L = #'((1 A) (2 B) (3 C) (4 D))'.
+                      Then ASSOC(3,L) returns #'((3 C) (4 D))'.
+
+            Comments: Note that EQUAL is used, not EQU.
+
+            References: Charniak et al. (1980), 302.
+               MTS LISP Manual, 19.
+               Schank & Riesbeck (1981), 55.
+               Shapiro (1979), 149.
+
+
+
+
+
+          +-----------------------------+
+          | ASSOCL(L1,L2)               |
+          +-----------------------------+
+
+            Returns the tail of L2, beginning with the first element whose
+               CAR is a MEMBER of L1.  If no element of L1 produces a match
+               in L2, ASSOCL returns NIL.
+
+            General Categories: List decomposition
+               List search
+
+            Example: Suppose L1 = #'(9 3 4 1 2)' and
+                             L2 = #'((1 A) (2 B) (3 C) (4 D))'.
+                     Then ASSOCL(L1,L2) returns all of L2.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 91 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | ATAN(N)                     |
+          +-----------------------------+
+
+            Returns the inverse tangent of N.  The result is in radians.
+
+            General Categories: Arithmetic function
+
+            Example: ATAN(2) returns 1.1071487177935.
+
+            References: Gimpel (1976), 334.
+
+
+
+
+
+          +-----------------------------+
+          | *ATOM(X)                    |
+          +-----------------------------+
+
+            Returns the null string.  It succeeds if X does not have the
+               datatype 'CONS', and fails otherwise.
+
+            General Categories: Predicate
+
+            Example: ATOM('A' ~ 17 ~ NIL) fails.
+
+            Comments: ATOM succeeds for all built-in SPITBOL datatypes, as
+               well as for all programmer-defined datatypes except 'CONS'.
+
+            References: Charniak et al. (1980), 302.
+               MTS LISP Manual, 17.
+               Schank & Riesbeck (1981), 55.
+               Shapiro (1979), 149.
+
+
+
+
+
+          +-----------------------------+
+          | ATOMP(X)                    |
+          +-----------------------------+
+
+            Returns T if X does not have the datatype 'CONS', and NIL
+               otherwise.
+
+            General Categories: Predicate
+
+            Example: ATOMP("A17NIL') returns T.
+
+            Comments: See ATOM.
+
+            References: See ATOM.
+
+
+
+
+       AI Programming in SNOBOL4       - 92 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | CAL(A)                      |
+          +-----------------------------+
+
+            Returns a list of the elements of the array A.  The array must
+               be one-dimensional.
+
+            General Categories: List composition
+
+            Example: If A<1> = 1, A<2> = "2", A<3> = "THREE", A<4> =
+               "four", and A<5> = 5, then CAL(A) returns
+               (1 ~ "2" ~ "THREE" ~ "four" ~ 5 ~ NIL).
+
+
+
+
+
+          +-----------------------------+
+          | *CAR(L)                     |
+          +-----------------------------+
+
+            Returns the first top-level element of the list L.  It can also
+               be used on the left-hand side of an assignment statement to
+               change the CAR of L (cf. RPLACA).
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+               List decomposition
+
+            Side Effects: If used on the left-hand side of an assignment
+               statement, CAR can have bad side-effects, e.g., creating
+               circular lists: CAR(L) = L.  Any function which alters
+               existing CONS cells can cause similar problems.  Such
+               functions can also cause unintended changes in the values of
+               identifiers which are not referenced directly in the
+               assignment statement.  These functions should be used
+               carefully (see references).
+
+            Example: If L = #'((8 A B) (10807 W) (60) (T (H)))', then
+               CAR(L) = (8 ~ 'A' ~ 'B' ~ NIL).
+
+            Comments: Note that CAR(L) = X has a different effect in
+               SNOLISPIST than (SET (CAR L) X) would have in LISP.
+
+            References: Charniak et al. (1980), 9, 10, 19-21, 302.
+               MTS LISP Manual, 12-14, 18-19, 22-23.
+               Schank & Riesbeck (1981), 55.
+               Shapiro (1979), 149-150.
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 93 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *CDR(L)                     |
+          +-----------------------------+
+
+            Returns the tail of L, i.e., L with its first top-level element
+               deleted.  CDR can also be used on the left- hand side of an
+               assignment statement: CDR(L) = X has the same effect as
+               RPLACD(L,X).  (See CAR.)
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+               List decomposition
+
+            Side Effects: See CAR.
+
+            Example: If L = ('P' ~ 'Q' ~ NIL), then CDR(L) returns ('Q' ~
+               NIL).  Note that if L is a "normal" list, then CDR always
+               returns a list, not an atom.
+
+            Comments: See CAR.
+
+            References: See CAR.
+
+
+
+
+
+          +-----------------------------+
+          | CAAR(L) through CDDDDR(L)   |
+          +-----------------------------+
+
+            Return the result of the composition of from two to four CARs
+               and CDRs.  All combinations of two to four A's and D's are
+               legal.  CADR(L) returns CAR(CDR(L)), CADAR(L) returns
+               CAR(CDR(CAR(L))), and so on.
+
+            General Categories: List decomposition
+
+            Example: If L = #'(A (B C D) 5 4 ((3 (2 1))))', then CADR(L)
+               returns ('B' ~ 'C' ~ 'D' ~ NIL).
+
+            References: Charniak et al. (1980), 19-23, 302.
+               MTS LISP Manual, 19.
+               Schank & Riesbeck (1981), 45-49, 55.
+               Shapiro (1979), 149-150.
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 94 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | CEIL(N)                     |
+          +-----------------------------+
+
+            Returns the smallest integer not smaller than N.  N may be any
+               integer or floating point number.
+
+            General Categories: Arithmetic function
+
+            Example: CEIL(8.8) returns 9.
+
+            References: Gimpel (1976), 327.
+
+
+
+
+
+          +-----------------------------+
+          | CLA(L)                      |
+          +-----------------------------+
+
+            Returns the elements of the list L converted to a one-
+               dimensional array.
+
+            General categories: Datatype conversion
+
+            Example: If L = ('E' ~ 'D' ~ 'C' ~ 'B' ~ 'A' ~ NIL), then
+               CLA(L) returns an array of five elements: 'E', 'D', 'C',
+               'B', and 'A'.
+
+
+
+
+
+          +-----------------------------+
+          | CLOG(N)                     |
+          +-----------------------------+
+
+            Returns log(N) (base 10).  N may be any positive integer or
+               floating point number.
+
+            General Categories: Arithmetic function
+
+            Example: CLOG(97) returns 1.9867717387128.
+
+            References: Gimpel (1976), 335-336.
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 95 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *CONCAT(L,S1,S2)            |
+          +-----------------------------+
+
+            Returns a single string consisting of the concatenation of the
+               elements of L.  S1, if present, will be inserted after each
+               element except the last.   (S1 might be a blank or a comma.)
+               S2, if present, will be placed before and after each
+               element.   (S2 might be a quotation mark.)
+
+            General Categories: Datatype conversion
+
+            Example: Let L = 'PAY' ~ 'YOUR' ~ 'DUES' ~ NIL.  CONCAT(L,'
+               ','"') will return '"PAY" "YOUR" "DUES"' as a single string.
+               (The double quotes are part of the string.)
+
+            Comments: This function was originally written as a utility
+               function for UNREAD.  It has also proved useful in the
+               construction of expressions at run-time.
+
+
+
+
+
+          +-----------------------------+
+          | *CONS(X,Y)                  |
+          +-----------------------------+
+
+            Returns a new CONS cell c such that CAR(c) = X and
+               CDR(c) = Y.
+
+            General Categories: List composition
+
+            Example: CONS('A',CONS('B',CONS('C',NIL))) returns the list
+               ('A' ~ 'B' ~ 'C' ~ NIL).
+
+            References: Charniak et al.(1980), 11, 19, 22-24, 302-303.
+               MTS LISP Manual, 12-14, 20.
+               Schank & Riesbeck (1981), 55.
+               Shapiro (1979), 150.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 96 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | COS(N)                      |
+          +-----------------------------+
+
+            Returns the cosine of N radians.  N may be any integer or
+               floating point number.
+
+            General Categories: Arithmetic function
+
+            Example: COS(-P...I. / 6) returns 0.86602540378456.
+
+            References: Gimpel (1976), 332-333.
+
+
+
+
+
+          +-----------------------------+
+          | DEFPROP(NAME,X,S)           |
+          +-----------------------------+
+
+            Returns the modified property list of NAME.
+
+            General Categories: Alters existing CONS cell(s)
+               Property-list function
+
+            Side Effects: X is put on the property list of NAME under the
+               indicator S.  DEFPROP operates in a manner similar to PUT:
+               Previous values of the indicator S are erased.
+                  If X is NIL, then S is placed on the property list as an
+               indicator with no associated values.
+
+            Example: DEFPROP( .DOG, 4, 'LEGS') makes sure that
+               ('LEGS' ~ 4 ~ NIL) is on the property list of DOG.
+
+            References: Shapiro (1979), 150.
+
+
+
+
+
+          +-----------------------------+
+          | DEG(N)                      |
+          +-----------------------------+
+
+            Returns the number of degrees in N radians.
+
+            General Categories: Arithmetic function
+
+            Example: DEG(P...I. / 4) returns 45.000000000013.
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 97 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | DFLOAT(N)                   |
+          +-----------------------------+
+
+            Returns N converted to datatype 'DREAL', if possible; otherwise
+               it fails.
+
+            General Categories: Arithmetic function
+               Datatype conversion
+
+            Example: DFLOAT(8) returns 8.D00, a 7-byte floating-point
+               number.
+
+            Comments: SPITBOL supports double precision floating- point
+               numbers, an extension of SNOBOL4.
+
+            +-----------------------------+
+               | DIFFERENCE(L)     |
+               +-----------------------------+
+
+            Returns the first element of L minus the sum of the rest.
+
+            General Categories: Arithmetic function
+
+            Example: DIFFERENCE(3 ~ 4 ~ 5 ~ 6 ~ -12 ~ NIL) returns 0, since
+               3 - 4 - 5 - 6 - (-12) = 0.
+
+            Comments: The argument to DIFFERENCE must be a list of numbers;
+               the list must end with NIL.  Cf. SUB, which is strictly
+               binary.
+
+            References: Charniak et al. (1980), 303.
+               Schank & Riesbeck (1981), 55-56.
+               Shapiro (1979), 150.
+
+
+
+
+
+          +-----------------------------+
+          | DIV(N1,N2)                  |
+          +-----------------------------+
+
+            Returns N1 / N2 in double precision.
+
+            General Categories: Arithmetic function
+
+            Example: DIV(7,8) returns .875.
+
+            Comments: Datatype conversion (to DREAL) is handled
+               automatically, so that DIV(7,8) is .875, not 0.
+
+            References: MTS LISP Manual, 26.
+
+
+
+
+       AI Programming in SNOBOL4       - 98 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | EQP(X,Y)                    |
+          +-----------------------------+
+
+            Returns T if EQU(X,Y) succeeds; NIL otherwise.
+
+            General Categories: Predicate
+
+            Example: See EQU.
+
+            Comments: See EQU.
+
+            References: See EQU.
+
+
+
+
+
+          +-----------------------------+
+          | EQU(X,Y)                    |
+          +-----------------------------+
+
+            Returns the null string.  It succeeds if X and Y are equal
+               numbers (as judged by the SPITBOL EQ function), or if they
+               are lexically equal strings (as judged by the SPITBOL LEQ
+               function), or if they are identical (as judged by the
+               SPITBOL IDENT function); fails otherwise.
+
+            General Categories: Predicate
+
+            Examples: All these succeed: EQU(8,'8'), EQU('8',8.0),
+               EQU('A',CAR('A' ~ NIL)), EQU('CAT',REVERSE('TAC')),
+               EQU(NIL,CDDR('S' ~ 'F' ~ NIL)).
+
+            Comments: This predicate is similar to the LISP EQ predicate
+               (EQ is a built-in numeric predicate in SPITBOL; hence the
+               name-change).  Cf. EQP, EQUAL, and EQUALP.
+
+            References.: Charniak et al. (1980), 304.
+               MTS LISP Manual, 17.
+               Shapiro (1979), 151.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4       - 99 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | EQUAL(X,Y)                  |
+          +-----------------------------+
+
+            Returns the null string.  It succeeds if EQU(X,Y) succeeds, or
+               if X and Y are lists which would PRINT as lexically equal
+               (LEQ) strings; otherwise, it fails.
+
+            General Categories: Predicate
+
+            Example: See EQU.  In addition, the following succeeds, while
+               the analogous EQU expression would fail:
+               EQUAL(7 ~ 8 ~ NIL, 7 ~ 8 ~ NIL).
+
+            Comments: EQU and EQUAL behave identically except when their
+               arguments are programmer-defined datatypes, such as 'CONS'.
+               EQU can succeed, given two list-valued arguments, if the two
+               happen to point to precisely the same list.  In general,
+               however, they won't, even if their respective values look
+               exactly the same.  This is because SPITBOL, like LISP, will
+               not store duplicate copies of identical strings, but will
+               store duplicate copies of identical-looking lists.
+
+            References: Charniak et al. (1980), 23-24, 304.
+               MTS LISP Manual, 17.
+               Schank & Riesbeck (1981), 56.
+               Shapiro (1979), 151.
+
+
+
+
+
+          +-----------------------------+
+          | EQUALP(X,Y)                 |
+          +-----------------------------+
+
+            Returns T if EQUAL(X,Y) succeeds; NIL otherwise.
+
+            General Categories: Predicate
+
+            Example: See EQUAL.
+
+            Comments: See EQUAL.
+
+            References: See EQUAL.
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 100 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | EVALCODE(S)                 |
+          +-----------------------------+
+
+            Returns the value of S, interpreted and evaluated as a SNOBOL4
+               (SPITBOL) expression.  If the evaluation of the expression
+               fails, EVALCODE fails.
+
+            General Categories.: Depends on S
+
+            Side Effects: Depends on S.
+
+            Example: EVALCODE('DUPL(" ",12)') returns a string of 12
+               blanks.
+
+            Comments: EVALCODE is mainly useful for evaluating expressions
+               which are constructed during program execution. The
+               references below are to the LISP EVAL function, which has a
+               similar purpose.
+
+            References: Charniak et al. (1980), 304.
+               MTS LISP Manual, 27.
+               Schank & Riesbeck (1981), 56.
+               Shapiro (1979), 151.
+
+
+
+
+
+          +-----------------------------+
+          | EVERY(NAME,L)               |
+          +-----------------------------+
+
+            Returns T if the function named NAME returns a non-NIL value
+               for every argument on the list L; otherwise, NIL.
+
+            General Categories: List composition
+               Mapping function
+
+            Example: EVERY( .NUMBERP, 6 ~ '7' ~ -8.888 ~ 'TWO' ~ NIL)
+               returns NIL because NUMBERP('TWO') returns NIL.
+
+            References: Charniak et al. (1980), 304.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 101 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | EVLIS(L)                    |
+          +-----------------------------+
+
+            Returns a list of the values of the identifiers whose names are
+               the elements of L.
+
+            General Categories: List composition
+               Mapping function
+
+            Example: If A = 1.657, B = 'UNION', C = '?', and
+               L = .A ~ .B ~ .C ~ NIL, then EVLIS(L) returns
+               (1.657 ~ 'UNION' ~ '?' ~ NIL).
+
+            Comments: The elements of L may be strings or names. They
+               should not be deferred (unevaluated) expressions.
+
+            References: MTS LISP Manual, 20.
+               Shapiro (1979), 151.
+
+
+
+
+
+          +-----------------------------+
+          | EXCLUDE(L1,L2)              |
+          +-----------------------------+
+
+            Returns the top-level elements of L1, excluding any which are
+               EQUAL to any element of L2.  No duplicate elements will
+               appear in the result (cf. INTERSECT and UNION).
+
+            General Categories: List composition
+               List decomposition
+               List search
+
+            Example: If L1 = (8 ~ 'A' ~ '7' ~ 'D' ~ NIL) and
+                     L2 = (7 ~ '8' ~ NIL), then EXCLUDE(L1,L2) returns
+                     ('A' ~ 'D' ~ NIL).
+
+            Comments: This version of EXCLUDE is in the INTERSECT- UNION
+               family; hence the elimination of duplicates in the result.
+
+            References: MTS LISP Manual, 21.
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 102 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | EXP(N)                      |
+          +-----------------------------+
+
+            Returns e**N, where e is the base of the natural logarithms and
+               N is any integer or floating point number.  The value of e,
+               in double precision, is stored as the value of NAT...BASE.
+               in SNOLISPIST.
+
+            General Categories: Arithmetic function
+
+            Example: EXP(P...I.) returns 23.140692632773.
+
+            References: Gimpel (1976), 336-337.
+
+
+
+
+
+          +-----------------------------+
+          | EXPLODE(X)                  |
+          +-----------------------------+
+
+            Returns a list of the single characters in UNREAD(X).
+
+            General Categories: Datatype conversion
+               List composition
+
+            Example: EXPLODE('DOG' ~ 'ARF' ~ NIL) returns
+               ( '(' ~ 'D' ~ 'O' ~ 'G' ~ ' ' ~
+               'A' ~ 'R' ~ 'F' ~ ')' ~ NIL ).
+
+            References: Charniak et al. (1980), 304.
+               MTS LISP Manual, 22.
+               Schank & Riesbeck (1981), 56.
+               Shapiro (1979), 151.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 103 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *FAIL.IF.NIL(L)             |
+          +-----------------------------+
+
+            Returns L if L is non-NIL.  If L is NIL, then the function call
+               fails.  The unary operator / is OPSYNed to this function:
+               /L is equivalent to FAIL.IF.NIL(L).
+
+            The argument L must be a list (datatype CONS) or a fatal error
+               will result.
+
+            General Categories: Predicate
+
+            Example: The statement
+                        Y = /GETPROP( .DOG, 'LEGS')
+               sets Y to whatever value is stored on the property list of
+               DOG under the indicator 'LEGS'.  If no such value exists,
+               GETPROP returns NIL, /GETPROP fails, and the value of Y
+               remains unchanged.
+
+            Comments: This function helps interface the T/NIL mode of LISP-
+               type predicates with the succeed/fail mode of SNOBOL4
+               predicates.
+
+
+
+
+
+          +-----------------------------+
+          | FAIL.IF.NIL.ELSE.SUCCEED(L) |
+          +-----------------------------+
+
+            Returns the null string.  It succeeds if /L succeeds, and fails
+               if /L fails.  The unary operator % is OPSYNed to this
+               function: %L is equivalent to
+                         FAIL.IF.NIL.ELSE.SUCCEED(L).
+               The argument L must be a list (datatype CONS) or a fatal
+               error will result.
+
+            General Categories: Predicate
+
+            Example: The statement
+                       Y = %FIND(P,LST) CONS(P,Y)
+               will add P to the list Y if P is a substructure of LST; if
+               not, FIND returns NIL, %FIND fails, and Y remains unchanged.
+
+            Note that /FIND would not work here: If FIND found P, it would
+               return a non-NIL value.  /FIND would pass along the same
+               value.  The right-hand side of the assignment statement
+               would be interpreted as a concatenation expression, and a
+               fatal error would result, because one or both of the
+               arguments would be lists, not strings.  Because SPITBOL
+               gives special attention to the null string, %FIND does not
+               cause the same error.
+
+
+
+       AI Programming in SNOBOL4      - 104 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | FIND(X,L)                   |
+          +-----------------------------+
+
+            Returns the first substructure of L which is EQUAL to X.  The
+               search is left-branching, depth-first.  If X is not EQUAL to
+               any substructure of L, then FIND returns NIL.
+
+            General Categories: List decomposition
+               List search
+
+            Example: If X = ('A' ~ NIL) and
+               L = (1 ~ (2 ~ ('A' ~ NIL)) ~ 3 ~ NIL), then FIND(X,L)
+               returns ('A' ~ NIL).
+
+            Comments: This version of FIND is not exactly the same as the
+               MTS LISP version.
+
+            References: MTS LISP Manual, 19.
+
+
+
+
+
+          +-----------------------------+
+          | FIX(N)                      |
+          +-----------------------------+
+
+            Returns N converted to datatype 'INTEGER' if possible;
+               otherwise, it fails.
+
+            General Categories: Arithmetic function
+               Datatype conversion
+
+            Example: FIX(9.995) returns 9
+
+            Comments: Real to integer conversion is possible only if the
+               real number is between -2147483648 and 2147483647. Reals in
+               this range are converted to integers by truncating their
+               fractional parts.
+
+            References: MTS LISP Manual, 26.
+               Shapiro (1979), 151.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 105 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | FLOAT(N)                    |
+          +-----------------------------+
+
+            Returns N converted to datatype REAL.
+
+            General Categories: Arithmetic function
+               Datatype conversion
+
+            Example: FLOAT(-9) returns -9.0, a 4-byte floating-point
+               number.
+
+            References: MTS LISP Manual, 26.
+               Shapiro (1979), 151.
+
+
+
+
+
+          +-----------------------------+
+          | FLOOR(N)                    |
+          +-----------------------------+
+
+            Returns the largest integer which is no larger than N.  N may
+               be any integer or floating point number.
+
+            General Categories: Arithmetic function
+
+            Example: FLOOR(-9.1) returns -10.
+
+            References: Gimpel (1976), 327.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 106 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | GENSYM()                    |
+          +-----------------------------+
+
+            Returns a string created by concatenating 'GSYM' with the
+               current value of &STCOUNT, the number of statements executed
+               so far.  This is usually intended for use as the name of an
+               identifier.  NEWSYM is a synonym for GENSYM.
+
+            General Categories: Definitional function
+
+            Example: $GENSYM() = LIST('O',NIL) has the effect of GSYM28347
+               = LIST('O',NIL), assuming that 28347 happens to be the
+               number of statements executed at the time GENSYM() is
+               called.
+
+            References: Charniak et al. (1980), 77-78, 306.
+               MTS LISP Manual, 21-22.
+               Shapiro (1979), 152.
+
+
+
+
+
+          +-----------------------------+
+          | GET(NAME,X)                 |
+          +-----------------------------+
+
+            Returns the value (always a list) associated with the indicator
+               X on the property list of the identifier named NAME.  If no
+               such value exists, GET returns NIL.
+
+            General Categories: List decomposition
+               List search
+               Property-list function
+
+            Example: If ('LEGS' ~ 4 ~ NIL) is an element of the property
+               list of DOG, then GET( .DOG, 'LEGS') returns (4 ~ NIL).
+
+            References: Charniak et al. (1980), 18, 304.
+               MTS LISP Manual, 24.
+               Schank & Riesbeck (1981), 57.
+               Shapiro (1979), 152.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 107 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | GETL(NAME,L)                |
+          +-----------------------------+
+
+            Returns the tail of the property list of the identifier named
+               NAME, beginning with the first element whose CAR is a MEMBER
+               of L.
+
+            General Categories: List decomposition
+               List search
+               Property-list function
+
+            Example: Suppose DOG has the following property-list:
+               (('NOSE' ~ 'WET' ~ NIL) ~
+               ('LEGS' ~ 4 ~ NIL) ~
+               ('TEETH' ~ 'SHARP' ~ NIL) ~ NIL).  Then
+               GETL( .DOG, 'WINGS' ~ 'TEETH' ~ 'NOSE' ~ NIL) will return
+               the entire property list.
+
+            References: Charniak et al. (1980), 305.
+
+
+
+
+
+          +-----------------------------+
+          | GETPROP(NAME,S)             |
+          +-----------------------------+
+
+            Returns the first value stored under the indicator S on the
+               property list of the identifier named NAME.
+
+            General Categories.: Alters existing CONS cell(s)
+               List decomposition
+               List search
+               Property-list function
+
+            Side Effects: The value returned is deleted from its place on
+               the property list.
+
+            Example: If ('LEGS' ~ 5 ~ 4 ~ 3 ~ 2 ~ 1 ~ NIL) is an element of
+               the property list of DOG, then five successive evaluations
+               of GETPROP(.DOG,'LEGS') will return 5, 4, 3, 2, and 1.  The
+               sixth such call will return NIL.
+
+            Comments: GETPROP is intended to be used with PUTPROP in the
+               manipulation of push-down stacks of property list values.
+
+            References:  MTS LISP Manual, 24-25.
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 108 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | GREATER(L)                  |
+          +-----------------------------+
+
+            Returns the null string.  It succeeds if the numbers in the
+               list L are in strictly decreasing order; otherwise, it
+               fails.
+
+            General Categories: Arithmetic function
+               Predicate
+
+            Example: GREATER(8 ~ 5 ~ 3 ~ -7 ~ 0 ~ NIL) fails.
+
+            References: MTS LISP Manual, 25.
+               Shapiro (1979), 152.
+
+
+
+
+
+          +-----------------------------+
+          | GREATERP(L)                 |
+          +-----------------------------+
+
+            Returns T if GREATER(L) succeeds; NIL otherwise.
+
+            General Categories: Arithmetic function
+               Predicate
+
+            Example: GREATERP(8.53211 ~ 5 ~ 3 ~ 2 ~ 1 ~ -1 ~ NIL) returns
+               T.
+
+            References: See GREATER.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 109 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *IN(NAME)                   |
+          +-----------------------------+
+
+            Returns the next logical record (as a string) from the file
+               which is associated with the identifier "INPUT.".  (Note
+               that the name of this identifier ends with a period!)
+
+            General Categories: Input
+
+            Side Effects: If NAME is not null, then the string returned by
+               IN also becomes the value of the identifier named NAME.
+
+            Example: TEMP = IN( .SAVE) reads the next input record, assigns
+               it as the value of TEMP, and also assigns it as the value of
+               SAVE.
+
+            Comments: No attempt is made in SNOLISPIST to simulate LISP
+               input functions.  All input is string input, and datatype
+               conversion (e.g., to list) must be handled by the
+               programmer.  (See READ.)
+
+
+
+
+
+          +-----------------------------+
+          | INSERT(X,L)                 |
+          +-----------------------------+
+
+            Returns L if X is EQUAL to an element of L; otherwise, it
+               returns CONS(X,L).
+
+            General Categories: List composition
+               List search
+
+            Example: INSERT(1, ('UN' ~ '1' ~ (8 ~ 'GNU') ~ NIL)) returns
+               its second argument unchanged.
+
+            References: Shapiro (1979), 152.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 110 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | INTERSECT(L1,L2)            |
+          +-----------------------------+
+
+            Returns the list of elements common to L1 and L2, without
+               duplicates.
+
+            General Categories: List composition
+               List decomposition
+               List search
+
+            Example: INTERSECT(('A' ~ 'B' ~ NIL), ('B' ~ 'CAT' ~ NIL))
+               returns ('B' ~ NIL).
+
+            References: MTS LISP Manual, 21.
+
+
+
+
+
+          +-----------------------------+
+          | LAST(L)                     |
+          +-----------------------------+
+
+            Returns the last non-NIL cell of L (always a list); or NIL if
+               no such cell exists.
+
+            General Categories: List decomposition
+               List search
+
+            Example: LAST('A' ~ ('COMPLEX' ~ 'ELEMENT' ~ NIL) ~ NIL)
+               returns ('COMPLEX' ~ 'ELEMENT' ~ NIL) ~ NIL.
+
+            Comments: LAST returns the last non-NIL CONS-cell of L, not a
+               copy of that cell.  Thus, changes to LAST(L), by means of
+               RPLACA, RPLACD, etc., produce changes in the value of L.
+               Also note that LAST(L) does not return the last element of L
+               (cf. RAC): LAST('A' ~ 'B' ~ NIL) returns ('B' ~ NIL), not
+               'B'.
+
+            References: Charniak et al. (1980), 305.
+               Schank & Riesbeck (1981), 57.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 111 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | LCOPY(L)                    |
+          +-----------------------------+
+
+            Returns a copy of the list L, i.e., a structure which is EQUAL
+               to L but not EQU to L.
+
+            General Categories: List composition
+
+            Example: For any list L,
+               EQU( !L, !LCOPY(L)) succeeds;
+               EQU( L, LCOPY(L)) fails; and
+               EQUAL( L, LCOPY(L)) succeeds.
+
+            Comments: COPY is a built-in function in SPITBOL; hence the
+               name change.
+
+            References: MTS LISP Manual, 20.
+
+
+
+
+
+          +-----------------------------+
+          | LENGTH(X)                   |
+          +-----------------------------+
+
+            Returns the number of top-level elements of X, if X is a list.
+               If X is an atom, LENGTH returns the number of characters in
+               its string representation; if X has no string
+               representation, LENGTH fails.
+
+            General Categories: List search
+
+            Example: LENGTH('UNION' ~ 'SUIT' ~ 'MAKER' ~ NIL) returns 3.
+
+            References: Charniak et al. (1980), 305.
+               MTS LISP Manual, 25.
+               Schank & Riesbeck (1981), 57.
+               Shapiro (1979), 152.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 112 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | LESS(L)                     |
+          +-----------------------------+
+
+            Returns the null string.  It succeeds if the numbers in the
+               list L are in strictly increasing order; otherwise, it
+               fails.
+
+            General Categories: Arithmetic function
+               Predicate
+
+            Example: LESS(1 ~ 2 ~ 3 ~ 5 ~ 8 ~ 13 ~ NIL) succeeds.
+
+            References: MTS LISP Manual, 25.
+               Shapiro (1979), 153.
+
+
+
+
+
+          +-----------------------------+
+          | LESSP(L)                    |
+          +-----------------------------+
+
+            Returns T if LESS(L) succeeds; NIL otherwise.
+
+            General Categories: Arithmetic function
+               Predicate
+
+            Example: LESSP(1 ~ 1 ~ 9.112 ~ 9112 ~ NIL) returns NIL.
+
+            References: See LESS.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 113 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *LIST(X,Y)                  |
+          +-----------------------------+
+
+            Returns CONS(X,Y), i.e., a list C such that CAR(C) = X and
+               CDR(C) = Y.  The binary operator ~ is OPSYNed to the LIST
+               function: 'A' ~ 'B' is equivalent to LIST('A','B').
+
+            General Categories: List composition
+
+            Example:
+               SNOLISPIST:
+                    A ~ (B ~ C) ~ (D ~ (E ~ F)) ~ NIL
+               LISP:
+                    (A (B C) (D (E F)))
+
+            Comments: The ~ operator is the highest precedence binary
+               operator in SPITBOL, and it is right-associative. Thus, (A ~
+               B ~ C ~ NIL) is equivalent to CONS(A,CONS(B,CONS(C,NIL))),
+               i.e., to LISP's (A B C).
+
+            Note that LIST is strictly binary in SNOLISPIST, but the ~
+               operator allows the chaining of an indefinite number of
+               arguments.
+
+            References: Charniak et al. (1980), 305.
+               MTS LISP Manual, 20.
+               Schank & Riesbeck (1981), 57.
+               Shapiro (1979), 153.
+
+
+
+
+
+          +-----------------------------+
+          | LOG(N1,N2)                  |
+          +-----------------------------+
+
+            Returns log(N1) (base N2); N1 > 0, N2 > 0, N2 <> 1.  If N2 is
+               omitted, e is assumed (i.e., the natural logarithm of N1 is
+               returned).
+
+            General Categories: Arithmetic function
+
+            Example: LOG(0.167, 2) returns -2.5820800292618.
+
+            References: Gimpel (1976), 335-336.
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 114 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | LREVERSE(L)                 |
+          +-----------------------------+
+
+            Returns the top-level elements of L in reverse order.
+
+            General Categories: List composition
+               List decomposition
+
+            Example: LREVERSE(11 ~ 9 ~ 8 ~ 4 ~ NIL) returns
+               (4 ~ 8 ~ 9 ~ 11 ~ NIL).
+
+            Comments: REVERSE is a built-in function in SPITBOL.  (It
+               reverses the characters in a string.)
+
+            References: Charniak et al. (1980), 15, 308.
+               MTS LISP Manual, 20.
+               Schank & Riesbeck (1981), 59.
+               Shapiro (1979), 155.
+
+
+
+
+
+          +-----------------------------+
+          | LTRACE(N,L)                 |
+          +-----------------------------+
+
+            Returns the null string.
+
+            General Categories: Output
+
+            Side Effects: This function permits tracing of functions which
+               have list arguments and/or which return list values.  A call
+               to LTRACE(N,L) turns on N-level tracing for every function
+               whose name is on the list L.  If N is omitted, then N = 3 is
+               assumed.
+               
+               0-level tracing indicates that tracing is to be turned off
+               for all functions whose names are on the list L.
+               
+               1-level tracing indicates that the values of the arguments
+               passed to the traced function and the value returned from
+               the traced function are to be reported every time the
+               function is called or returned from.  The trace messages go
+               to the user's terminal.
+               
+               2-level tracing includes the information requested by 1-
+               level tracing; in addition, the values of all local
+               variables and arguments are reported every time the traced
+               function returns.
+               
+
+
+
+
+
+       AI Programming in SNOBOL4      - 115 -                    August, 1982
+
+
+
+
+
+
+
+
+               3-level tracing includes the information requested by 2-
+               level tracing; in addition, the program will pause every
+               time the traced function is called or returned from.  At
+               this time, any SPITBOL or SNOLISPIST expression may be
+               entered.  This expression will be immediately evaluated.
+               Such an expression could be used to turn off or alter the
+               level of tracing of one or more functions; to initiate
+               tracing of one or more additional functions; to print the
+               value of a variable; to alter the value of a variable; or to
+               do anything else that can be accomplished with one
+               expression.  A simple line-feed (null line) will cause the
+               program to continue.
+               
+               Certain functions cannot be traced.  These include all the
+               SPITBOL built-in functions, as well as the following
+               SNOLISPIST functions:
+               
+               LTRACE, POP, any LAMBDA, PRT.VIA.OUTPUT, ATOM, CAR, CDR,
+               TDUMP, PRINT.IN.FIELD, UNREAD, NULL, UNCONS, IN, CONCAT,
+               MAPCAR, LIST, and PRINT.
+
+            Example: LTRACE(1, .FUNCT1 ~ .APPEND ~ .XYZ ~ NIL) turns on 1-
+               level tracing for the functions FUNCT1, APPEND, and XYZ.
+               Here, FUNCT1 and XYZ are presumably user-defined, while
+               APPEND is a SNOLISPIST function.
+
+            Comments: Requests to trace untraceable functions are simply
+               ignored.
+               
+               LTRACE is under the control of the SNOBOL4 keyword $TRACE.
+               This keyword must be set to a positive integer or tracing
+               will be inhibited.
+
+            References: MTS LISP Manual, 63-64.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 116 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | MAP(NAME,L)                 |
+          +-----------------------------+
+
+            Returns NIL.
+
+            General Categories: Mapping function
+
+            Side Effects: Applies the function named NAME to L, then to
+               CDR(L), then to CDDR(L), and so on.
+
+            Example: %MAP( .PRINT, 'AARDVARK' ~ 'SYZYGY' ~ 'ZAX' ~ NIL)
+               causes (AARDVARK SYZYGY ZAX), (SYZYGY ZAX), and (ZAX) to be
+               printed on three successive lines, then fails.
+
+            References: Charniak et al. (1980), 61.
+               MTS LISP Manual, 28.
+
+
+
+
+
+          +-----------------------------+
+          | MAPC(NAME,L)                |
+          +-----------------------------+
+
+            Returns NIL.
+
+            General Categories: Mapping function
+
+            Side Effects: Applies the function named NAME to CAR(L), then
+               to CADR(L), then to CADDR(L), and so on.
+
+            Example: %MAPC( .PRINT, 'AARDVARK' ~ 'SYZYGY' ~ 'ZAX' ~ NIL)
+               causes AARDVARK, SYZYGY, and ZAX to be printed on three
+               successive lines, then fails.
+
+            References: Charniak et al. (1980), 61, 306.
+               MTS LISP Manual, 28.
+               Schank & Riesbeck (1981), 65.
+               Shapiro (1979), 153.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 117 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | MAPCAN(NAME,L)              |
+          +-----------------------------+
+
+            Returns NCONC(MAPCAR(NAME,L)).
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+               Mapping function
+
+            Side Effects: See MAPCON.
+
+            Example: MAPCAN( .LAST, ((1 ~ 2 ~ 3 ~ 4 ~ NIL) ~ (7 ~ 8 ~ NIL)
+               ~ ('A' ~ 'B' ~ NIL) ~ NIL)) returns (4 ~ 8 ~ 'B' ~ NIL).
+
+            References: Charniak et al. (1980), 61-62, 306.
+               MTS LISP Manual, 28.
+               Schank & Riesbeck (1981), 65.
+
+
+
+
+
+          +-----------------------------+
+          | MAPCAR(NAME,L)              |
+          +-----------------------------+
+
+            Returns a list of the values returned when the function named
+               NAME is applied successively to CAR(L), CADR(L), CADDR(L),
+               and so on.
+
+            General Categories: List composition
+               Mapping function
+
+            Example: MAPCAR( .ADD1, 19 ~ 43 ~ '88' ~ '69' ~ NIL) returns
+               (20 ~ 44 ~ 89 ~ 70 ~ NIL).
+
+            References: Charniak et al. (1980), 15-17, 61-62, 306.
+               MTS LISP Manual, 28.
+               Schank & Riesbeck (1981), 65.
+               Shapiro (1979), 153.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 118 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *MAPCARV(NAME,L)            |
+          +-----------------------------+
+
+            Returns the reverse of MAPCAR(NAME,L).
+
+            General Categories: List composition
+               Mapping function
+
+            Example: MAPCARV( .NUMBERP, #'(zed 7 74 EQ *)' ) returns (NIL ~
+               NIL ~ T ~ T ~ NIL ~ NIL).  (The final NIL is the list
+               terminator.)
+
+            Comments: This function is sometimes useful when an argument
+               list is built up by CONSing elements together.  Generally,
+               such a list is built backwards.  MAPCARV can then be used to
+               map the list and to restore the original order.  This saves
+               two needless calls to LREVERSE.
+
+            References: See MAPCAR.
+
+
+
+
+
+          +-----------------------------+
+          | MAPCON(NAME,L)              |
+          +-----------------------------+
+
+            Returns NCONC(MAPLIST(NAME,L)).
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+               Mapping function
+
+            Side Effects: NCONC uses RPLACD, so the usual caveats apply:
+               Functions that alter existing cons-cells can have unexpected
+               consequences.  Note also that NAME must return a list for
+               each argument in L.
+
+            Example: MAPCON( .LREVERSE, 1 ~ 2 ~ 3 ~ 4 ~ 5 ~ NIL) returns (5
+               ~ 4 ~ 3 ~ 2 ~ 1 ~ 5 ~ 4 ~ 3 ~ 2 ~ 5 ~ 4 ~ 3 ~ 5 ~ 4 ~ 5 ~
+               NIL).
+
+            References: Charniak et al. (1980), 61-62.
+               MTS LISP Manual, 28.
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 119 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | MAPLIST(NAME,L)             |
+          +-----------------------------+
+
+            Returns a list of the values returned when the function named
+               NAME is applied successively to L, CDR(L), CDDR(L), and so
+               on.
+
+            General Categories: List composition
+               Mapping function
+
+            Example: MAPLIST( .PLUS, 1 ~ 2 ~ 3 ~ 4 ~ NIL) returns
+               (10 ~ 9 ~  7 ~ 4 ~ NIL).
+
+            References: Charniak et al. (1980), 61.
+               MTS LISP Manual, 28.
+
+
+
+
+
+          +-----------------------------+
+          | MAX(N1,N2)                  |
+          +-----------------------------+
+
+            Returns the larger of N1 and N2.
+
+            General Categories: Arithmetic function
+
+            Example: MAX(6.78, 12.2243) returns 12.2243.
+
+            References: MTS LISP Manual, 26.
+               Shapiro (1979), 153.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 120 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | MEMBER(X,L)                 |
+          +-----------------------------+
+
+            Returns the tail of L beginning with the first top-level
+               element which is EQUAL to X.  If no such element exists,
+               MEMBER returns NIL.
+
+            General Categories: List composition
+               List decomposition
+               List search
+
+            Example:
+               MEMBER(1, ((1 ~ NIL) ~ (2 ~ NIL) ~ '1' ~ 'A' ~ NIL)) returns
+               ('1' ~ 'A' ~ NIL).
+
+            Comments: Cf. ASSOC and MEMQ.
+
+            References: Charniak et al. (1980), 306.
+               MTS LISP Manual, 19.
+               Schank & Riesbeck (1981), 46, 57.
+               Shapiro (1979), 153.
+
+
+
+
+
+          +-----------------------------+
+          | MEMQ(X,L)                   |
+          +-----------------------------+
+
+            Returns the null string.  It succeeds if MEMBER(X,L) is non-
+               NIL; otherwise, it fails.
+
+            General Categories: Predicate
+
+            Example: The statement
+                     = MEMQ(1, INTEGERS) 'ONE' ~ A
+               will CONS the string 'ONE' onto the front of the list A if
+               the integer 1 (or anything EQUAL to it, e.g., '1.0') is a
+               member of the list INTEGERS.
+
+            Comments: See MEMBER.
+
+            References: See MEMBER.
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 121 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | MIN(N1,N2)                  |
+          +-----------------------------+
+
+            Returns the smaller of N1 and N2.
+
+            General Categories: Arithmetic function
+
+            Example: MIN(0,MAX(-7,8)) returns 0.
+
+            References: MTS LISP Manual, 26.
+               Shapiro (1979), 153.
+
+
+
+
+
+          +-----------------------------+
+          | MINUS(N)                    |
+          +-----------------------------+
+
+            Returns -N.
+
+            General Categories: Arithmetic function
+
+            Example: MINUS(80.8) returns -80.8.
+
+            References: Charniak et al. (1980), 306.
+               MTS LISP Manual, 26.
+               Schank & Riesbeck (1981), 57.
+               Shapiro (1979), 153.
+
+
+
+
+
+          +-----------------------------+
+          | MULT(N1,N2)                 |
+          +-----------------------------+
+
+            Returns the product of N1 and N2.
+
+            General Categories: Arithmetic function
+
+            Example: MULT(7, -8.1) returns -56.7.
+
+            Comments: MULT is binary.  For a comparable function which
+               takes a list argument, see TIMES.
+
+            References: Charniak et al. (1980), 310.
+               MTS LISP Manual, 26.
+               Schank & Riesbeck (1981), 60.
+               Shapiro (1979), 156.
+
+
+
+
+       AI Programming in SNOBOL4      - 122 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | NCONC(L)                    |
+          +-----------------------------+
+
+            Returns a concatenated list of the elements of CAR(L), CADR(L),
+               CADDR(L), etc.  L must be a list of lists.
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+
+            Side Effects: NCONC(L) works analogously to APPEND(L), except
+               that NCONC links the sublists together by using
+               RPLACD(LAST(...)) operations.  This avoids the creation of
+               new CONS cells, and is therefore more efficient than APPEND.
+               It does, however, introduce the risk of creating circular
+               (endless) lists and/or altering the values of some variables
+               in unanticipated ways.
+
+            Example:
+               Let A = ('B' ~ 'C' ~ NIL),
+                   B = ('NN' ~ 'OO' ~ NIL), and
+                   C = ('FRONT' ~ A).
+               Now execute the statement
+                   LONG = NCONC(A ~ B ~ NIL)
+               At this point,
+                   LONG = ('B' ~ 'C' ~ 'NN' ~ 'OO' ~ NIL),
+               but we also have (!)
+                   A = ('B' ~ 'C' ~ 'NN' ~ 'OO' ~ NIL) and
+                   C = ('FRONT' ~ 'B' ~ 'C' ~ 'NN' ~ 'OO' ~ NIL).
+               Even worse results would have been produced by
+                   LONG = NCONC(A ~ C ~ NIL).
+
+            Comments: Note that MAPCAN and MAPCON use NCONC.
+
+            References: Charniak et al. (1980), 23, 306.
+               MTS LISP Manual, 23-24 (GRAFT).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 123 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | NEG(N)                      |
+          +-----------------------------+
+
+             Returns the null string.  It succeeds if N is less than 0;
+               otherwise it fails.
+
+            General Categories: Predicate
+
+            Example: The statement
+                    Y = NEG(FFC) SQRT( -FFC)
+               sets Y to the square root of -FFC if FFC is negative;
+               otherwise, the value of Y remains unchanged.
+
+            Comments: In LISP, this predicate usually goes under the name
+               MINUSP.
+
+            References: Schank & Riesbeck (1981), 57.
+               Shapiro (1979), 153.
+
+
+
+
+
+          +-----------------------------+
+          | NEGP(N)                     |
+          +-----------------------------+
+
+            Returns T if NEG(N) succeeds; NIL otherwise.
+
+            General Categories: Predicate
+
+            Example: MAPCAR( .NEGP, 6 ~ -7 ~ 8 ~ -9 ~ 10 ~ -11 ~ -12 ~ 13 ~
+               NIL) returns (NIL ~ T ~ NIL ~ T ~ NIL ~ T ~ T ~ NIL ~ NIL).
+               (The final NIL is the list terminator.)
+
+            References: See NEG.
+
+
+
+
+
+          +-----------------------------+
+          | NEWSYM()                    |
+          +-----------------------------+
+
+            Synonym for GENSYM().
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 124 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | NOT()                       |
+          +-----------------------------+
+
+             Synonym for NULL().
+
+
+
+
+
+          +-----------------------------+
+          | NOTP()                      |
+          +-----------------------------+
+
+            Synonym for NULLP().
+
+
+
+
+
+          +-----------------------------+
+          | NTH(L,N)                    |
+          +-----------------------------+
+
+            Returns the tail of L beginning with the Nth top-level element.
+               If N is 0 or 1, L is returned.  If N exceeds LENGTH(L), then
+               NIL is returned.  If N is negative, then the last N elements
+               of L are returned (not in reverse order).  NTH(L, -1) is
+               equivalent to LAST(L).
+
+            General Categories: List decomposition
+               List search
+
+            Example: Let LST = ('F' ~ 'G' ~ NIL) ~ (1 ~ 2 ~ NIL) ~
+                    HOO' ~ 'HAH' ~ NIL.
+               Then NTH(LST, -2) returns ('HOO' ~ 'HAH' ~ NIL).
+
+            Comments: See LAST.
+
+            References: Charniak et al. (1980), 310 (SUFLIST).
+               MTS LISP Manual, 19.
+               Shapiro (1979), 143.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 125 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *NULL(L)                    |
+          +-----------------------------+
+
+            *NULL(L)
+
+            Returns the null string.  It succeeds if L is NIL; otherwise,
+               it fails.  NOT is a synonym for NULL.
+
+               The argument L must be a list (datatype CONS) or a fatal
+               error will result.
+
+            General Categories: Predicate
+
+            Example: NULL(T) fails.
+
+            References: Charniak et al. (1980), 306.
+               MTS LISP Manual, 18.
+               Schank & Riesbeck (1981), 49-50.
+               Shapiro (1979), 153.
+
+
+
+
+
+          +-----------------------------+
+          | NULLP(L)                    |
+          +-----------------------------+
+
+            Returns T if NULL(L) succeeds; otherwise, NIL.  NOTP is a
+               synonym for NULLP.
+
+               The argument L must be a list (datatype CONS) or a fatal
+               error will result.
+
+            General Categories: Predicate
+
+            Example: NULLP(8 ~ NIL) returns NIL.
+
+            References: See NULL.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 126 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | NUMBER(X)                   |
+          +-----------------------------+
+
+            Returns the null string.  It succeeds if X can be converted to
+               any of the datatypes 'INTEGER', 'REAL', or 'DREAL'; fails
+               otherwise.
+
+            General Categories: Predicate
+
+            Example: NUMBER('-3.1415926') succeeds and returns the null
+               string.
+
+            References: Charniak et al. (1980), 306.
+               MTS LISP Manual, 18.
+               Schank & Riesbeck (1981), 58.
+               Shapiro (1979), 153.
+
+
+
+
+
+          +-----------------------------+
+          | NUMBERP(X)                  |
+          +-----------------------------+
+
+            Returns T if NUMBER(X) succeeds; NIL otherwise.
+
+            General Categories: Predicate
+
+            Example: NUMBERP('+3.1415926?') returns NIL.
+
+            References: See NUMBER.
+
+
+
+
+
+          +-----------------------------+
+          | PLUS(L)                     |
+          +-----------------------------+
+
+            Returns the sum of the numbers in the list L.
+
+            General Categories: Arithmetic function
+
+            Example: PLUS(8.3 ~ -9.1 ~ 6.25 ~ NIL) returns 5.45.
+
+            Comments: Cf. ADD.
+
+            References: Charniak et al. (1980), 307.
+               MTS LISP Manual, 26 (ADD).
+               Schank & Riesbeck (1981), 58.
+               Shapiro (1979), 154.
+
+
+
+       AI Programming in SNOBOL4      - 127 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *POP(NAME)                  |
+          +-----------------------------+
+
+            Synonym for UNCONS(NAME).
+
+
+
+
+
+          +-----------------------------+
+          | PRELIST(L,N)                |
+          +-----------------------------+
+
+            Returns a list consisting of the first N top-level elements of
+               L.  If N is zero, NIL is returned.  If N exceeds LENGTH(L),
+               L is returned.  If N is negative, the last ABS(N) elements
+               of L are returned.
+
+            General Categories: List decomposition
+               List search
+
+            Example: PRELIST('A' ~ 'B' ~ 'C' ~ 'D' ~ 'E' ~ NIL, 3) returns
+               'A' ~ 'B' ~ 'C' ~ NIL.
+
+            References: Charniak et al. (1980), 96, 307.
+
+
+
+
+
+          +-----------------------------+
+          | *PRINT(X)                   |
+          +-----------------------------+
+
+            Synonym for PRT.VIA.OUTPUT.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 128 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | PRINT.IN.FIELD(N,X)         |
+          +-----------------------------+
+
+            Returns a string which depends upon the values of N and X.  If
+               the first two characters of X are 'C.', 'L.', or 'R.', then
+               the rest of X is treated as an expression, and its value is
+               centered ('C.'), left-justified ('L.'), or right-justified
+               ('R.') in a field of N spaces.  If the first two characters
+               of X do not match any of the three special prefixes ('C.',
+               'L.', or 'R.'), then N copies of X are concatenated and the
+               resulting string is returned.
+
+               This function is intended to help with formatted output.
+               The binary operator $ is OPSYNed to PRINT.IN.FIELD: (N % X)
+               is equivalent to PRINT.IN.FIELD(N,X).
+
+            General Categories: Datatype conversion
+               Output
+
+            Side Effects: If the first two characters of X are 'C.', 'L.',
+               or 'R.', then the remainder of X is EVALed.  This may or may
+               not have side effects, depending upon the value of X.
+
+            Example: The statement
+                    |(62 % 'C.LST')
+               will center the value of LST in a 62-column field.  In other
+               words, the value of LST will be padded with blanks on the
+               left and right to increase its length to 62.
+
+            Comments: If the string to be padded exceeds the requested
+               field size, the string itself is returned.
+
+               Note that, although this function is classified as an output
+               function, it does not by itself cause anything to be written
+               to the output file.  It is intended to be embedded in an
+               argument to PRT.VIA.OUTPUT (|).
+
+            References: Shapiro (1979), 144-147.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 129 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *PRT.VIA.OUTPUT(X)          |
+          +-----------------------------+
+
+            Returns the string representation of X.  The unary operator |
+               is OPSYNed to this function: That is, |X is equivalent to
+               PRT.VIA.OUTPUT(X).
+
+            General Categories: Output
+
+            Side Effects: This string representation of X is written to the
+               output file associated with the identifier "OUTPUT.".  (Note
+               that the name of this identifier ends with a period.)
+               Initially,this output file will be the user's terminal.
+
+            Example:
+               |''  will print one blank line
+               |||''  will print three blank lines
+               |'Hi, sailor!'  will print a friendly greeting.
+
+            Comments: See IN, PRINT.IN.FIELD, UNREAD, and PRINT.
+
+
+
+
+
+          +-----------------------------+
+          | PUT(NAME,S,X)               |
+          +-----------------------------+
+
+            Returns the modified property list of NAME.
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+               List search
+               Property-list function
+
+            Side Effects: X is put on the property list of the identifier
+               named NAME, under the indicator S.  If S already has a value
+               or list of values associated with it, all such values are
+               deleted and replaced by X.
+
+               If X is NIL, then S is placed on the property list as an
+               indicator with no associated values.
+
+            Example: PUT( .CHILD, 'BEHAVIOR', 'CHARMING') puts the element
+               ('BEHAVIOR' ~ 'CHARMING' ~ NIL) on the property list of the
+               identifier CHILD.  Any previous value(s) associated with
+               'BEHAVIOR' are erased.
+
+            Comments: Cf. ADDPROP, GET, DEFPROP, PUTPROP, GETL, PUTL.
+
+            References: MTS LISP Manual, 24.
+               Shapiro (1979), 154.
+
+
+
+       AI Programming in SNOBOL4      - 130 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | PUTL(L,S,X)                 |
+          +-----------------------------+
+
+            Returns NIL.
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+               List search
+               Property-list function
+
+            Side Effects: Puts X under the indicator S on the property list
+               of each identifier whose name is an element of L, erasing
+               any previous value(s) associated with S.
+
+            Example: PUTL(LID,'STAGE',NIL) initializes the value for the
+               property indicator 'STAGE' (or resets that value) for each
+               identifier whose name is an element of LID.
+
+            References: MTS LISP Manual, 24 (PUT).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 131 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | PUTPROP(NAME,X,S)           |
+          +-----------------------------+
+
+            Returns the modified property list of NAME.
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+               List search
+               Property-list function
+
+            Side Effects: It adds X to the list of values associated with
+               the indicator S on the property list of the identifier named
+               NAME (without erasing other values associated with S).
+
+               If X is NIL, and if S is already an indicator on the
+               property list, then nothing changes.  If X is NIL and S is
+               not an indicator, then (S   NIL) is added to the property
+               list.
+
+            Example:
+
+            Suppose 'BEHAVIOR' ~ 'CHARMING' ~ NIL is an element of the
+               property list of CHILD.
+
+               PUTPROP(.CHILD,'AMUSING','BEHAVIOR') would change this
+               element to ('BEHAVIOR' ~ 'AMUSING' ~ 'CHARMING' ~ NIL).
+
+            Comments: Cf. PUT, ADDPROP, PUTL, DEFPROP.
+
+            References: Charniak et al. (1980), 308.
+               MTS LISP Manual, 25 (ADDPROP).
+               Schank & Riesbeck (1981), 50, 59.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 132 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | QUOTIENT(L)                 |
+          +-----------------------------+
+
+            Returns the first element of L, divided by the product of the
+               rest.  (If L has just one element, that element is
+               returned.)
+
+            General Categories: Arithmetic function
+
+            Example: QUOTIENT(5 ~ 4 ~ 3 ~ 2 ~ 1 ~ NIL) returns
+               .20833333333333.
+
+            Comments: Double precision division is automatic.
+
+            References: Charniak et al. (1980), 308.
+               MTS LISP Manual, 26 (binary DIVIDE).
+               Shapiro (1979), 154.
+
+
+
+
+
+          +-----------------------------+
+          | RAC(L)                      |
+          +-----------------------------+
+
+            Returns the last top-level element of L.
+
+            General Categories: List decomposition
+               List search
+
+            Example: Let L = #'((E A T) MORE F I S H)'.  Then RAC(L)
+               returns 'H'.
+
+            Comments: RAC(L) is not equivalent to LAST(L), but it is
+               equivalent to CAR(LREVERSE(L)).
+
+            References: Shapiro (1979), 154.
+
+
+
+
+
+          +-----------------------------+
+          | RAD(N)                      |
+          +-----------------------------+
+
+            Returns the number of radians in N degrees.
+
+            General Categories: Arithmetic function
+
+            Example: RAD(66.666667) returns 1.1635529234349.
+
+
+
+
+       AI Programming in SNOBOL4      - 133 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | RAISE(N1,N2)                |
+          +-----------------------------+
+
+            Returns N1**N2.  N1 and N2 may be integers or floating point
+               numbers.
+
+            General Categories: Arithmetic function
+
+            Example: RAISE(2, DIV(P...I., 2)) returns 2.9706864235513.
+
+            References: Gimpel (1976), 337.
+
+
+
+
+
+          +-----------------------------+
+          | RDC(L)                      |
+          +-----------------------------+
+
+            Returns a copy of L with its last top-level element deleted.
+
+            General Categories: List decomposition
+               List search
+
+            Example: Let L = #'(A AA AAA AAAA)'.  Then RDC(L) returns ('A'
+               ~ 'AA' ~ 'AAA' ~ NIL).
+
+            Comments: RDC(L) = LREVERSE(CDR(LREVERSE(L))).
+
+            References: Shapiro (1979), 154.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 134 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | *READ(S)                    |
+          +-----------------------------+
+
+            Returns the list represented by S.  String-to-list conversion
+               is carried out using LISP-like rules.  The # unary operator
+               is OPSYNed to the READ function: #S is equivalent to
+               READ(S).
+
+            General Categories: Datatype conversion
+               List composition
+
+            Side Effects: In READ only, a \ unary operator indicates that
+               the value of a string is to replace the string.  Multiple
+               \'s indicate multiple evaluations.
+
+            Example:
+               Let A = 5, B = 'BOOK', and C = 'CHILD'.
+               Then #'((A \A) (B \B) (C . \C))' returns
+                 (('A' ~ 5 ~ NIL) ~ ('B' ~ 'BOOK' ~ NIL) ~
+                  ('C' ~ 'CHILD') ~ NIL).
+
+            Comments: Dotted pairs are allowed, as in LISP, but there must
+               be at least one blank on each side of the dot, and the
+               dotted pair must be surrounded by parentheses.
+
+               Quoted literal strings are recognized.  Double quotes (")
+               can occur inside single-quoted (') strings and vice versa.
+               Blanks and parentheses can occur inside quoted strings.
+
+               The following expressions all translate to NIL:
+               ('' . ''), ("" . ""), (), and NIL.  Also, as indicated in
+               the example, NIL is provided automatically at the end of a
+               normal list.
+
+               The following expressions translate to T:
+               T and (T . T).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 135 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | READLIST(L)                 |
+          +-----------------------------+
+
+            Returns READ(CONCAT(L)).  L is a list of strings, not
+               necessarily single characters.  All the strings are
+               concatenated to form one long string S.  READLIST then
+               returns READ(S).
+
+            General Categories: Datatype conversion
+               List composition
+
+            Example: Let L =
+               ( '(' ~ 'FO' ~ ' TO' ~ ' ' ~ 'MAT)' ~ NIL ).
+
+            CONCAT would form the concatenated string '(FO TO MAT)' and
+               READLIST would return #'(FO TO MAT)', which is the list
+               ('FO' ~ 'TO' ~ 'MAT' ~ NIL).
+
+            References: Charniak et al. (1980), 51, 71, 308.
+               Shapiro (1979), 154.
+
+
+
+
+
+          +-----------------------------+
+          | *REMAINDER(N1,N2)           |
+          +-----------------------------+
+
+            Returns N1 modulo N2.
+
+            General Categories: Arithmetic function
+
+            Example: REMAINDER(8,3) returns 2.
+
+            Comments: N1 and N2 must be integers.  REMAINDER is the same as
+               the SPITBOL REMDR function.  This means that the sign of the
+               result is, by definition, the sign of the first argument.
+
+            References: Charniak et al. (1980), 308.
+               MTS LISP Manual, 26.
+               Shapiro (1979), 155.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 136 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | REMOVE(L,X)
+          +-----------------------------+
+
+            Returns a new list in which all occurrences of X in L have been
+               deleted.
+
+            General Categories: List composition
+               List decomposition
+               List search
+
+            Example: If L = #'((1 A) (2 B) (3 (2 B)))', then
+               REMOVE( L, (2 ~ 'B' ~ NIL) ) returns
+               (1 ~ 'A' ~ NIL) ~ (3 ~ NIL) ~ NIL.
+
+            References: Charniak et al. (1980),
+               MTS LISP Manual, 20-21 (COPY), 23 (DELETE).
+               Schank & Riesbeck (1981), 59.
+               Shapiro (1979), 155.
+
+
+
+
+
+          +-----------------------------+
+          | REMPROP(NAME,S)             |
+          +-----------------------------+
+
+            Returns T if the indicator S is found on the property list of
+               the identifier named NAME; otherwise NIL.
+
+            General Categories: List decomposition
+               List search
+               Predicate
+               Property-list function
+
+            Side Effects: The indicator S and all its associated values are
+               removed from the property list of NAME.
+
+            Example: REMPROP( .CHILD, 'BEHAVIOR') removes the indicator
+               'BEHAVIOR' from the property list of CHILD, returning T if
+               such an indicator was there to be removed, or NIL if no such
+               indicator was there.
+
+            References: Charniak et al. (1980), 308.
+               MTS LISP Manual, 24 (REM).
+               Schank & Riesbeck (1981), 59.
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 137 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | ROUND(N)                    |
+          +-----------------------------+
+
+            Returns N rounded to the nearest integer.   (.5 rounds up for
+               positive numbers and down for negative numbers.)
+
+            General Categories: Arithmetic function
+
+            Example: ROUND(-8.5) returns -9.
+
+            References: Shapiro (1979), 147.
+
+
+
+
+
+          +-----------------------------+
+          | RPLACA(L,X)                 |
+          +-----------------------------+
+
+            Returns the list formed by replacing the CAR of L with X.
+
+            General Categories:  Alters existing CONS cell(s)
+               List composition
+
+            Side Effects: This is a function that alters an existing CONS
+               cell.  Therefore, it carries the usual risks of creating
+               circular lists and of unintentionally altering  the values
+               of other variables (cf. NCONC).
+
+            Example: Consider the assignment statement
+                    L = RPLACA(L,L)
+               This statement creates a circular list.
+
+            References: Charniak et al. (1980), 21-22, 308.
+               MTS LISP Manual, 22.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 138 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | RPLACD(L,X)                 |
+          +-----------------------------+
+
+            Returns the list created by replacing the CDR of L with X.
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+
+            Side Effects: See RPLACA, NCONC.
+
+            Example: If L = #'((A B) (C (D E)) F)', then
+                    RPLACD(L, ('E' ~ 'F' ~ NIL)) returns
+                    (('A' ~ 'B' ~ NIL) ~ 'E' ~ 'F' ~ NIL).
+               This list also becomes the value of L.
+
+            References: Charniak et al. (1980), 21-22, 309.
+               MTS LISP Manual, 22-23.
+
+
+
+
+
+          +-----------------------------+
+          | RPLACN(L,N,X)               |
+          +-----------------------------+
+
+            Returns the list created by replacing the Nth element of L with
+               X.  If N is 0, then X is CONSed onto the front of L.  If N >
+               LENGTH(L), then LIST(X,NIL) is NCONCed onto the end of L.
+               If N < 0, the elements of L are numbered "from the right,"
+               with the last element being number 1.
+
+            General Categories: Alters existing CONS cell(s)
+               List composition
+               List search
+
+            Side Effects: The value of L is changed unless N = 0.
+
+            Example: If L = #'(1 2 3 4 5 6)', then
+                    RPLACN(L,3,'THREE') returns
+                    (1 ~ 2 ~  'THREE' ~ 4 ~ 5 ~ 6 ~ NIL).
+               This list also becomes the new value of L.
+
+            Comments: See RPLACA, RPLACD, NCONC.
+
+            References: Shapiro (1979), 143.
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 139 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | SET.(NAME,X)                |
+          +-----------------------------+
+
+            Returns X.
+
+            General Categories: Definitional function
+
+            Side Effects: X becomes the value of the identifier named NAME.
+
+            Example: SET.( .C, 'SHINING') returns 'SHINING' and sets the
+               value of C to 'SHINING'.
+
+            Comments: (Editor's note) This function was named SET (no
+               period) in the original report.  The period is appended to
+               distinguish the function from the Spitbol function by the
+               same name, used to position direct-access files.
+
+            References: Charniak et al. (1980), 18, 309.
+               MTS LISP Manual, 22.
+               Schank & Riesbeck (1981), 60.
+               Shapiro (1979), 155.
+
+
+
+
+
+          +-----------------------------+
+          | SETL(L)                     |
+          +-----------------------------+
+
+            Returns the list with elements CADR(L), CADDDR(L), ...; i.e.,
+               the even-numbered elements of L.
+
+            General Categories: Definitional function
+               List composition
+               List decomposition
+
+            Side Effects: Sets the value of CAR(L) to CADR(L), of CADDR(L)
+               to CADDDR(L), and so on.  Note that the odd-numbered
+               elements of L are interpreted as names, and the even-
+               numbered elements are interpreted as values.
+
+            Example: If A = #'(X1 5 X2 17 X3 19 X4 23)', then SETL(A)
+               returns (5 ~ 17 ~ 19 ~ 23 ~ NIL) and sets X1 = 5, X2 = 17,
+               X3 = 19, and X4 = 23.
+
+            Comments: This is just the list-argument form of SET which is
+               available in some LISPs.  Note that the structure of the
+               argument list determines whether SETL acts like LISP's SETQ,
+               SET, or something else.
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 140 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | SIGN(N)                     |
+          +-----------------------------+
+
+            Returns -1 if N is negative, 1 if N is positive, 0 if N is
+               zero.
+
+            General Categories: Arithmetic function
+
+            Example: SIGN(8 x -9.5) returns -1.
+
+
+
+
+
+          +-----------------------------+
+          | SIN(N)                      |
+          +-----------------------------+
+
+            Returns the sine of N radians.  N may be any integer or real
+               number.
+
+            General Categories: Arithmetic function
+
+            Example: SIN(P...I. / 4) returns 0.70710678118633.
+               (P...I. = pi.)
+
+            References: Gimpel (1976), 332-333.
+
+
+
+
+
+          +-----------------------------+
+          | SORT.(A,N1,N2,S)            |
+          +-----------------------------+
+
+            Returns the array A with elements N1 through N2 sorted
+               according to predicate P.  P may be 'LE' (numeric array,
+               ascending sort), 'GE' (numeric, descending), 'LLE' (string,
+               ascending), or 'LGE' (string, descending).
+
+            Side Effects: The array argument itself is altered.
+
+            Example: If ROSTER is an array of N students' names, then
+               SORT.(ROSTER,1,N, 'LLE') will cause the names to be arranged
+               in alphabetical order.
+
+            Comments: The sorting method is described in Singleton (1968).
+               
+               (Editor's note) This function was named SORT (no period) in
+               the original report.  The period is appended to distinguish
+               the function from the Spitbol function by the same name.
+
+
+
+
+       AI Programming in SNOBOL4      - 141 -                    August, 1982
+
+
+
+
+
+
+
+
+            References: Singleton (1968).
+               Gimpel (1975), 280, 292, 299.
+               Wirth (1976), 76-84.
+
+
+
+
+
+          +-----------------------------+
+          | SNOC(L,X)                   |
+          +-----------------------------+
+
+            Returns a copy of L with X added on as the last top-level
+               element.
+
+            General Categories: List composition
+
+            Example: If L = ~'(A B C)', then
+               SNOC( L, 4) returns ('A' ~ 'B' ~ 'C' ~ 4 ~ NIL).
+
+            References: Schank & Riesbeck ~i981), 54, 69 (CONS-END).
+               Shapiro (1979), 155,
+
+
+
+
+
+          +-----------------------------+
+          | SOME(NAME,L)                |
+          +-----------------------------+
+
+            Returns T if the function named NAME returns a non-NIL value
+               for some argument in the list L; NIL otherwise.
+
+            General Categories: Mapping function
+               Predicate
+
+            Example: If L = #'(! # $ % & 18.9 * =)',
+               then SOME( .NUMBERP, L) returns T.
+
+            Comments: Cf. EVERY, SUBSET.
+
+            References: Charniak et al. (1980), 309.
+               Schank & Riesbeck (1981), 66.
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 142 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | SQRT(N)                     |
+          +-----------------------------+
+
+            Returns the double-precision square root of N.  N may be any
+               non-negative integer or floating point number.
+
+            General Categories: Arithmetic function
+
+            Example: SQRT(4.5) returns 2.1213203435596.
+
+            References: Gimpel (1976), 330-331.
+
+
+
+
+
+          +-----------------------------+
+          | SUB(N1,N2)                  |
+          +-----------------------------+
+
+            Returns N1 - N2.
+
+            General Categories: Arithmetic function
+
+            Example: SUB(1,8) returns -7.
+
+            References: Charniak et al. (1980), 303 (DIFFERENCE).
+               MTS LISP Manual, 26.
+               Schank & Riesbeck (1981), 55 (DIFFERENCE).
+               Shapiro (1979), 150 (DIFFERENCE).
+
+
+
+
+
+          +-----------------------------+
+          | SUB1(N)                     |
+          +-----------------------------+
+
+            Returns N - 1.
+
+            General Categories: Arithmetic function
+
+            Example: SUB1(14) returns 13.
+
+            References: Charniak et al. (1980), 309.
+               MTS LISP Manual, 26.
+               Shapiro (1979), 155.
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 143 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | SUBSET(NAME,L)              |
+          +-----------------------------+
+
+            Returns a list of the elements of L for which the function
+               named NAME returns a non-NIL value.
+
+            General Categories: List composition
+               List decomposition
+               Mapping function
+
+            Example: SUBSET( .ATOMP, #'((A J) (J R) JUDY (SAM SON)
+               ORVILLE)') returns ('JUDY' ~ 'ORVILLE' ~ NIL).
+
+            References: Charniak et al. (1980), 309.
+
+
+
+
+
+          +-----------------------------+
+          | SUBST(L,X1,X2)              |
+          +-----------------------------+
+
+            Returns a copy of L with each occurrence of X1 replaced by X2.
+
+            General Categories: List composition
+               List decomposition
+               List search
+
+            Example: Let L = #'(PAC-MAN (CHOMP CHOMP CHOMP))', X1 =
+               'CHOMP', and X2 = #'(RUN)'.  Then SUBST(L,X1,X2) returns
+               ('PAC-MAN' ~ (('RUN' ~ NIL) ~ ('RUN' ~ NIL) ~ ('RUN' ~ NIL)
+               ~ NIL) ~ NIL).
+
+            References: Charniak et al. (1980), 309.
+               MTS LISP Manual, 20-21 (COPY).
+               Schank & Riesbeck (1981), 60.
+               Shapiro (1979), 155.
+
+
+
+
+
+          +-----------------------------+
+          | SUFLIST(L,N)                |
+          +-----------------------------+
+
+            Returns the list obtained by applying the CDR operation N times
+               to L.  If N is zero, L is returned.  If N is negative,
+               PRELIST(L,LENGTH(L) + N) is returned; i.e., RDC is applied N
+               times to L.  If ABS(N) exceeds LENGTH(L), NIL is returned.
+
+
+
+
+
+       AI Programming in SNOBOL4      - 144 -                    August, 1982
+
+
+
+
+
+
+
+
+            General Categories: List decomposition
+               List search
+
+            Example: If L = #'(A I PROGRAMMING)' then SUFLIST(L,2) returns
+               ('PROGRAMMING' ~ NIL).
+
+            References: Charniak et al. (1980), 310.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 145 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | TAN(N)                      |
+          +-----------------------------+
+
+            Returns the tangent of N radians.  N may be any integer or real
+               number such that COS(N) is different from 0.
+
+            General Categories: Arithmetic function
+
+            Example: TAN(SQRT(2) * P...I.) returns 3.6202185670771.
+
+            References: Gimpel (1976), 332-33j.
+
+
+
+
+
+          +-----------------------------+
+          | TDUMP(NAME,N)               |
+          +-----------------------------+
+
+            Returns nothing: It produces a fatal-error message and
+               terminates the run.
+
+            General Categories: Output
+
+            Side Effects: NAME is the name of the function in which the
+               fatal error occurred.  N, which is optional, is the number
+               of the argument (to NAME) which caused the fatal error.
+
+               TDUMP prints a message which gives the name of the function
+               NAME, the name and value of each argument to NAME, and the
+               name and value of each local variable in NAME when the error
+               occurred.  If N is specified, then the Nth argument is
+               flagged (with a row of asterisks to its left) to indicate
+               that it was the cause of the error.
+
+               Finally, TDUMP accepts an integer (0, 1, or 2) from the
+               user's terminal.  (The user is prompted for this.)  A zero
+               indicates that no SPITBOL dump is desired; a 1 requests a 1-
+               level SPITBOL dump (names and values of all keywords and
+               natural variables); and a 2 requests a 2-level dump (same as
+               1, plus array, table, and list elements).
+
+            Example: TDUMP(.F9,2) causes a fatal-error message to be
+               printed, with F9 as the name of the offending function and
+               with the second argument to F9 flagged as the cause of the
+               error.
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 146 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | TIMES(L)                    |
+          +-----------------------------+
+
+            Returns the product of the numbers on the list L.
+
+            General Categories: Arithmetic function
+
+            Example: TIMES( #'(8 7 6 5 4 3 2 1 0)') returns 0.
+
+            Comments: Cf. MULT.
+
+            References: Charniak et al. (1980), 310.
+               MTS LISP Manual, 26.
+               Schank & Riesbeck (1981), 60.
+               Shapiro (1979), 156.
+
+
+
+
+
+          +-----------------------------+
+          | *UNCONS(NAME)               |
+          +-----------------------------+
+
+            Returns the CAR of the list which is the value of the
+               identifier named NAME.  A synonym for UNCONS is POP.
+
+            General Categories: List decomposition
+
+            Side Effects: The value of the identifier named NAME becomes
+               the CDR of its former value.
+
+            Example: Let C = #'(F R U I T)'.  Then POP( .C) returns 'F',
+               and the value of C becomes ('R' ~ 'U' ~ 'I' ~ 'T' ~ NIL).
+
+            Comments: The value of NAME cannot be a dotted pair or an atom;
+               if it is, a fatal error results.  If the value of NAME is
+               NIL, then POP fails; this is useful for loop control.
+
+            References: Charniak et al. (1980), 34-37, 307.
+               MTS LISP Manual, 29.
+               Schank & Riesbeck (1981), 49, 58, 69.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 147 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | UNION(L1,L2)                |
+          +-----------------------------+
+
+            Returns a list of the elements which appear in L1 or in L2,
+               without duplicates.
+
+            General Categories: List composition
+               List decomposition
+               List search
+
+            Example: UNION(#'(Z W X)', #'(8 X R W)') returns ('Z' ~ 'W' ~
+               'X' ~ 8 ~ 'R' ~ NIL).
+
+            References: Charniak et al. (1980), 110-112.
+               MTS LISP Manual, 21.
+               Shapiro (1979), 130.
+
+
+
+
+
+          +-----------------------------+
+          | *UNREAD(L)                  |
+          +-----------------------------+
+
+            Returns the string expression for the list L, using (more or
+               less) LISP syntax.  Lists and dotted pairs are
+               parenthesized.  Literal atoms containing internal blanks are
+               enclosed in quotes (") unless they are already enclosed in
+               quotes.
+
+            The unary operator | is OPSYNed to the UNREAD function: !L is
+               equivalent to UNREAD(L).
+
+            General Categories: Datatype conversion
+
+            Example: If L = 'L' ~ 'I' ~ 'S' ~ 'T' ~ NIL, then
+               !L = '(L I S T)'.
+
+            References: Charniak et al. (1980).
+               MTS LISP Manual.
+               Schank & Riesbeck (1981).
+               Shapiro (1979).
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 148 -                    August, 1982
+
+
+
+
+
+
+
+
+          +-----------------------------+
+          | ZERO(N)                     |
+          +-----------------------------+
+
+            Returns the null string.  It succeeds if N is equal to 0; fails
+               otherwise.
+
+            General Categories: Arithmetic function
+               Predicate
+
+            Example: ZERO(11.23581321) fails.
+
+            References: Charniak et al. (;980), 310.
+               MTS LISP Manual, 25.
+               Shapiro (1979), i56.
+
+
+
+
+
+          +-----------------------------+
+          | ZEROP(N)                    |
+          +-----------------------------+
+
+            Returns T if ZERO(N) succeeds; NIL otherwise.
+
+            General Categories: Arithmetic function
+               Predicate
+
+            Example: ZEROP(5.0 ~ '5') returns T.
+
+            References: See ZERO.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 149 -                    August, 1982
+
+
+
+
+
+
+
+
+                                     APPENDIX G
+
+            This is a compilation listing of a group of programs which were
+          used in debugging SNOLISPIST.  They illustrate a few of the
+          system's capabilities, as well as some LISPish programming
+          techniques (e.g., mapping functions and EVALing expressions).
+          The test program is designed to run interactively from a
+          terminal.  The tests are largely self-documenting.
+
+              *
+              * To run this test program:
+              *     a)  have copies of TEST, SNOLISP/LIB, and SNOLISP/CORE
+              *         under your account;
+              *     b)  type
+              *         $RUN *SPITBOL SCARDS=SNOLISP/CORE+TEST PAR=SIZE=64
+              *
+              *
+              * Tests of single-argument numerical functions
+              *     SNOLISPIST
+              *
+          1    PAWS = *?( |'' |'Press ENTER to continue.'
+              +     |'' IN()    |(COLLECT() ' bytes available' |'') |'' )
+          2    DEXP('PAUSE() = EVAL(PAWS)')
+              *
+          3    ||''
+          4    ?( |'Single-argument numerical functions' |'' )
+          5    |'Incidentally uses MAPC, DEXP with LAMBDA, and EVALCODE'
+          6    |''
+          7    MAPC(DEXP('LAMBDA(EXPR) = '
+              +          '|("     " EVALCODE( |EXPR))' ),
+              +     'ABS(-15.9999)' ~
+              +     'SIGN(0 - 4444.4444)' ~
+              +     'ADD1(-1)' ~
+              +     'SUB1(14456.9765)' ~
+              +     'FLOAT(13 + 15 + 17)' ~
+              +     'DFLOAT(17 - 15 - 13)' ~
+              +     'FIX(P...I.)' ~
+              +     'MINUS(LN...10.)' ~
+              +     'ROUND(-8.5)' ~ NIL)
+              *
+          8    PAUSE()
+              *
+              *
+              * Tests of binary numerical functions
+              *     SNOLISPIST
+              *
+              *
+          9    ||''
+          10   |'Binary numerical functions'
+          11   |''
+          12   MAPC(DEXP('LAMBDA(EXPR) = '
+              +          '|("    " EVALCODE( |EXPR))' ),
+              +     'ADD(P...I.,LN...10.)' ~
+              +     'SUB(P...I.,LN...10.)' ~
+
+
+
+       AI Programming in SNOBOL4      - 150 -                    August, 1982
+
+
+
+
+
+
+
+
+              +     'MULT(P...I.,LN...10.)' ~
+              +     'DIV(P...I.,LN...10.)' ~
+              +     'MAX(1,-1)' ~
+              +     'MIN(1,-1)' ~
+              +     'REMAINDER(-44444444.119)' ~ NIL)
+              *
+          13   PAUSE()
+              *
+              *
+              * Tests of list-argument numerical functions
+              *     SNOLISPIST
+              *
+          14   ||''
+          15   |'List-argument numerical functions'
+          16   |''
+          17   |'Incidentally uses MAPCAR, LREVERSE, and READ'
+          18   |''
+          19   ARGUMENT.LIST =
+              +     MAPCAR(.DFLOAT,
+              +        LREVERSE(
+              +             #'(1 1 2 -3 5 8 -13 21)' ))
+          20   ?( |'Here is the argument list: ' |'' )
+          21   |ARGUMENT.LIST
+              *
+          22   PAUSE()
+              *
+          23   MAPC(DEXP('LAMBDA(FUNCTION) = '
+              +          '|("     " APPLY( |FUNCTION, ARGUMENT.LIST))' ),
+              +     .PLUS ~
+              +     .DIFFERENCE ~
+              +     .TIMES ~
+              +     .QUOTIENT ~
+              +     NIL)
+              *
+          24   PAUSE()
+              *
+              *
+              * Tests of extended numerical functions
+              *     SNOLISPIST
+              *
+              *
+          25   |''
+          26   |'Extended numerical functions'
+          27   |''
+          28   ?( |'Testing FLOOR' |'' )
+          29   AL = #'(-10.9 -7.9 -6.01 -0.00001 0.00001 6.01 7.9 10.9)'
+          30   |'Argument list = '
+          31   ?( I("     "   !AL) |'' )
+          32   |MAPCAR(.FLOOR,AL)
+              *
+          33   PAUSE()
+              *
+          34   |''
+          35   ?( |'Testing CEIL' |'' )
+
+
+
+       AI Programming in SNOBOL4      - 151 -                    August, 1982
+
+
+
+
+
+
+
+
+          36   |'Argument list = '
+          37   ?( |("     "   !AL) |'' )
+          38   |MAPCAR(.CEIL,AL)
+              *
+          39   PAUSE()
+              *
+          40   |''
+          41   ?( |'Testing SQRT by inverse mapping' |'' )
+          42   AL = #'(1 10 100 1000 10000 100000 1000000 10000000)'
+          43   |'Argument list = '
+          44   ?( |("     "   !AL) |'' )
+          45   |MAPCAR(DEXP('LAMBDA(A) = ROUND(A * A)'),
+              +     MAPCAR(.SQRT,AL))
+              *
+          46   PAUSE()
+              *
+          47   |''
+          48   |'Testing trigonometric and inverse trigonometric functions'
+          49   ?( |('     by inverse mapping') |'' )
+          50   AL = #( '(0 10 20 30 40 50 60 70 80 90 100 120 '
+              +     '130 140 150 160 170 180 190 200 210 220 230 240 '
+              +     '250 260 270 280 290 300 310 320 330 340 350 360)' )
+          51   |'Argument list = '
+          52   ?( |("     "   !AL) |'' )
+          53   ?( |'SIN and ASIN' |'' )
+          54   |MAPCAR(.ROUND,
+              +     MAPCAR(.DEG,
+              +        MAPCAR(.ASIN,
+              +             MAPCAR(.SIN,
+              +                  MAPCAR(.RAD,AL)))))
+              *
+          55   PAUSE()
+              *
+          56   ?( |'COS and ACOS' |'' )
+          57   |MAPCAR(.ROUND,
+              +     MAPCAR(.DEG,
+              +        MAPCAR(.ACOS,
+              +             MAPCAR(.COS,
+              +                  MAPCAR(.RAD,AL)))))
+              *
+          58   PAUSE()
+              *
+          59   ?( |'TAN and ATAN' |'' )
+          60   |MAPCAR(.ROUND,
+              +     MAPCAR(.DEG,
+              +        MAPCAR(.ATAN,
+              +             MAPCAR(.TAN,
+              +                  MAPCAR(.RAD,AL)))))
+              *
+          61   PAUSE()
+              *
+          62   |''
+          63   |'Logarithms to the base 2 of the first 30 powers of 2'
+          64   |''
+
+
+
+       AI Programming in SNOBOL4      - 152 -                    August, 1982
+
+
+
+
+
+
+
+
+          65   I = 0 ; AL  = NIL  ; TWP = 1
+          68  TWO.LOOP
+          69        I = LT(I,30) I + 1      :F(TWO.LOOP.END)
+          70        TWP = 2 * TWP
+          71        AL = TWP ~ AL      :(TWO.LOOP)
+          72  TWO.LOOP.END
+          73        AL =  LREVERSE(AL)
+              *
+          74   |MAPCAR(DEXP('LAMBDA(Z) = ROUND(LOG(Z,2))'), AL)
+              *
+          75   PAUSE()
+              *
+          76   |''
+          77   ?( |'The first 10 powers of e' |'' )
+          78   |MAPCAR(DEXP('LAMBDA(Z) = RAISE(NAT...BASE.,Z)' ),
+              +     #'(1 2 3 4 5 6 7 8 9 10)' )
+              *
+          79   PAUSE()
+              *
+          80   |''
+          81   ?( |'The first 10 negative powers of e' |'' )
+          82   |MAPCAR(DEXP('LAMBDA(X) = RAISE(NAT...BASE., -X)' ),
+              +     #'(1 2 3 4 5 6 7 8 9 10)' )
+              *
+          83   PAUSE()
+              *
+              *
+              * Test program for all compound CAR/CDR
+              * functions in SNOLISPIST
+              *
+          84   MNMNM = #'(1 2 3 4)'
+              *
+              * Build a reasonably hairy list
+              *
+          85   LKLKL = #'((((\MNMNM) \MNMNM) \MNMNM) \MNMNM)'
+          86   MNMNM = #'(\LKLKL \LKLKL \LKLKL \LKLKL)'
+          87   LKLKL = LCOPY(MNMNM)
+              *
+          88   ||''
+          89   |('LKLKL = ' !LKLKL)
+          90   |''
+          91   MAPC(DEXP('LAMBDA(S) = '
+              +          '|EVAL( |(  "C" S "R(LKLKL)" ))' ),
+              +     #('(A D AA AD DA DD '
+              +       ' AAA AAD ADA DAA '
+              +       ' ADD DAD DDA DDD '
+              +       ' AAAA AAAD AADA ADAA DAAA '
+              +       ' AADD ADAD DAAD ADDA DADA DDAA '
+              +       ' ADDD DADD DDAD DDDA DDDD)' ))
+              *
+          92   PAUSE()
+              *
+              *
+              * SNOLISPIST I/O test program
+
+
+
+       AI Programming in SNOBOL4      - 153 -                    August, 1982
+
+
+
+
+
+
+
+
+              *
+          93       A = 'C' ; B = 'L' ; C = 'R'
+              *
+          96       (|(11 % 'C.A') |'Centered.' ||'')
+          97       (|(11 % 'L.B') |'Left justified.'  ||'')
+          98       (|(11 % 'R.C') |'Right justified.'  ||'')
+          99    L = #'(A CENTERED LIST)'
+              *
+          100   (|(72 % 'C.L') |'A centered list.' ||'')
+              *
+          101  (|'Test of indentation via % operator.' |'')
+          102  ?( |'Outline Level I' |'' )
+          103  ?( |(5 % ' '   'Outline Level I.A') |'' )
+          104  ?( |(10 % ' '   'Outline Level I.A.1') |'' )
+          105  ?( |(15 % ' '   'Outline Level I.A.1.a') ||'' )
+              *
+          106  PAUSE()
+              *
+          107  |'Input test:   Should print echo of next input line.'
+          108  |''
+          109  |IN()
+              *
+          110  PAUSE()
+              *
+              *
+              * Tests of recursively defined list processing functIons
+              *   SNOLISPIST
+              *
+              *
+          111  ||''
+          112  |'Recursively defined list processing functions'
+          113  |''
+          114  ?( |'Test LCOPY' |'' )
+          115  ORIGINAL = #'((O . R) (I . G) (I . N) (A . L))'
+          116  COPY = LCOPY(ORIGINAL)
+          117  |'Here is the original:'
+          118  ?( |(62 % 'C.ORIGINAL') |'' )
+          119  |'Here is the copy:'
+          120  ?( |(62 % 'C.COPY') |'' )
+          121  |'Are they EQU?'
+          122  ?( |("     "   ~EQU(COPY,ORIGINAL) 'No.') |'' )
+          123  |'Are they EQUAL?'
+          124  ?( |("     "   EQUAL(COPY,ORIGINAL) 'Yes.') |'' )
+              *
+          125  PAUSE()
+              *
+          126  ?( |'Test SUBST' |'' )
+          127  TEST.LIST = #'(1 (2) (3 . 4) ((5 . 6) 7) 1 2 3 4 5 6 7)'
+          128  SUBST.LIST = #'(S I X)'
+          129  |'Here is the original list:'
+          130  ?( |(62 % 'C.TEST.LIST') |'' )
+          131  ?( |'Here is the target sublist:  6' |'' )
+          132  |'Here is the result:'
+          133  ?( |(62 % 'C.SUBST(TEST.LIST,6,SUBST.LIST)' ) |'' )
+
+
+
+       AI Programming in SNOBOL4      - 154 -                    August, 1982
+
+
+
+
+
+
+
+
+              *
+          134  PAUSE()
+              *
+          135  ?( |'Test REMOVE' |'' )
+          136  TEST.LIST = #'(A (B (C . D) E (F . G)) H A I R)'
+          137  REM.LIST = #'(C . D)'
+          138  |'Here is the test list:'
+          139  ?( |(62 % 'C.TEST.LIST') |'' )
+          140  |'Here is the list to be removed:'
+          141  ?( |(62 % 'C.REM.LIST') |'' )
+          142  |'Here is the result:'
+          143  ?( |(62 % 'C.REMOVE(TEST.LIST.REM.LIST)' ) |'' )
+              *
+          144  PAUSE()
+              *
+          145  ?( |'Test FIND' |'' )
+          146  TEST.LIST = #'(H A Y ((N . E) (E . D) (L . E)) S T A C K)'
+          147  FIND.LIST = #'(E . D)'
+          148  |'Here is the test list:'
+          149  ?( |(62 % 'C.TEST.LIST') |'' )
+          150  |'Here is the list to be found:'
+          151  ?( |(62 % 'C.FIND.LIST') |'' )
+          152  |'Here is the result:'
+          153  ?( |(62 % 'C.FIND(FIND.LIST,TEST.LIST)' ) |'' )
+              *
+          154  PAUSE()
+              *
+              * Tests of miscellaneous list processing functions
+              *     SNOLISPIST
+              *
+          155  ||''
+          156  |'Miscellaneous list processing functions'
+          157  |''
+          158  ?( |'Test EXPLODE and READLIST by inverse mapping' |'' )
+          159  |MAPCAR(.READLIST,
+              +     MAPCAR(.EXPLODE,
+              +        #'(1 AARDVARK (SUB LIST) (C (O (MPLEX))))' ))
+              *
+          160  PAUSE()
+              *
+          161  |''
+          162  ?( |'Test LENGTH' |'' )
+          163  |MAPLIST(.LENGTH,
+              +     EXPLODE('abcdefghijklmnopqrstuvwxyz'))
+              *
+          164  PAUSE()
+              *
+          165  |''
+          166  |'Test SETL (SET indirectly)'
+          167  |''
+          168  DEFINE('PLACE(CH)A')    :(PLACE.END)
+          169 PLACE
+              +     &ALPHABET CH @A
+          170       PLACE = A     :(RETURN)
+
+
+
+       AI Programming in SNOBOL4      - 155 -                    August, 1982
+
+
+
+
+
+
+
+
+          171 PLACE.END
+              *
+          172  DEFINE('INTERLEAVE(L1,L2)LL')      :(INTERLEAVE.END)
+          173 INTERLEAVE
+              +     LL = NIL
+          174 INTERLEAVE1
+              +     LL = POP( .L2) ~ POP( .L1) ~ LL
+              +        :S(INTERLEAVE1)
+          175       INTERLEAVE = LREVERSE(LL)    :(RETURN)
+          176 INTERLEAVE.END
+              *
+          177       AA =  EXPLODE('abcdefghijklmnopqrstuvwxyz')
+          178       VV =  MAPCAR(.PLACE,AA)
+          179       SETL(INTERLEAVE(AA,VV))
+          180       MAPC(DEXP('LAMBDA(Z) = '
+              +          '?|(Z " = " VALUE(Z))' ),  AA)
+              *
+          181  PAUSE()
+              *
+              *
+              *  Tests of set functions on lists
+              *     SNOLISPIST
+              *
+              *
+          182  ||''
+          183  |'Set functions'
+          184  |''
+          185  EVEN  = #'(2 4 6 8 10 12 14 16 18 20)'
+          186  ODD   = #'(1 3 5 7 9 11 13 15 17 19)'
+          187  PRIME = #'(2 3 5 7 11 13 17 19)'
+          188  FIBONACCI = #'(1 1 2 3 5 8 13)'
+          189  UNIVERSE = UNION(EVEN,ODD)
+          190  NON.PRIME = EXCLUDE(UNIVERSE,PRIME)
+          191  EVEN.PRIME = INTERSECT(EVEN,PRIME)
+          192  PRIME.FIBO = INTERSECT(PRIME,FIBONACCI)
+          193  ODD.FIBO = INTERSECT(ODD,FIBONACCI)
+          194  PRIME.OR.FIBO = UNION(PRIME,FIBONACCI)
+          195  NEITHER.PRIME.NOR.FIBO = EXCLUDE(UNIVERSE,PRIME.OR.FIBO)
+              *
+          196  MAPC(DEXP('LAMBDA(NAME) = |$|( |"" NAME )' ),
+              +     #( '(EVEN ODD PRIME FIBONACCI UNIVERSE NON.PRIME '
+              +          'EVEN.PRIME PRIME.FIBO ODD.FIBO PRIME.OR.FIBO '
+              +          'NEITHER.PRIME.NOR.FIBO)' ))
+              *
+          197  PAUSE()
+              *
+              *
+              *  Tests of some functions for adding to a list
+              *     SNOLISPIST
+              *
+              *
+          198  ||''
+          199  |'Functions which add elements to lists'
+          200  |''
+
+
+
+       AI Programming in SNOBOL4      - 156 -                    August, 1982
+
+
+
+
+
+
+
+
+          201  LIST1 = EXPLODE('APPEND')
+          202  LIST2 = EXPLODE('NCONC')
+          203  LIST3 = EXPLODE('SNOC')
+          204  LIST4 = EXPLODE('INSERT')
+              *
+          205  EXTRA.LIST = EXPLODE('EXTRA')
+          206  EXTRA.ATOM = CONCAT(EXTRA.LIST)
+              *
+          207  ||''
+          208  ?( |'Test APPEND' |'' )
+          209  |(62 % 'C.APPEND(LIST1 ~ EXTRA.LIST ~ NIL)' )
+              *
+          210  PAUSE()
+              *
+          211  ?( |'Test NCONC' |'' )
+          212  |(62 % 'C.NCONC(LIST2 ~ EXTRA.LIST ~ NIL)' )
+              *
+          213  PAUSE()
+              *
+          214  ?( |'Test SNOC' |'' )
+          215  |(62 % 'C.SNOC(LIST3,EXTRA.ATOM)' )
+              *
+          216  PAUSE()
+              *
+          217  ?( |'Test INSERT' |'' )
+          218  |(62 % 'C.INSERT("R",LIST4)'  )
+          219  |''
+          220  |(62 % 'C.INSERT(EXTRA.ATOM,LIST4)' )
+              *
+          221  PAUSE()
+              *
+              * Tests of replacement functions
+              *     SNOLISPIST
+              *
+              *
+          222  ||''
+          223  |'Replacement functions'
+          224  |''
+          225  LST = READ(
+              +     '(NOW IS THE TIME FOR ALL GOOD MEN '
+              +     'TO COME TO THE AID OF THEIR PARTY)' )
+          226  |''
+          227  |'The test list is'
+          228  ?( |(62 % 'C.LST') |'' )
+              *
+          229  PAUSE()
+              *
+          230  ?( |'Reverse the CDR' |'' )
+          231  RPLACD(LST,LREVERSE(CDR(LST)))
+          232  ?( |(62 % 'C.LST') |'' )
+              *
+          233  PAUSE()
+              *
+          234  ?( |'Put it back like it was' |'' )
+
+
+
+       AI Programming in SNOBOL4      - 157 -                    August, 1982
+
+
+
+
+
+
+
+
+          235  RPLACD(LST,LREVERSE(CDR(LST)))
+          236  ?( |(62 % 'C.LST') |'' )
+              *
+          237  PAUSE()
+              *
+          238  ?( |'Use RPLACA to change the first five words' |'' )
+          239  RPLACA(LST,'Now')
+          240  RPLACA(CDR(LST),'is')
+          241  RPLACA(CDDR(LST),'the')
+          242  RPLACA(CDDDR(LST),'time')
+          243  RPLACA(CDDDDR(LST),'for')
+          244  ?( |(62 % 'C.LST') |'' )
+              *
+          245  PAUSE()
+              *
+          246  ?( |'Change the last five words using RPLACN' |'' )
+          247  RPLACN(LST,-1,'party?')
+          248  RPLACN(LST,-2,'their')
+          249  RPLACN(LST,-3,'of')
+          250  RPLACN(LST,-4,'aid')
+          251  RPLACN(LST,-5,'the')
+          252  ?( |(62 % 'C.LST') |'' )
+              *
+          253  PAUSE()
+              *
+          254  |'Restore the original list; then reverse each '
+          255  ?( I("     "   'word, starting with the last.') |'' )
+          256  LST = READ(
+              +     '(NOW IS THE TIME FOR ALL GOOD MEN '
+              +     'TO COME TO THE AID OF THEIR PARTY)' )
+          257  |''
+          258  |'The test list is'
+          259  ?( |(62 % 'C.LST') |'' )
+              *
+          260  PAUSE()
+              *
+          261        N = LENGTH(LST)
+          262        I = 0
+          263 LUPE
+          264        I = LT(I,N) I + 1       :F(LUPE.END)
+          265        K = -I
+          266        RPLACN(LST,K,REVERSE(CAR(NTH(LST,K))))
+          267        PRINT(LST)         :(LUPE)
+          268 LUPE.END
+              +     PAUSE()
+              *
+              *
+              * Tests of sublist functions
+              *     SNOLISPIST
+              *
+              *
+          269  ||''
+          270  |'Sublist functions'
+          271  |''
+
+
+
+       AI Programming in SNOBOL4      - 158 -                    August, 1982
+
+
+
+
+
+
+
+
+          272  LST = READ(
+              +     '(NEVER TRY TO GIVE NECESSARY AND SUFFICIENT '
+              +     'CONDITIONS FOR ANYTHING -- Linsky)' )
+          273  |''
+          274  |'The test list is'
+          275  PRINT(LST)
+          276  PAUSE()
+              *
+          277  |'The last element is'
+          278  PRINT(LAST(LST))
+              *
+          279   PAUSE()
+              *
+          280  ?( |'Here is a vertical listing, using NTH' |'' )
+          281       N = LENGTH(LST)
+          282       I = 0
+          283 LOOP
+              +     I = LT(I,N) I + 1       :F(LOOP.END)
+          284       PRINT(CAR(NTH(LST,I)))       :(LOOP)
+          285 LOOP.END      PAUSE()
+              *
+          286  |''
+          287  |'The first 8 elements are'
+          288  PRINT(PRELIST(LST,8))
+          289  PAUSE()
+              *
+          290  |'The tail starting with element 4 is'
+          291  PRINT(SUFLIST(LST,3))
+          292  PAUSE()
+              *
+          293  |'The sublist consisting of elements 4 through 8 is'
+          294  PRINT(PRELIST(SUFLIST(LST,3),5))
+          295  PAUSE()
+              *
+          296  |'The RAC is'
+          297  PRINT(RAC(LST))
+          298  |'The RDC is'
+          299  PRINT(RDC(LST))
+          300  PAUSE()
+              *
+              *
+              * Tests of list searching functions
+              *      SNOLISPIST
+              *
+              *
+          301  ||''
+          302  |'Searching functions'
+          303  |''
+          304  ALIST = READ(
+              +      '((1 BUN) '
+              +      '(2 SHOE) '
+              +      '(3 TREE) '
+              +      '(4 DOOR BORE SHORE CORE) '
+              +      '(5 HIVE JIVE) '
+
+
+
+       AI Programming in SNOBOL4      - 159 -                    August, 1982
+
+
+
+
+
+
+
+
+              +      '(6 SEX) '
+              +      '(7 HEAVEN) '
+              +      '(8 WAIT) '
+              +      '(9 RESIGN) '
+              +      '(10 WHEN?) )' )
+              *
+          305  |'The test list is'
+          306  PRINT(ALIST)
+          307  PAUSE()
+              *
+          308  ?( |'NIL followed-by beat poetry' |'' )
+          309  PRINT(ASSOC(95,ALIST))
+          310  PRINT(ASSOC(6,ALIST))
+          311  PRINT(ASSOC(9,ALIST))
+          312  PRINT(ASSOC(5,ALIST))
+          313  PRINT(ASSOC(10,ALIST))
+              *
+          314  PAUSE()
+              *
+          315  MESS = #'(47 ABC XYZ BUN WAIT 5 7 1 3)'
+          316  |''
+          317  |'The list of targets for ASSOCL is'
+          318  |''
+          319  |'LTRACE is also tested here.'
+          320  |''
+          321  PRINT(MESS)
+          322  PAUSE()
+              *
+          323  LTRACE(3, .ASSOCL ~ NIL) ; &TRACE = 10000
+          325  PRINT(ASSOCL(MESS,ALIST))
+          326  LTRACE(0, .ASSOCL ~ NIL) ; &TRACE = 0
+          328  PAUSE()
+              *
+          329  |'Here is the tail of MESS starting with BUN'
+          330  PRINT(MEMBER('BUN',MESS))
+          331  PAUSE()
+              *
+          332  MEMQ('WAIT',MESS) ?|'This line should appear'
+          333  MEMQ('INCLINE',ALIST) ?|'This line should NOT appear'
+              *
+          334  PAUSE()
+              *
+              * Tests of mapping functions
+              *     SNOLISPIST
+              *
+              *
+          335  ||''
+          336  |'Mapping functions'
+          337  |''
+          338  ?( |'Unimaginative MAP test' |'' )
+          339  MAP(.PRINT,#'(A B C D 11 22 33 44 (5 . 5))' )
+              *
+          340  PAUSE()
+              *
+
+
+
+       AI Programming in SNOBOL4      - 160 -                    August, 1982
+
+
+
+
+
+
+
+
+          341  ?( |'Unimaginative MAPC test' |'' )
+          342  MAPC(.PRINT,
+              +     READ(
+              +         '(Now is the time for all good men '
+              +         'to come to the aid of their party)' ))
+              *
+          343  PAUSE()
+              *
+          344  ?( |'Unimaginative MAPLIST test' |'' )
+          345  PRINT(MAPLIST(.LENGTH,
+              +     #'(10 9 8 7 6 5 4 pi 3 e 2 1 0 BLAST OFF!    i)' ))
+              *
+          346  PAUSE()
+              *
+          347  ?( |'MAPCON test -- What will happen???' |'' )
+          348  PRINT(MAPCON(.EXPLODE,
+              +     #'(EVERY GOOD BOY DOES FINE)' ))
+              *
+          349  PAUSE()
+              *
+          350  ?( |'MAPCAN test -- What wlll happen?????' |'' )
+          351  PRINT(MAPCAN(.EXPLODE,
+              +     #'(CINNAMON PERSIMMON SIMIAN)' ))
+          352  PAUSE()
+              *
+          353  |'EVERY test (correct answer = NIL)'
+          354  PRINT(EVERY(.NUMBERP,
+              +     #'(5 4 3 2 1 0 X)' ))
+              *
+          355  PAUSE()
+              *
+          356  |'EVLIS test'
+          357  |'Correct answer is (1 2 3 (LIST VALUE))'
+          358  SETL( #'(A 1 B 2 C 3 D (LIST VALUE))' )
+          359  PRINT(EVLIS(#'(A B C D)' ))
+              *
+          360  PAUSE()
+              *
+          361  |'SOME test (correct answer = NIL)'
+          362  PRINT(SOME(.ZEROP,
+              +     #'(19 9 8 3 6 4 2 \P...I. \LN...10. 66 666 -1)' ))
+              *
+          363  PAUSE()
+              *
+          364  |'SUBSET test (should print only negative numbers)'
+          365  PRINT(SUBSET(.NEGP,
+              +     #'(0 0 0 -1 -2 9 8 6.3 \-P...I. \LN...10. -5)' ))
+              *
+          366  PAUSE()
+              *
+              *
+              * Tests of non-numerical Predicates
+              *     SNOLISPIST
+              *
+
+
+
+       AI Programming in SNOBOL4      - 161 -                    August, 1982
+
+
+
+
+
+
+
+
+          367       LLST = #'(A (SMALL (TEST (LIST))))'
+          368  ||''
+          369  |'A series of Ts'
+          370  |''
+          371  MAPC(DEXP('LAMBDA(EXPR) = |("      " !EVALCODE( |EXPR))' ),
+              +     '/T' ~
+              +     'NULLP(NIL)' ~
+              +     'NOTP(NIL)' ~
+              +     'ATOMP(13.965)' ~
+              +     'NUMBERP(-13.965)' ~
+              +     'EQP(13,"13.000000")' ~
+              +     'EQUALP(LLST,LCOPY(LLST))' ~
+              +     NIL)
+              *
+          372  PAUSE()
+              *
+          373  ||''
+          374  |'A series of NILs'
+          375  |''
+          376  LLST = #'(TWEEDLE (DEE . DUM))'
+          377  MAPC(DEXP('LAMBDA(EXPR) = |("    " !EVALCOOE( |EXPR))' ),
+              +    'NULLP(14 ~ NIL)' ~
+              +    'NOTP(1 ~ 1)' ~
+              +    'ATOMP(1 ~ 2 ~ 3 ~ NIL)' ~
+              +    'NUMBERP("LINDA")' ~
+              +    'EQP(LLST,LCOPY(LLST))' ~
+              +    NIL)
+              *
+          378  PAUSE()
+              *
+              *
+              * Tests of numerical predicates
+              *    SNOLISPIST
+              *
+              *
+          379  ||''
+          380  |'Alternating series of Ts and NILs'
+          381  |''
+          382  ?( |'Testing NEGP' |'' )
+          383  |MAPCAR(.NEGP,
+              +    #'(-1 2 -3.0 4 -5.00 6.00 -7.7 8.8 -8.999 10.101010)')
+              *
+          384  PAUSE()
+              *
+          385  ?( |'Testing ZEROP' |'' )
+          386  |MAPCAR(.ZEROP,
+              +    #'(0 14 0. -41 0.0 29 -0.0 2.99 00000 99999)')
+              *
+          387  PAUSE()
+              *
+          388  ?( |'Testing LESSP' |'' )
+          389  |LESSP( #'( \-P...I. 0.00 0.01 10000000)' )
+          390  |LESSP( #'( \-LN...10. 0.00 1.01 1.000000)' )
+              *
+
+
+
+       AI Programming in SNOBOL4      - 162 -                    August, 1982
+
+
+
+
+
+
+
+
+          391  PAUSE()
+              *
+          392  |'Testing GREATERP.'
+          393  |''
+          394  |GREATERP( #'( \P...I. 3.1 -4  -19.84)' )
+          395  |GREATERP( #'( 6 16 7 17    14.82   )' )
+              *
+          396  PAUSE()
+              *
+              *
+              * Tests of the property-list functions
+              *    SNOLISPIST
+              *
+              *
+          397  ||''
+          398  |'Property list functions'
+          399  |''
+              *
+              *
+          400  MAPC(DEXP('LAMBDA(XPR) = '
+              +     '|("      " !EVAL( |( |"" XPR )))' ),
+              +     'PUT(.DOG,"NUMBER.OF.LEGS",4)' ~
+              +     'GET(.DOG,"NUMBER.OF.LEGS")' ~ 'PAUSE()' ~
+              +     'REMPROP(.DOG,"NUMBER.OF.LEGS")' ~
+              +     'GET(.DOG,"NUMBER.OF.LEGS")' ~ 'PAUSE()' ~
+              +     'PUTL(#"(DOG CAT HORSE)","NUMBER.OF.LEGS",4)' ~
+              +     'GET(.DOG,"NUMBER.OF.LEGS")' ~
+              +     'GET(.CAT,"NUMBER.OF.LEGS")' ~
+              +     'GET(.HORSE,"NUMBER.OF.LEGS")' ~
+              +     'GET(.ARMADILLO,"NUMBER.OF.LEGS")' ~ 'PAUSE()' ~
+              +     'PUTPROP(.DOG,3,"LEGS")' ~
+              +     'PUTPROP(.DOG,2,"LEGS")' ~
+              +     'PUTPROP(.DOG,1,"LEGS")' ~
+              +     'PUTPROP(.DOG,1,"HEAD")' ~
+              +     'GETL(.DOG,#"(LEGS HEAD)")' ~
+              +     'GETL(.DOG,#"(HEAD)")' ~ 'PAUSE()' ~
+              +     'ADDPROP(.DOG,3,"LEGS")' ~
+              +     'GET(.DOG,"LEGS")' ~
+              +     'ADDPROP(.DOG,"ANOMALY","LEGS")' ~
+              +     'GET(.DOG,"LEGS")' ~ 'PAUSE()' ~
+              +     'DEFPROP(.FISH,0,"LEGS")' ~
+              +     'GETL(.FISH,#"(EYES ARMS TEETH LEGS)")' ~
+              +     NIL )
+              *
+          401  PAUSE()
+              *
+              *
+          402  |''
+          403  ?( |'Empty all property stacks' |'' )
+          404  ?( |'DOG -- "LEGS"' |'' )
+              *
+          405 LOOP1 TEMP = GETPROP( .DOG, 'LEGS' )
+          406       ?( PRINT(TEMP) DIFFER(TEMP,NIL) )     :S(LOOP1)
+          407  |''
+
+
+
+       AI Programming in SNOBOL4      - 163 -                    August, 1982
+
+
+
+
+
+
+
+
+          408  PAUSE()
+          409  ?( |'DOG -- "NUMBER.OF.LEGS"' |'' )
+          410 LOOP2   TEMP = GETPROP( .DOG, 'NUMBER.OF.LEGS' )
+          411         ?( PRINT(TEMP) DIFFER(TEMP,NIL) )     :S(LOOP2)
+          412  |''
+          413  PAUSE()
+          414  ?( |'DOG -- "HEAD"' |'' )
+          415 LOOP3   TEMP = GETPROP( .DOG, 'HEAD' )
+          416         ?( PRINT(TEMP) DIFFER(TEMP,NIL) )       :S(LOOP3)
+          417  |''
+          418  PAUSE()
+          419  |'CAT -- "NUMBER.OF.LEGS"'
+          420 LOOP4   TEMP = GETPROP( .CAT, 'NUMBER.OF.LEGS' )
+          421         ?( PRINT(TEMP) DIFFER(TEMP,NIL) )     :S(LOOP4)
+          422  |''
+          423  PAUSE()
+          424  ?( |'FISH -- "LEGS"' |'' )
+          425 LOOP5 TEMP = GETPROP( .FISH, 'LEGS' )
+          426       ?( PRINT(TEMP) DIFFER(TEMP,NIL) )      :S(LOOP5)
+          427  |''
+          428  PAUSE()
+          429  ?( |'HORSE -- "NUMBER.OF.LEGS"' |''   )
+          430 LOOP6 TEMP = GETPROP( .HORSE, 'NUMBER.OF.LEGS' )
+          431       ?( PRINT(TEMP) DIFFER(TEMP,NIL) )      :S(LOOP6)
+              *
+          432  PAUSE()
+              *
+          433  ||''
+          434  ?( |'A combined test of CLA, CAL, and SORT' |'' )
+          435  ?( |'Should print ABDENWSSREBA' |'' )
+          436  L = CLA(EXPLODE('BADNEWSBEARS'))
+          437  SORT(L,7,12,'LGE')
+          438  SORT(L,1,6,'LLE')
+          439  |READLIST(CAL(L))
+              *
+          440  PAUSE()
+              *
+          441  ||''
+          442  |'A further test of SORT/CAL/CLA:'
+          443  |'Make anagrams out of some six-letter names by'
+          444  |'alphabetizing their letters.'
+          445  |''
+          446  MAPC(
+              + DEXP(
+              +   'LAMBDA(X) = '
+              +    'PRINT('
+              +     'CONCAT('
+              +      'CAL('
+              +       'SORT(CLA(EXPLODE(X)),1,6,.LLE) )))' ),
+              +         ('MARVIN' ~
+              +         'PACMAN' ~
+              +         'LOLITA' ~
+              +         'MERLIN' ~
+              +         'ELIJAH' ~
+
+
+
+       AI Programming in SNOBOL4      - 164 -                    August, 1982
+
+
+
+
+
+
+
+
+              +         'SHAFTO' ~
+              +         'SYLVIA' ~
+              +         'ITALIA' ~
+              +         'GEORGE' ~
+              +         'GIMPEL' ~
+              +         'BACKUS' ~ NIL) )
+              *
+          447  PAUSE()
+              *
+          448  ||''
+          449  |'TDUMP test:  Should print suitable error message.'
+          450  |''
+          451  |(72 % 'C.a=b+c?')
+          452 END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 165 -                    August, 1982
+
+
+
+
+
+
+
+
+                                     APPENDIX H
+
+            This is a compilation listing of a version of Bertram Raphael's
+          SIR (Semantic Information Retrieve) program.  This version of the
+          program is an almost literal SNOBOL4 translation of Shapiro's
+          (1979, pp. 123-138) LISP version.  This SNOBOL4 version has been
+          tested on Shapiro's (138-140) test dialogue.
+
+              * This version of Bertram Raphael's SIR program
+              * was translated into SNOBOL4 using the SNOLISPIST
+              * list processing routines.
+              *
+              * This program follows closely the LISP version by
+              * S. Shapiro (Techniques of Artificial Intelligence,
+              * 1979, pp. 123-140.
+              *
+              * To run the program:
+              *   a) have copies of SIR, SNOLISP/CORE, and SNOLISP/LIB
+              *      under your account:
+              *   b) type $RUN *SPITBOL SCARDS=SNOLISP/CORE+SIR PAR=SIZE=64
+              *
+              *
+          1    DEFINE('SIR()S')    :(SIR.END)
+          2   SIR   S = GET.SENTENCE()      :F(FRETURN)
+          3         SIR = EQU(CAR(S),"BYE") "GOOD-BYE"     :S(RETURN)
+          4         PROCESS(S)    :S(SIR)F(FRETURN)
+          5   SIR.END
+              *
+          6    DEFINE('GET.SENTENCE()S,P')       :(GET.SENTENCE.END)
+          7   GET.SENTENCE   S = S " " IN()          :F(FRETURN)
+          8        S RPOS(1) ANY("!?") . P = " " P
+              +         :F(GET.SENTENCE)
+          9    GET.SENTENCE = READ( "(" S ")" )      :S(RETURN)F(FRETURN)
+          10  GET.SENTENCE.END
+              *
+          11   DEXP('PROCESS(SENTENCE) = PROCESS.1(SENTENCE,RULE.LIST)')
+              *
+          12   DEFINE('PROCESS.1(SENTENCE,RULES)RESP,CA')
+              +         :(PROCESS.1.END)
+          13  PROCESS.1      CA = POP( .RULES)   :F(PROCESS.1.ERR)
+          14       RESP = APPLY.RULE(CA,SENTENCE)
+          15       IDENT(RESP,NIL)    :S(PROCESS.1)
+          16       PROCESS.1 = |RESP       :(RETURN)
+          17  PROCESS.1.ERR
+              +     |"STATEMENT FORM NOT RECOGNIZED."
+          18        |"   IN PROCESS.1, "
+          19        |("    SENTENCE = " CONCAT(SENTENCE," "))     :(RETURN)
+          20  PROCESS.1.END
+              *
+          21   DATA('RULE(PATTERN,VARIABLES,TESTS,ACTION)')
+              *
+          22   DEFINE('APPLY.RULE(RULE,INP)')   :(APPLY.RULE.END)
+          23  APPLY.RULE     APPLY.RULE = NIL
+
+
+
+
+       AI Programming in SNOBOL4      - 166 -                    August, 1982
+
+
+
+
+
+
+
+
+          24        APPLY.RULE =
+              +        DIFFER(NIL,MATCH(INP,PATTERN(RULE),VARIABLES(RULE)))
+              +        APPLY.RULE.1(
+              +            APPLY.TESTS(TESTS(RULE),EVLIS(VARIABLES(RULE))),
+              +            ACTION(RULE))       :(RETURN)
+          25  APPLY.RULE.END
+              *
+          26   DEFINE('MATCH(INP,PAT,VARS)')     :(MATCH.END)
+          27  MATCH     ATOM(PAT)      :S(MATCH.A)
+          28        INITIALIZE(VARS)
+          29        MATCH.FLAG = MATCH1(INP,PAT,VARS)
+          30  MATCH.A  MATCH = MATCH.FLAG   :(RETURN)
+          31  MATCH.END
+              *
+          32   DEXP('INITIALIZE(LVARS) = MAPC( .'
+              + DEXP('LAMBDA(LAMBDA...V) = SET(LAMBDA...V,NIL)')
+              +     ',LVARS)')
+              *
+          33   DEFINE('MATCH1(INP,PAT,VARS)CA')    :(MATCH1.END)
+          34  MATCH1  MATCH1 = NULL(INP) NULLP(PAT)       :S(RETURN)
+          35        MATCH1 = NULL(PAT) NIL       :S(RETURN)
+          36        CA = CAR(PAT)
+          37        MEMQ(CA,VARS)     :F(MATCH1A)
+          38           MATCH1 = NULL( CDR(PAT))
+              +             SET(CA,APPEND($CA ~ INP ~ NIL))
+              +             :S(RETURN)
+          39           MATCH1 = EQU(CAR(INP),CADR(PAT))
+              +             MATCH1(CDR(INP),CDDR(PAT),VARS)
+              +             :S(RETURN)
+          40           MATCH1 = DIFFER(NIL,SET(CA,SNOC($CA,CAR(INP))))
+              +             MATCH1(CDR(INP),PAT,VARS)     :(RETURN)
+          41  MATCH1A  MATCH1 = EQU(CAR(INP),CA)
+              +             MATCH1(CDR(INP),CDR(PAT),VARS)
+              +             :S(RETURN)
+          42           MATCH1 = NIL       :(RETURN)
+          43  MATCH1.END
+              *
+          44   DEFINE('APPLY.TESTS(TESTS,PHRASES)L')     :(APPLY.TESTS.END)
+          45  APPLY.TESTS    APPLY.TESTS = NIL
+          46        L = NIL
+          47  APPLY.TESTS1 L = DIFFER(NIL,PHRASES) DIFFER(NIL,TESTS)
+              +        APPLY(CAR(TESTS),CAR(PHRASES)) ~ L       :F(RETURN)
+          48        DIFFER(NIL,CAR(L))  ?POP( .TESTS)  ?POP( .PHRASES)
+              +                 :F(RETURN)
+          49        APPLY.TESTS = NULL(TESTS) NULL(PHRASES)
+              +        LREVERSE(L)      :S(RETURN)F(APPLY.TESTS1)
+          50  APPLY.TESTS.END
+              *
+          51   DEFINE('APPLY.RULE.1(L,ACT)XPR')       :(APPLY.RULE.1.END)
+          52  APPLY.RULE.1
+              +     APPLY.RULE.1 = NULL(L)  NIL  :S(RETURN)
+          53        XPR =
+              +        CAR(ACT) '('
+              +        CONCAT( RMAPCAR( L, CDR(ACT)), ',', '"') ')'
+
+
+
+       AI Programming in SNOBOL4      - 167 -                    August, 1982
+
+
+
+
+
+
+
+
+          54        APPLY.RULE.1 = EVALCODE(XPR)      :(RETURN)
+          55  APPLY.RULE.1.END
+              *
+          56   DEFINE('RMAPCAR(S,LF)F')    :(RMAPCAR.END)
+          57  RMAPCAR  RMAPCAR = NIL
+          58  RMAPCAR1      F = POP( .LF)       :F(RMAPCAR2)
+          59        RMAPCAR = APPLY(F,S) ~ RMAPCAR        :(RMAPCAR1)
+          60  RMAPCAR2      RMAPCAR = LREVERSE(RMAPCAR)   :(RETURN)
+          61  RMAPCAR.END
+              *
+          62   DEFINE('ADDXRY(X,REL,Y)')    :(ADDXRY.END)
+          63  ADDXRY   ADDXRY = MEMQ(Y,GET(X,REL)) NIL    :S(RETURN)
+          64        ADDXRY = PUTPROP(X,Y,REL)    :(RETURN)
+          65  ADDXRY.END   OPSYN( .ADDYRX, .ADDXRY)
+          66   DEXP('PATH(PATH...X,PATH...R,PATH...Y) = '
+              +     'MEMQ( $PATH...Y,'
+              +     'PATH1( $PATH...X ~ NIL, PATH...R))')
+              *
+          67   DEFINE('PATH1(LN,LR)')     :(PATH1.END)
+          68  PATH1    DIFFER(NIL,LN)  DIFFER(NIL,LR)      :F(PATH1C)
+          69        DIFFER(NIL,CDR(LR)) MEMQ(CADR(LR),"*" ~ "+" ~ NIL)
+              +             :F(PATH1A)
+          70         LN = EXTENDM(CADR(LR),LN,CAR(LR))
+          71         LR = CDR(LR)       :(PATH1B)
+          72  PATH1A    LN = EXTEND(LN,CAR(LR))
+          73  PATH1B    LR = CDR(LR)    :(PATH1)
+          74  PATH1C    PATH1 = LN      :(RETURN)
+          75  PATH1.END
+              *
+          76   DEFINE('EXTENDM(OP,LN,R)')   :(EXTENDM.END)
+          77  EXTENDM  LN = IDENT(OP,"+") EXTEND(LN,R)
+          78        EXTENDM = LN
+          79  EXTENDM1      DIFFER(NIL,LN) :F(RETURN)
+          80        LN = COMPLEMENT(EXTEND(LN,R),EXTENDM)
+          81        EXTENDM = APPEND(EXTENDM ~ LN ~ NIL)  :(EXTENDM1)
+          82  EXTENDM.END
+              *
+          83   DEFINE('EXTEND(LN,R)')       :(EXTEND.END)
+          84  EXTEND   EXTEND = NULL(LN) NIL    :S(RETURN)
+          85        EXTEND = ~ATOM(R) PATH1(LN,R)     :S(RETURN)
+          86        EXTEND = UNION(GET(CAR(LN),R),
+              +        EXTEND(CDR(LN),R))   :(RETURN)
+          87  EXTEND.END
+              *
+          88   OPSYN( .COMPLEMENT, .EXCLUDE)
+              *
+          89   G.DETS = READ( "(EACH EVERY ANY A AN)" )
+          90   S.DETS = READ( "(THE)" )
+              *
+          91   DEXP('UNIQUE(NP) = NIL ; UNIQUE = '
+              +     'NULL(CDR(NP)) CAR(NP) ; ')
+              *
+          92   DEXP('GENERIC(NP) = NIL ; GENERIC = '
+              +     'MEMQ(CAR(NP),G.DETS) RAC(NP) ; ')
+
+
+
+       AI Programming in SNOBOL4      - 168 -                    August, 1982
+
+
+
+
+
+
+
+
+              *
+          93   DEXP('SPECIFIC(NP) = NIL ; SPECIFIC = '
+              +     'MEMQ(CAR(NP),S.DETS) RAC(NP) ; ')
+              *
+          94   DEXP('UNIQUE.GENERIC(NPNP) = '
+              +   'APPLY.TESTS( #"(UNIQUE GENERIC)", SPLIT(NPNP,G.DETS))')
+              *
+          95   DEXP('SPECIFIC.GENERIC(NPNP) = '
+              +  'APPLY.TESTS( #"(SPECIFIC GENERIC)", SPLIT(NPNP,G.DETS))')
+              *
+          96   DEXP('GENERIC.GENERIC(NPNP) = '
+              +  'APPLY.TESTS( #"(GENERIC GENERIC)", SPLIT(NPNP,G.DETS))')
+              *
+          97   DEXP('SPLIT(SNP.LD) = SPLIT1(CDR(SNP),LD,CAR(SNP) ~'
+              +        'NIL,NIL)')
+              *
+          98   DEFINE('SPLIT1(SNP,LD,NP,LNP)')   :(SPLIT1.END)
+          99  SPLIT1   SPLIT1 =
+              +     NULL(SNP) LREVERSE( LREVERSE(NP) ~ LNP)     :S(RETURN)
+          100       SPLIT1 = MEMQ(CAR(SNP),LD)
+              +        SPLIT1(CDR(SNP),LD,CAR(SNP) ~ NIL,
+              +             LREVERSE(NP) ~ LNP)       :S(RETURN)
+          101       SPLIT1 =
+              +        SPLIT1( CDR(SNP), LD, CAR(SNP) ~ NP, LNP)
+              +             :(RETURN)
+          102 SPLIT1.END
+              *
+              * Some responses returned from semantic routines
+              *
+          103  UNDERSTAND = "I UNDERSTAND."
+          104  YES = "YES."
+          105  SOMETIMES = "SOMETIMES."
+          106  INSUFFICIENT = "INSUFFICIENT INFORMATION"
+          107  SILENCE = ""
+              *
+          108  DEFINE('SETR(X,Y)')    :(SETR.END)
+          109 SETR  ADDXRY(X,"SUBSET",Y)
+          110       ADDYRX(Y,"SUPERSET",X)
+          111       SETR = UNDERSTAND      :(RETURN)
+          112 SETR.END
+              *
+          113  DEFINE('SETRQ(X,Y)')   :(SETRQ.END)
+          114 SETRQ  SETRQ = PATH( .X, #"(SUBSET *)", .Y)   YES
+              +        :S(RETURN)
+          115       SETRQ = PATH( .Y, #"(SUBSET +)", .X)   SOMETIMES
+              +        :S(RETURN)
+          116       SETRQ = INSUFFICIENT   :(RETURN)
+          117 SETRQ.END
+              *
+          118  DEFINE('SETRS(X,Y)')  :(SETRS.END)
+          119 SETRS ADDXRY(X,"MEMBER",Y)
+          120         ADDYRX(Y,"ELEMENTS",X)
+          121         SETRS = UNDERSTAND  :(RETURN)
+          122 SETRS.END
+
+
+
+       AI Programming in SNOBOL4      - 169 -                    August, 1982
+
+
+
+
+
+
+
+
+              *
+          123  DEFINE('SETRSQ(X,Y)') :(SETRSQ.END)
+          124 SETRSQ   SETRSQ =
+              +        PATH( .X, #"(EQUIV * MEMBER SUBSET *)", .Y)   YES
+              +        :S(RETURN)
+          125       SETRSQ = INSUFFICIENT :(RETURN)
+          126 SETRSQ.END
+              *
+          127  DEFINE('SETRS1(X,Y)') :(SETRS1.END)
+          128 SETRS1   SETRS1 = DIFFER(NIL,SET(.X,SPECIFY(X)))
+              +        SETRS(X,Y)      :S(RETURN)
+          129       SETRS1 = SILENCE   :(RETURN)
+          130 SETRS1.END
+              *
+          131  DEXP('SPECIFY(X) = '
+              +     'SPECIFY1(EQUIV.COMPRESS(GET(X,"ELEMENTS")),X)')
+              *
+          132  DEFINE('SPECIFY1(U,X)')      :(SPECIFY1.END)
+          133 SPECIFY1     NULL(U)    :F(SPECIFY1A)
+          134       SPECIFY1 = SET( .U, GENSYM())
+          135       SETRS(U,X)
+          136       |(U " IS A " X ".")   :(RETURN)
+          137 SPECIFY1A
+              +     SPECIFY1 = NULL(CDR(U)) CAR(U)    :S(RETURN)
+          138       |("WHICH " X "? ... " !U)
+          139       SPECIFY1 = NIL    :(RETURN)
+          140 SPECIFY1.END
+              *
+          141  DEXP('EQUIV.COMPRESS(LX) = EQUIV.COMP1(LX,NIL)')
+              *
+          142  DEFINE('EQUIV.COMP1(LX,LEX)')     :(EQUIV.COMP1.END)
+          143 EQUIV.COMP1
+              +     EQUIV.COMP1 = NULL(LX) NIL   :S(RETURN)
+          144       EQUIV.COMP1 = MEMQ(CAR(LX),LEX)
+              +        EQUIV.COMP1(CDR(LX),LEX)      :S(RETURN)
+          145       EQUIV.COMP1 =
+              +        CAR(LX) ~
+              +             EQUIV.COMP1( CDR(LX),
+              +                  APPEND( GET(CAR(LX),"EQUIV") ~ LEX ~ NIL))
+              +                  :(RETURN)
+          146 EQUIV.COMP1.END
+              *
+          147  DEFINE('SETRS1Q(X,Y)')      :(SETRS1Q.END)
+          148 SETRS1Q  SETRS1Q = DIFFER(NIL,SET(.X,SPECIFY(X)))
+              +        SETRSQ(X,Y)    :S(RETURN)
+          149       SETRS1Q = SILENCE      :(RETURN)
+          150 SETRS1Q.END
+              *
+          151  DEFINE('EQUIV(X,Y)')   :(EQUIV.END)
+          152 EQUIV  ADDXRY(X,"EQUIV",Y)
+          153        ADDYRX(Y,"EQUIV",X)
+          154        EQUIV = UNDERSTAND   :(RETURN)
+          155 EQUIV.END
+              *
+
+
+
+       AI Programming in SNOBOL4      - 170 -                    August, 1982
+
+
+
+
+
+
+
+
+          156 DEFINE('EQUIV1(X,Y)')  :(EQUIV1.END)
+          157 EQUIV1  EQUIV1 = DIFFER(NIL,SET(.Y,SPECIFY(Y)))
+              +       EQUIV(X,Y)     :S(RETURN)
+          158      EQUIV1 = SILENCE  :(RETURN)
+          159 EQUIV1.END
+              *
+          160  DEFINE('OWNR(X,Y)')   :(OWNR.END)
+          161 OWNR  ADDXRY(X,"OWNED.BY",Y)
+          162       ADDYRX(Y,"POSSESS.BY.EACH",X)
+          163       OWNR = UNDERSTAND      :(RETURN)
+          164 OWNR.END
+              *
+          165  DEFINE('OWNRQ(X,Y)')  :(OWNRQ.END)
+          166 OWNRQ OWNRQ = EQU(X,Y)
+              +        "NO, THEY ARE THE SAME."     :S(RETURN)
+          167       OWNRQ = PATH( .Y, #"(SUBSET * POSSESS.BY.EACH)", .X)
+              +        YES  :S(RETURN)
+          168       OWNRQ = INSUFFICIENT  :(RETURN)
+          169 OWNRQ.END
+              *
+          170  DEFINE('OWNRGU(X,Y)') :(OWNRGU.END)
+          171 OWNRGU   ADDYRX(Y,"POSSESS",X)
+          172       ADDXRY(X,"OWNED",Y)
+          173       OWNRGU = UNDERSTAND       :(RETURN)
+          174 OWNRGU.END
+              *
+          175  DEFINE('OWNRGUQ(X,Y)')     :(OWNRGUQ.END)
+          176 OWNRGUQ OWNRGUQ =
+              +         PATH( .Y, #"(EQUIV * POSSESS SUBSET *)", .X)
+              +         YES     :S(RETURN)
+          177       OWNRGUQ =
+              +         PATH( .Y, #("(EQUIV * MEMBER SUBSET *"
+              +           " POSSESS.BY.EACH SUBSET *)"), .X)
+              +         YES      :S(RETURN)
+          178       OWNRGUQ = INSUFFICIENT      :(RETURN)
+          179 OWNRGUQ.END
+              *
+          180  DEFINE('OWNRSGQ(X,Y)')     :(OWNRSGQ.END)
+          181 OWNRSGQ  OWNRSGQ = IDENT(NIL,SPECIFY(X)) SILENCE :S(RETURN)
+          182       OWNRSGQ =
+              +        PATH( .X, #"(OWNED EQUIV * MEMBER SUBSET *)", .Y)
+              +        YES      :S(RETURN)
+          183       OWNRSGQ = INSUFFICIENT      :(RETURN)
+          184 OWNRSGQ.END
+              *
+          185  DEFINE('MAKE.RULES(STL)ST,R')    :(MAKE.RULES.END)
+          186 MAKE.RULES    MAKE.RULES = NIL
+          187 MAKE.RULES1   ST = POP( .STL)    :F(MAKE.RULES2)
+          188       ST = READ( "(" ST ")" )
+          189       R = RULE(CAR(ST),CADR(ST),CADDR(ST),CADDDR(ST))
+          190       MAKE.RULES = R ~ MAKE.RULES       :(MAKE.RULES1)
+          191 MAKE.RULES2   MAKE.RULES = LREVERSE(MAKE.RULES)    :(RETURN)
+          192 MAKE.RULES.END
+              *
+
+
+
+       AI Programming in SNOBOL4      - 171 -                    August, 1982
+
+
+
+
+
+
+
+
+          193  RULE.LIST = MAKE.RULES(
+              + '(IS *X* ?) (*X*) (UNIQUE.GENERIC) (SETRSQ CAAR CADAR)' ~
+              + '   -    (*X*) (SPECIFIC.GENERIC) (SETRS1Q CAAR CADAR)' ~
+              + '   -    (*X*) (GENERIC.GENERIC) (SETRQ CAAR CADAR)' ~
+              + '(DOES *X* OWN *Y* ?) (*X* *Y*) (GENERIC GENERIC) '
+              +    '(OWNRQ CADR CAR)' ~
+              + '   -    (*X* *Y*) (UNIQUE GENERIC) (OWNRGUQ CADR CAR)' ~
+              + '   -    (*X* *Y*) (GENERIC SPECIFIC) (OWNRSGQ CADR CAR)' ~
+              + '(*X* IS *Y* !) (*X* *Y*) (UNIQUE GENERIC) '
+              +    '(SETRS CAR CADR)' ~
+              + '   -    (*X* *Y*) (GENERIC GENERIC) (SETR CAR CADR)' ~
+              + '   -    (*X* *Y*) (SPECIFIC GENERIC) (SETRS1 CAR CADR)' ~
+              + '   -    (*X* *Y*) (UNIQUE UNIQUE) (EQUIV CAR CADR)' ~
+              + '   -    (*X* *Y*) (UNIQUE SPECIFIC) (EQUIV1 CAR CADR)' ~
+              + '   -    (*X* *Y*) (SPECIFIC UNIQUE) (EQUIV1 CADR CAR)' ~
+              + '(*X* OWNS *Y* !) (*X* *Y*)  (GENERIC GENERIC) '
+              +    '(OWNR CADR CAR)' ~
+              + '   -     (*X* *Y*) (UNIQUE GENERIC) (OWNRGU CADR CAR)' ~
+              + NIL)
+              *
+          194  |("THE SIR PROGRAM STARTS  WITH " COLLECT() " BYTES.")
+          195  |SIR()
+          196 END
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+       AI Programming in SNOBOL4      - 172 -                    August, 1982
+
+

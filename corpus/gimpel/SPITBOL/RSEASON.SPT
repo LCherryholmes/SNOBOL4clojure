@@ -1,0 +1,55 @@
+* RSEASON.spt - Simulates baseball seasons, producing the number
+*		of runs scored in a season of N games.
+*
+*	Player statistics and batting order obtained from file
+*	RSEASON.in, for the 1927 New York Yankees.  There were 154
+*	games in the 1927 season.
+*
+*	Players	 AB   H   DB  TR  HR   BB
+*	------- ---  ---  --  --  --  ---
+*	Combs	648, 231, 36, 23,  6,  62
+*	Koenig	526, 150, 20, 11,  3,  25
+*	Ruth	540, 192, 29,  8, 60, 138
+*	Gehrig	584, 218, 52, 18, 47, 109
+*	Meusel	516, 174, 47,  9,  8,  45
+*	Lazzeri	570, 176, 29,  8, 18,  69
+*	Dugan	387, 104, 24,  3,  2,  27
+*	Collins	251,  69,  9,  3,  7,  54
+*	Pitcher	500,  50,  5,  1,  2,  10
+*
+*	AB - At bats, H - Hits, DB - Doubles
+*	TR - Triples, HR - Home runs, BB - Base on balls
+*
+*	Program simulates 10 seasons, and produces the number of
+*	runs each season, and the mean and standard deviation.
+*
+*	By reordering lines in the data file, other lineups can
+*	be tried.
+*
+	&STLIMIT = 5000000
+	TERMINAL = ~INPUT(.INPUT,5,"rseason.in")
++			"Could not open file rseason.in"  :S(END)
+-INCLUDE "rseason.inc"
+	SEASONS = 10
+	GAMES = 154
+	SUM = 0
+	ERROR = 0
+	N = 1
+	OUTPUT = "Playing " SEASONS " seasons of " GAMES " games each."
+	OUTPUT = "This will take a while, why don't you hit the snack bar?"
+	OUTPUT =
+	OUTPUT = "Total runs per season"
+	OUTPUT = "---------------------"
+
+RSEAS_1	OUTPUT = RUNS = RSEASON(GAMES)
+	SUM = SUM + RUNS
+	ERROR = ERROR + RUNS ** 2
+	N = NE(N,SEASONS) N + 1			:S(RSEAS_1)
+*
+* Compute some statistics
+*
+	MEAN = SUM / SEASONS
+	ERROR = SQRT(ERROR - SEASONS * (MEAN ** 2))
+	OUTPUT = "Mean and standard deviation: " MEAN " +- "
++		 (2.0 * ERROR) / SEASONS
+END

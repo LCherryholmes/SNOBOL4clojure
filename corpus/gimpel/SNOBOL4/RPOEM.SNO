@@ -1,0 +1,11 @@
+* RPOEM.SNO - Generate poems using RPOEM.IN as sample input file:
+*
+	TERMINAL = ~INPUT(.INPUT,5,,'rpoem.in')
++		   "Could not open input file, rpoem.in"  :S(END)
+-INCLUDE "rsentenc.inc"
+
+RPOEM	RPOEM = RSENTENCE('<RPOEM>')
+RPOEM_1	RPOEM BREAK('/') . OUTPUT '/' =	:S(RPOEM_1)
+	OUTPUT =
+	N = LT(N,10) N + 1			:S(RPOEM)
+END

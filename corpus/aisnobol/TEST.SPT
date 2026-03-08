@@ -1,0 +1,817 @@
+* TEST.SPT - SPITBOL VERSION
+*
+* To run this test program:
+*     a)  have copies of test.spt, snocore.spt, and snolib.spt
+*         under your default directory.
+*     b)  type
+*           spitbol spitcore.spt test.spt <test.in
+*
+*
+* Tests of single-argument numerical functions
+*     SNOLISPIST
+*
+* PAWS = *?( |'' |'Press ENTER to continue.'
+*+     |'' IN()    |(COLLECT() * 4 ' bytes available' |'') |'' )
+ PAWS = *?( |'' )
+ DEXP('PAUSE() = EVAL(PAWS)')
+*
+ ||''
+ ?( |'Single-argument numerical functions' |'' )
+ |'Incidentally uses MAPC, DEXP with LAMBDA, and EVALCODE'
+ |''
+ MAPC(DEXP('LAMBDA(EXPR) = '
++          '|("     " EVALCODE( |EXPR))' ),
++     'ABS(-15.9999)' ~
++     'SIGN(0 - 4444.4444)' ~
++     'ADD1(-1)' ~
++     'SUB1(14456.9765)' ~
++     'FLOAT(13 + 15 + 17)' ~
++     'DFLOAT(17 - 15 - 13)' ~
++     'FIX(P...I.)' ~
++     'MINUS(LN...10.)' ~
++     'ROUND(-8.5)' ~ NIL)
+*
+ PAUSE()
+*
+*
+* Tests of binary numerical functions
+*     SNOLISPIST
+*
+*
+ ||''
+ |'Binary numerical functions'
+ |''
+ MAPC(DEXP('LAMBDA(EXPR) = '
++          '|("    " EVALCODE( |EXPR))' ),
++     'ADD(P...I.,LN...10.)' ~
++     'SUB(P...I.,LN...10.)' ~
++     'MULT(P...I.,LN...10.)' ~
++     'DIV(P...I.,LN...10.)' ~
++     'MAX(1,-1)' ~
++     'MIN(1,-1)' ~
++     'REMAINDER(-44444444,119)' ~ NIL)
+*
+ PAUSE()
+*
+*
+* Tests of list-argument numerical functions
+*     SNOLISPIST
+*
+ ||''
+ |'List-argument numerical functions'
+ |''
+ |'Incidentally uses MAPCAR, LREVERSE, and READ'
+ |''
+ ARGUMENT.LIST =
++     MAPCAR(.DFLOAT,
++        LREVERSE(
++             #'(1 1 2 -3 5 8 -13 21)' ))
+ ?( |'Here is the argument list: ' |'' )
+ |ARGUMENT.LIST
+*
+ PAUSE()
+*
+ MAPC(DEXP('LAMBDA(FUNCTION) = '
++          '|("     " APPLY( |FUNCTION, ARGUMENT.LIST))' ),
++     .PLUS ~
++     .DIFFERENCE ~
++     .TIMES ~
++     .QUOTIENT ~
++     NIL)
+*
+ PAUSE()
+*
+*
+* Tests of extended numerical functions
+*     SNOLISPIST
+*
+*
+ |''
+ |'Extended numerical functions'
+ |''
+ ?( |'Testing FLOOR' |'' )
+ AL = #'(-10.9 -7.9 -6.01 -0.00001 0.00001 6.01 7.9 10.9)'
+ |'Argument list = '
+ ?( |("     "   !AL) |'' )
+ |MAPCAR(.FLOOR,AL)
+*
+ PAUSE()
+*
+ |''
+ ?( |'Testing CEIL' |'' )
+ |'Argument list = '
+ ?( |("     "   !AL) |'' )
+ |MAPCAR(.CEIL,AL)
+*
+ PAUSE()
+*
+ |''
+ ?( |'Testing SQRT by inverse mapping' |'' )
+ AL = #'(1 10 100 1000 10000 100000 1000000 10000000)'
+ |'Argument list = '
+ ?( |("     "   !AL) |'' )
+ |MAPCAR(DEXP('LAMBDA(A) = ROUND(A * A)'),
++     MAPCAR(.SQRT,AL))
+*
+ PAUSE()
+*
+ |''
+ |'Testing trigonometric and inverse trigonometric functions'
+ ?( |('     by inverse mapping') |'' )
+ AL = #( '(5 15 25 35 45 55 65 75 85 95 105 115 125 '
++     '135 145 155 165 175 185 195 205 215 225 235 245 '
++     '255 265 275 285 295 305 315 325 335 345 355)' )
+ |'Argument list = '
+ ?( |("     "   !AL) |'' )
+ ?( |'SIN and ASIN' |'' )
+ |MAPCAR(.ROUND,
++     MAPCAR(.DEG,
++        MAPCAR(.ASIN,
++             MAPCAR(.SIN,
++                  MAPCAR(.RAD,AL)))))
+*
+ PAUSE()
+*
+ ?( |'COS and ACOS' |'' )
+ |MAPCAR(.ROUND,
++     MAPCAR(.DEG,
++        MAPCAR(.ACOS,
++             MAPCAR(.COS,
++                  MAPCAR(.RAD,AL)))))
+*
+ PAUSE()
+*
+ ?( |'TAN and ATAN' |'' )
+ |MAPCAR(.ROUND,
++     MAPCAR(.DEG,
++        MAPCAR(.ATAN,
++             MAPCAR(.TAN,
++                  MAPCAR(.RAD,AL)))))
+*
+ PAUSE()
+*
+ |''
+ |'Logarithms to the base 2 of the first 30 powers of 2'
+ |''
+ I = 0 ; AL  = NIL  ; TWP = 1
+TWO.LOOP
+      I = LT(I,30) I + 1      :F(TWO.LOOP.END)
+      TWP = 2 * TWP
+      AL = TWP ~ AL      :(TWO.LOOP)
+TWO.LOOP.END
+      AL =  LREVERSE(AL)
+*
+ |MAPCAR(DEXP('LAMBDA(Z) = ROUND(LOG(Z,2))'), AL)
+*
+ PAUSE()
+*
+ |''
+ ?( |'The first 10 powers of e' |'' )
+ |MAPCAR(DEXP('LAMBDA(Z) = RAISE(NAT...BASE.,Z)' ),
++     #'(1 2 3 4 5 6 7 8 9 10)' )
+*
+ PAUSE()
+*
+ |''
+ ?( |'The first 10 negative powers of e' |'' )
+ |MAPCAR(DEXP('LAMBDA(X) = RAISE(NAT...BASE., -X)' ),
++     #'(1 2 3 4 5 6 7 8 9 10)' )
+*
+ PAUSE()
+*
+*
+* Test program for all compound CAR/CDR
+* functions in SNOLISPIST
+*
+ MNMNM = #'(1 2 3 4)'
+*
+* Build a reasonably hairy list
+*
+ LKLKL = #'((((\MNMNM) \MNMNM) \MNMNM) \MNMNM)'
+ MNMNM = #'(\LKLKL \LKLKL \LKLKL \LKLKL)'
+ LKLKL = LCOPY(MNMNM)
+*
+ ||''
+ |('LKLKL = ' !LKLKL)
+ |''
+ MAPC(DEXP('LAMBDA(S) = '
++          '|EVAL( |(  "C" S "R(LKLKL)" ))' ),
++     #('(A D AA AD DA DD '
++       ' AAA AAD ADA DAA '
++       ' ADD DAD DDA DDD '
++       ' AAAA AAAD AADA ADAA DAAA '
++       ' AADD ADAD DAAD ADDA DADA DDAA '
++       ' ADDD DADD DDAD DDDA DDDD)' ))
+*
+ PAUSE()
+*
+*
+* SNOLISPIST I/O test program
+*
+     A = 'C' ; B = 'L' ; C = 'R'
+*
+     (|(11 % 'C.A') |'Centered.' ||'')
+     (|(11 % 'L.B') |'Left justified.'  ||'')
+     (|(11 % 'R.C') |'Right justified.'  ||'')
+  L = #'(A CENTERED LIST)'
+*
+  (|(72 % 'C.L') |'A centered list.' ||'')
+*
+ (|'Test of indentation via % operator.' |'')
+ ?( |'Outline Level I' |'' )
+ ?( |(5 % ' '   'Outline Level I.A') |'' )
+ ?( |(10 % ' '   'Outline Level I.A.1') |'' )
+ ?( |(15 % ' '   'Outline Level I.A.1.a') ||'' )
+*
+ PAUSE()
+*
+ |'Input test:   Should print echo of next input line.'
+ |''
+ |IN()
+*
+ PAUSE()
+*
+*
+* Tests of recursively defined list processing functIons
+*   SNOLISPIST
+*
+*
+ ||''
+ |'Recursively defined list processing functions'
+ |''
+ ?( |'Test LCOPY' |'' )
+ ORIGINAL = #'((O . R) (I . G) (I . N) (A . L))'
+ COPY = LCOPY(ORIGINAL)
+ |'Here is the original:'
+ ?( |(62 % 'C.ORIGINAL') |'' )
+ |'Here is the copy:'
+ ?( |(62 % 'C.COPY') |'' )
+ |'Are they EQU?'
+ ?( |("     "   ~EQU(COPY,ORIGINAL) 'No.') |'' )
+ |'Are they EQUAL?'
+ ?( |("     "   EQUAL(COPY,ORIGINAL) 'Yes.') |'' )
+*
+ PAUSE()
+*
+ ?( |'Test SUBST' |'' )
+ TEST.LIST = #'(1 (2) (3 . 4) ((5 . 6) 7) 1 2 3 4 5 6 7)'
+ SUBST.LIST = #'(S I X)'
+ |'Here is the original list:'
+ ?( |(62 % 'C.TEST.LIST') |'' )
+ ?( |'Here is the target sublist:  6' |'' )
+ |'Here is the result:'
+ ?( |(62 % 'C.SUBST(TEST.LIST,6,SUBST.LIST)' ) |'' )
+*
+ PAUSE()
+*
+ ?( |'Test REMOVE' |'' )
+ TEST.LIST = #'(A (B (C . D) E (F . G)) H A I R)'
+ REM.LIST = #'(C . D)'
+ |'Here is the test list:'
+ ?( |(62 % 'C.TEST.LIST') |'' )
+ |'Here is the list to be removed:'
+ ?( |(62 % 'C.REM.LIST') |'' )
+ |'Here is the result:'
+ ?( |(62 % 'C.REMOVE(TEST.LIST,REM.LIST)' ) |'' )
+*
+ PAUSE()
+*
+ ?( |'Test FIND' |'' )
+ TEST.LIST = #'(H A Y ((N . E) (E . D) (L . E)) S T A C K)'
+ FIND.LIST = #'(E . D)'
+ |'Here is the test list:'
+ ?( |(62 % 'C.TEST.LIST') |'' )
+ |'Here is the list to be found:'
+ ?( |(62 % 'C.FIND.LIST') |'' )
+ |'Here is the result:'
+ ?( |(62 % 'C.FIND(FIND.LIST,TEST.LIST)' ) |'' )
+*
+ PAUSE()
+*
+* Tests of miscellaneous list processing functions
+*     SNOLISPIST
+*
+ ||''
+ |'Miscellaneous list processing functions'
+ |''
+ ?( |'Test EXPLODE and READLIST by inverse mapping' |'' )
+ |MAPCAR(.READLIST,
++     MAPCAR(.EXPLODE,
++        #'(1 AARDVARK (SUB LIST) (C (O (MPLEX))))' ))
+*
+ PAUSE()
+*
+ |''
+ ?( |'Test LENGTH' |'' )
+ |MAPLIST(.LENGTH,
++     EXPLODE('abcdefghijklmnopqrstuvwxyz'))
+*
+ PAUSE()
+*
+ |''
+ |'Test SETL (SET indirectly)'
+ |''
+ DEFINE('PLACE(CH)A')    :(PLACE.END)
+PLACE
++     &ALPHABET CH @A
+      PLACE = A     :(RETURN)
+PLACE.END
+*
+ DEFINE('INTERLEAVE(L1,L2)LL')      :(INTERLEAVE.END)
+INTERLEAVE
++     LL = NIL
+INTERLEAVE1
++     LL = POP( .L2) ~ POP( .L1) ~ LL
++        :S(INTERLEAVE1)
+      INTERLEAVE = LREVERSE(LL)    :(RETURN)
+INTERLEAVE.END
+*
+      AA =  EXPLODE('abcdefghijklmnopqrstuvwxyz')
+      VV =  MAPCAR(.PLACE,AA)
+      SETL(INTERLEAVE(AA,VV))
+      MAPC(DEXP('LAMBDA(Z) = '
++          '?|(Z " = " VALUE(Z))' ),  AA)
+*
+ PAUSE()
+*
+*
+*  Tests of set functions on lists
+*     SNOLISPIST
+*
+*
+ ||''
+ |'Set functions'
+ |''
+ EVEN  = #'(2 4 6 8 10 12 14 16 18 20)'
+ ODD   = #'(1 3 5 7 9 11 13 15 17 19)'
+ PRIME = #'(2 3 5 7 11 13 17 19)'
+ FIBONACCI = #'(1 1 2 3 5 8 13)'
+ UNIVERSE = UNION(EVEN,ODD)
+ NON.PRIME = EXCLUDE(UNIVERSE,PRIME)
+ EVEN.PRIME = INTERSECT(EVEN,PRIME)
+ PRIME.FIBO = INTERSECT(PRIME,FIBONACCI)
+ ODD.FIBO = INTERSECT(ODD,FIBONACCI)
+ PRIME.OR.FIBO = UNION(PRIME,FIBONACCI)
+ NEITHER.PRIME.NOR.FIBO = EXCLUDE(UNIVERSE,PRIME.OR.FIBO)
+*
+ MAPC(DEXP('LAMBDA(NAME) = |$|( |"" NAME )' ),
++     #( '(EVEN ODD PRIME FIBONACCI UNIVERSE NON.PRIME '
++          'EVEN.PRIME PRIME.FIBO ODD.FIBO PRIME.OR.FIBO '
++          'NEITHER.PRIME.NOR.FIBO)' ))
+*
+ PAUSE()
+*
+*
+*  Tests of some functions for adding to a list
+*     SNOLISPIST
+*
+*
+ ||''
+ |'Functions which add elements to lists'
+ |''
+ LIST1 = EXPLODE('APPEND')
+ LIST2 = EXPLODE('NCONC')
+ LIST3 = EXPLODE('SNOC')
+ LIST4 = EXPLODE('INSERT')
+*
+ EXTRA.LIST = EXPLODE('EXTRA')
+ EXTRA.ATOM = CONCAT(EXTRA.LIST)
+*
+ ||''
+ ?( |'Test APPEND' |'' )
+ |(62 % 'C.APPEND(LIST1 ~ EXTRA.LIST ~ NIL)' )
+*
+ PAUSE()
+*
+ ?( |'Test NCONC' |'' )
+ |(62 % 'C.NCONC(LIST2 ~ EXTRA.LIST ~ NIL)' )
+*
+ PAUSE()
+*
+ ?( |'Test SNOC' |'' )
+ |(62 % 'C.SNOC(LIST3,EXTRA.ATOM)' )
+*
+ PAUSE()
+*
+ ?( |'Test INSERT' |'' )
+ |(62 % 'C.INSERT("R",LIST4)'  )
+ |''
+ |(62 % 'C.INSERT(EXTRA.ATOM,LIST4)' )
+*
+ PAUSE()
+*
+* Tests of replacement functions
+*     SNOLISPIST
+*
+*
+ ||''
+ |'Replacement functions'
+ |''
+ LST = READ(
++     '(NOW IS THE TIME FOR ALL GOOD MEN '
++     'TO COME TO THE AID OF THEIR PARTY)' )
+ |''
+ |'The test list is'
+ ?( |(62 % 'C.LST') |'' )
+*
+ PAUSE()
+*
+ ?( |'Reverse the CDR' |'' )
+ RPLACD(LST,LREVERSE(CDR(LST)))
+ ?( |(62 % 'C.LST') |'' )
+*
+ PAUSE()
+*
+ ?( |'Put it back like it was' |'' )
+ RPLACD(LST,LREVERSE(CDR(LST)))
+ ?( |(62 % 'C.LST') |'' )
+*
+ PAUSE()
+*
+ ?( |'Use RPLACA to change the first five words' |'' )
+ RPLACA(LST,'Now')
+ RPLACA(CDR(LST),'is')
+ RPLACA(CDDR(LST),'the')
+ RPLACA(CDDDR(LST),'time')
+ RPLACA(CDDDDR(LST),'for')
+ ?( |(62 % 'C.LST') |'' )
+*
+ PAUSE()
+*
+ ?( |'Change the last five words using RPLACN' |'' )
+ RPLACN(LST,-1,'party?')
+ RPLACN(LST,-2,'their')
+ RPLACN(LST,-3,'of')
+ RPLACN(LST,-4,'aid')
+ RPLACN(LST,-5,'the')
+ ?( |(62 % 'C.LST') |'' )
+*
+ PAUSE()
+*
+ |'Restore the original list; then reverse each '
+ ?( |("     "   'word, starting with the last.') |'' )
+ LST = READ(
++     '(NOW IS THE TIME FOR ALL GOOD MEN '
++     'TO COME TO THE AID OF THEIR PARTY)' )
+ |''
+ |'The test list is'
+ ?( |(62 % 'C.LST') |'' )
+*
+ PAUSE()
+*
+       N = LENGTH(LST)
+       I = 0
+LUPE
+       I = LT(I,N) I + 1       :F(LUPE.END)
+       K = -I
+       RPLACN(LST,K,REVERSE(CAR(NTH(LST,K))))
+       PRINT(LST)         :(LUPE)
+LUPE.END
++     PAUSE()
+*
+*
+* Tests of sublist functions
+*     SNOLISPIST
+*
+*
+ ||''
+ |'Sublist functions'
+ |''
+ LST = READ(
++     '(NEVER TRY TO GIVE NECESSARY AND SUFFICIENT '
++     'CONDITIONS FOR ANYTHING -- Linsky)' )
+ |''
+ |'The test list is'
+ PRINT(LST)
+ PAUSE()
+*
+ |'The last element is'
+ PRINT(LAST(LST))
+*
+  PAUSE()
+*
+ ?( |'Here is a vertical listing, using NTH' |'' )
+      N = LENGTH(LST)
+      I = 0
+LOOP
++     I = LT(I,N) I + 1       :F(LOOP.END)
+      PRINT(CAR(NTH(LST,I)))       :(LOOP)
+LOOP.END      PAUSE()
+*
+ |''
+ |'The first 8 elements are'
+ PRINT(PRELIST(LST,8))
+ PAUSE()
+*
+ |'The tail starting with element 4 is'
+ PRINT(SUFLIST(LST,3))
+ PAUSE()
+*
+ |'The sublist consisting of elements 4 through 8 is'
+ PRINT(PRELIST(SUFLIST(LST,3),5))
+ PAUSE()
+*
+ |'The RAC is'
+ PRINT(RAC(LST))
+ |'The RDC is'
+ PRINT(RDC(LST))
+ PAUSE()
+*
+*
+* Tests of list searching functions
+*      SNOLISPIST
+*
+*
+ ||''
+ |'Searching functions'
+ |''
+ ALIST = READ(
++      '((1 BUN) '
++      '(2 SHOE) '
++      '(3 TREE) '
++      '(4 DOOR BORE SHORE CORE) '
++      '(5 HIVE JIVE) '
++      '(6 SEX) '
++      '(7 HEAVEN) '
++      '(8 WAIT) '
++      '(9 RESIGN) '
++      '(10 WHEN?) )' )
+*
+ |'The test list is'
+ PRINT(ALIST)
+ PAUSE()
+*
+ ?( |'NIL followed-by beat poetry' |'' )
+ PRINT(ASSOC(95,ALIST))
+ PRINT(ASSOC(6,ALIST))
+ PRINT(ASSOC(9,ALIST))
+ PRINT(ASSOC(5,ALIST))
+ PRINT(ASSOC(10,ALIST))
+*
+ PAUSE()
+*
+ MESS = #'(47 ABC XYZ BUN WAIT 5 7 1 3)'
+ |''
+ |'The list of targets for ASSOCL is'
+ |''
+ |'LTRACE is also tested here.'
+ |''
+ PRINT(MESS)
+ PAUSE()
+*
+ LTRACE(2, .ASSOCL ~ NIL) ; &TRACE = 10000
+ PRINT(ASSOCL(MESS,ALIST))
+ LTRACE(0, .ASSOCL ~ NIL) ; &TRACE = 0
+ PAUSE()
+*
+ |'Here is the tail of MESS starting with BUN'
+ PRINT(MEMBER('BUN',MESS))
+ PAUSE()
+*
+ MEMQ('WAIT',MESS) ?|'This line should appear'
+ MEMQ('INCLINE',ALIST) ?|'This line should NOT appear'
+*
+ PAUSE()
+*
+* Tests of mapping functions
+*     SNOLISPIST
+*
+*
+ ||''
+ |'Mapping functions'
+ |''
+ ?( |'Unimaginative MAP test' |'' )
+ MAP(.PRINT,#'(A B C D 11 22 33 44 (5 . 5))' )
+*
+ PAUSE()
+*
+ ?( |'Unimaginative MAPC test' |'' )
+ MAPC(.PRINT,
++     READ(
++         '(Now is the time for all good men '
++         'to come to the aid of their party)' ))
+*
+ PAUSE()
+*
+ ?( |'Unimaginative MAPLIST test' |'' )
+ PRINT(MAPLIST(.LENGTH,
++     #'(10 9 8 7 6 5 4 pi 3 e 2 1 0 BLAST OFF!    i)' ))
+*
+ PAUSE()
+*
+ ?( |'MAPCON test -- What will happen???' |'' )
+ PRINT(MAPCON(.EXPLODE,
++     #'(EVERY GOOD BOY DOES FINE)' ))
+*
+ PAUSE()
+*
+ ?( |'MAPCAN test -- What wlll happen?????' |'' )
+ PRINT(MAPCAN(.EXPLODE,
++     #'(CINNAMON PERSIMMON SIMIAN)' ))
+ PAUSE()
+*
+ |'EVERY test (correct answer = NIL)'
+ PRINT(EVERY(.NUMBERP,
++     #'(5 4 3 2 1 0 X)' ))
+*
+ PAUSE()
+*
+ |'EVLIS test'
+ |'Correct answer is (1 2 3 (LIST VALUE))'
+ SETL( #'(A 1 B 2 C 3 D (LIST VALUE))' )
+ PRINT(EVLIS(#'(A B C D)' ))
+*
+ PAUSE()
+*
+ |'SOME test (correct answer = NIL)'
+ PRINT(SOME(.ZEROP,
++     #'(19 9 8 3 6 4 2 \P...I. \LN...10. 66 666 -1)' ))
+*
+ PAUSE()
+*
+ |'SUBSET test (should print only negative numbers)'
+ PRINT(SUBSET(.NEGP,
++     #'(0 0 0 -1 -2 9 8 6.3 \-P...I. \LN...10. -5)' ))
+*
+ PAUSE()
+*
+*
+* Tests of non-numerical Predicates
+*     SNOLISPIST
+*
+      LLST = #'(A (SMALL (TEST (LIST))))'
+ ||''
+ |'A series of Ts'
+ |''
+ MAPC(DEXP('LAMBDA(EXPR) = |("      " !EVALCODE( |EXPR))' ),
++     '/T' ~
++     'NULLP(NIL)' ~
++     'NOTP(NIL)' ~
++     'ATOMP(13.965)' ~
++     'NUMBERP(-13.965)' ~
++     'EQP(13,"13.000000")' ~
++     'EQUALP(LLST,LCOPY(LLST))' ~
++     NIL)
+*
+ PAUSE()
+*
+ ||''
+ |'A series of NILs'
+ |''
+ LLST = #'(TWEEDLE (DEE . DUM))'
+ MAPC(DEXP('LAMBDA(EXPR) = |("    " !EVALCODE( |EXPR))' ),
++    'NULLP(14 ~ NIL)' ~
++    'NOTP(1 ~ 1)' ~
++    'ATOMP(1 ~ 2 ~ 3 ~ NIL)' ~
++    'NUMBERP("LINDA")' ~
++    'EQP(LLST,LCOPY(LLST))' ~
++    NIL)
+*
+ PAUSE()
+*
+*
+* Tests of numerical predicates
+*    SNOLISPIST
+*
+*
+ ||''
+ |'Alternating series of Ts and NILs'
+ |''
+ ?( |'Testing NEGP' |'' )
+ |MAPCAR(.NEGP,
++    #'(-1 2 -3.0 4 -5.00 6.00 -7.7 8.8 -8.999 10.101010)')
+*
+ PAUSE()
+*
+ ?( |'Testing ZEROP' |'' )
+ |MAPCAR(.ZEROP,
++    #'(0 14 0. -41 0.0 29 -0.0 2.99 00000 99999)')
+*
+ PAUSE()
+*
+ ?( |'Testing LESSP' |'' )
+ |LESSP( #'( \-P...I. 0.00 0.01 10000000)' )
+ |LESSP( #'( \-LN...10. 0.00 1.01 1.000000)' )
+*
+ PAUSE()
+*
+ |'Testing GREATERP.'
+ |''
+ |GREATERP( #'( \P...I. 3.1 -4  -19.84)' )
+ |GREATERP( #'( 6 16 7 17    14.82   )' )
+*
+ PAUSE()
+*
+*
+* Tests of the property-list functions
+*    SNOLISPIST
+*
+*
+ ||''
+ |'Property list functions'
+ |''
+*
+*
+ MAPC(DEXP('LAMBDA(XPR) = '
++     '|("      " !EVAL( |( |"" XPR )))' ),
++     'PUT(.DOG,"NUMBER.OF.LEGS",4)' ~
++     'GET(.DOG,"NUMBER.OF.LEGS")' ~ 'PAUSE()' ~
++     'REMPROP(.DOG,"NUMBER.OF.LEGS")' ~
++     'GET(.DOG,"NUMBER.OF.LEGS")' ~ 'PAUSE()' ~
++     'PUTL(#"(DOG CAT HORSE)","NUMBER.OF.LEGS",4)' ~
++     'GET(.DOG,"NUMBER.OF.LEGS")' ~
++     'GET(.CAT,"NUMBER.OF.LEGS")' ~
++     'GET(.HORSE,"NUMBER.OF.LEGS")' ~
++     'GET(.ARMADILLO,"NUMBER.OF.LEGS")' ~ 'PAUSE()' ~
++     'PUTPROP(.DOG,3,"LEGS")' ~
++     'PUTPROP(.DOG,2,"LEGS")' ~
++     'PUTPROP(.DOG,1,"LEGS")' ~
++     'PUTPROP(.DOG,1,"HEAD")' ~
++     'GETL(.DOG,#"(LEGS HEAD)")' ~
++     'GETL(.DOG,#"(HEAD)")' ~ 'PAUSE()' ~
++     'ADDPROP(.DOG,3,"LEGS")' ~
++     'GET(.DOG,"LEGS")' ~
++     'ADDPROP(.DOG,"ANOMALY","LEGS")' ~
++     'GET(.DOG,"LEGS")' ~ 'PAUSE()' ~
++     'DEFPROP(.FISH,0,"LEGS")' ~
++     'GETL(.FISH,#"(EYES ARMS TEETH LEGS)")' ~
++     NIL )
+*
+ PAUSE()
+*
+*
+ |''
+ ?( |'Empty all property stacks' |'' )
+ ?( |'DOG -- "LEGS"' |'' )
+*
+LOOP1 TEMP = GETPROP( .DOG, 'LEGS' )
+      ?( PRINT(TEMP) DIFFER(TEMP,NIL) )     :S(LOOP1)
+ |''
+ PAUSE()
+ ?( |'DOG -- "NUMBER.OF.LEGS"' |'' )
+LOOP2   TEMP = GETPROP( .DOG, 'NUMBER.OF.LEGS' )
+        ?( PRINT(TEMP) DIFFER(TEMP,NIL) )     :S(LOOP2)
+ |''
+ PAUSE()
+ ?( |'DOG -- "HEAD"' |'' )
+LOOP3   TEMP = GETPROP( .DOG, 'HEAD' )
+        ?( PRINT(TEMP) DIFFER(TEMP,NIL) )       :S(LOOP3)
+ |''
+ PAUSE()
+ |'CAT -- "NUMBER.OF.LEGS"'
+LOOP4   TEMP = GETPROP( .CAT, 'NUMBER.OF.LEGS' )
+        ?( PRINT(TEMP) DIFFER(TEMP,NIL) )     :S(LOOP4)
+ |''
+ PAUSE()
+ ?( |'FISH -- "LEGS"' |'' )
+LOOP5 TEMP = GETPROP( .FISH, 'LEGS' )
+      ?( PRINT(TEMP) DIFFER(TEMP,NIL) )      :S(LOOP5)
+ |''
+ PAUSE()
+ ?( |'HORSE -- "NUMBER.OF.LEGS"' |''   )
+LOOP6 TEMP = GETPROP( .HORSE, 'NUMBER.OF.LEGS' )
+      ?( PRINT(TEMP) DIFFER(TEMP,NIL) )      :S(LOOP6)
+*
+ PAUSE()
+*
+ ||''
+ ?( |'A combined test of CLA, CAL, and SORT' |'' )
+ ?( |'Should print ABDENWSSREBA' |'' )
+ L = CLA(EXPLODE('BADNEWSBEARS'))
+ SORT.(L,7,12,'LGE')
+ SORT.(L,1,6,'LLE')
+ |READLIST(CAL(L))
+*
+ PAUSE()
+*
+ ||''
+ |'A further test of SORT/CAL/CLA:'
+ |'Make anagrams out of some six-letter names by'
+ |'alphabetizing their letters.'
+ |''
+ MAPC(
++ DEXP(
++   'LAMBDA(X) = '
++    'PRINT('
++     'CONCAT('
++      'CAL('
++       'SORT.(CLA(EXPLODE(X)),1,6,.LLE) )))' ),
++         ('MARVIN' ~
++         'PACMAN' ~
++         'LOLITA' ~
++         'MERLIN' ~
++         'ELIJAH' ~
++         'SHAFTO' ~
++         'SYLVIA' ~
++         'ITALIA' ~
++         'GEORGE' ~
++         'GIMPEL' ~
++         'BACKUS' ~ NIL) )
+*
+ PAUSE()
+*
+ ||''
+ |'TDUMP test:  Should print suitable error message.'
+ |''
+ |(72 % 'C.a=b+c?')
+END
