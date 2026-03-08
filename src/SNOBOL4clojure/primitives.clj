@@ -20,7 +20,23 @@
 (defn ARBNO!  [Σ Δ _Π] (err nil Δ))
 (defn FENCE!  [Σ Δ _Π] (err nil Δ))
 (defn FENCE!! [Σ Δ _Π] (err nil Δ))
-(defn BREAKX$ [Σ Δ _Π] (err nil Δ))
+;; BREAKX$ — like BREAK$ but participates in backtracking:
+;; on first call matches up to (but not including) the first break char,
+;; then on each retry advances ONE character past the break char.
+;; Implemented as a stateful multi-yield: φ (ζ slot 5) stores retry count.
+;; In the engine BREAKX$ is handled specially; the primitive here is the
+;; single-step scanner used by the engine's BREAKX# node.
+;; For the simple (non-backtracking) form we expose the same interface as BREAK$.
+(defn BREAKX$ [Σ Δ Π]
+  ;; Single-yield form: scan until a char in Π is found (same as BREAK$).
+  ;; The engine's BREAKX# node handles the backtracking by calling this
+  ;; at successive positions.
+  (loop [σ Σ δ Δ]
+    (if (not (seq σ))
+      (err σ δ)                          ; no break char found → fail
+      (if (contains? Π (first σ))
+        [σ δ]                            ; stopped before the break char
+        (recur (rest σ) (inc δ))))))
 
 ;; ── Positional ────────────────────────────────────────────────────────────────
 (defn POS#  [Σ Δ Π] (if (equal Δ Π)         [Σ Δ] (err Σ Δ)))
@@ -62,7 +78,18 @@
     (if (>= (count σ) Π) [σ δ]
       (if (not (seq σ)) (err σ δ) (recur (rest σ) (inc δ))))))
 
+;; ── Zero-width anchors ────────────────────────────────────────────────────────
+(defn BOL# [Σ Δ _Π] (if (clojure.core/= Δ 0) [Σ Δ] (err Σ Δ)))
+(defn EOL# [Σ Δ _Π] (if (not (seq Σ)) [Σ Δ] (err Σ Δ)))
+
 ;; ── Span and break ────────────────────────────────────────────────────────────
+;; NSPAN$ — like SPAN$ but matches 0 or more chars (no minimum-1 requirement)
+(defn NSPAN$ [Σ Δ Π]
+  (loop [σ Σ δ Δ]
+    (if (not (contains? Π (first σ)))
+      [σ δ]                              ; always succeeds, even on zero chars
+      (recur (rest σ) (inc δ)))))
+
 (defn SPAN$ [Σ Δ Π]
   (loop [σ Σ δ Δ]
     (if (not (contains? Π (first σ)))

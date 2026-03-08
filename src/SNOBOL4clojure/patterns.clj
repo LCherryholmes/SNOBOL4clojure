@@ -7,8 +7,9 @@
 ;; ── Character-class patterns ──────────────────────────────────────────────────
 (defn ANY    [S] (list 'ANY$    (charset S)))
 (defn BREAK  [S] (list 'BREAK$  (charset S)))
-(defn BREAKX [S] (list 'BREAKX$ (charset S)))
+(defn BREAKX [S] (list 'BREAKX# (charset S)))   ; backtracking form
 (defn NOTANY [S] (list 'NOTANY$ (charset S)))
+(defn NSPAN  [S] (list 'NSPAN$  (charset S)))    ; 0-or-more span
 (defn SPAN   [S] (list 'SPAN$   (charset S)))
 
 ;; ── Length / position patterns ────────────────────────────────────────────────
@@ -17,6 +18,10 @@
 (defn RPOS [I] (list 'RPOS# I))
 (defn RTAB [I] (list 'RTAB# I))
 (defn TAB  [I] (list 'TAB#  I))
+
+;; ── Zero-width anchor patterns ────────────────────────────────────────────────
+(def BOL (list 'BOL#))    ; beginning of subject (position 0)
+(def EOL (list 'EOL#))    ; end of subject (no chars remaining)
 
 ;; ── Repetition / structural patterns ─────────────────────────────────────────
 (defn ARBNO [P]  (list 'ARBNO! P))

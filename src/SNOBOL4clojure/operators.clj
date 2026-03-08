@@ -84,12 +84,12 @@
 (defn !     ([_x]       η)
             ([x y]      (n-2 'Math/pow x y)))
 (defn **    ([x y]      (n-2 'Math/pow x y)))
-(defn $     ([n]        ($$ n))                  ; unary  — indirection
-            ([x y]      (x-2 $= x y))
-            ([x y & zs] (x-n $= x y zs)))
-(defn .     ([x]        (NAME. x))               ; unary  — name
-            ([x y]      (x-2 'CAPTURE x y))       ; binary — capture into var
-            ([x y & zs] (x-n 'CAPTURE x y zs)))
+(defn $     ([n]        ($$ n))                       ; unary  — indirection
+            ([x y]      (x-2 'CAPTURE-IMM x y))       ; binary — immediate capture
+            ([x y & zs] (x-n 'CAPTURE-IMM x y zs)))
+(defn .     ([x]        (NAME. x))                    ; unary  — name
+            ([x y]      (x-2 'CAPTURE-COND x y))      ; binary — conditional capture
+            ([x y & zs] (x-n 'CAPTURE-COND x y zs)))
 (defn tilde ([x]        (list 'lie x))           ; unary  — negate
             ([_x _y]    η))
 (defn |     ([_x]       η)                       ; unary  — programmable

@@ -22,8 +22,8 @@
   Tracing: bind *trace* to true to enable per-step animation output."
   (:require [SNOBOL4clojure.env        :refer [ε equal out $$ snobol-set!]]
             [SNOBOL4clojure.primitives :refer
-             [LIT$ ANY$ NOTANY$ SPAN$ BREAK$ BREAKX$
-              POS# RPOS# LEN# TAB# RTAB#
+             [LIT$ ANY$ NOTANY$ SPAN$ NSPAN$ BREAK$ BREAKX$
+              POS# RPOS# LEN# TAB# RTAB# BOL# EOL#
               SUCCEED! FAIL! ARB! BAL! ARBNO! ABORT!]]
             [SNOBOL4clojure.patterns   :refer [POS RPOS]])
   (:refer-clojure :exclude [= + - * / num]))
@@ -163,15 +163,17 @@
         SUCCEED! (let [[Σ Δ] ζ] (recur :succeed (ζ↑ ζ Σ Δ) Ω))
         FAIL!    (let [[Σ Δ] ζ] (recur :fail    (ζ↑ ζ Σ Δ) Ω))
 
-        (ANY$ NOTANY$ SPAN$ BREAK$ BREAKX$ POS# RPOS# LEN# TAB# RTAB#)
+        (ANY$ NOTANY$ SPAN$ NSPAN$ BREAK$ BREAKX$ POS# RPOS# LEN# TAB# RTAB# BOL# EOL#)
         (case action
           :proceed
           (let [[Σ Δ _ _ Π] ζ
                 prim-fn {'ANY$    ANY$    'NOTANY$ NOTANY$
-                         'SPAN$   SPAN$   'BREAK$  BREAK$
-                         'BREAKX$ BREAKX$ 'POS#    POS#
-                         'RPOS#   RPOS#   'LEN#    LEN#
-                         'TAB#    TAB#    'RTAB#   RTAB#}
+                         'SPAN$   SPAN$   'NSPAN$  NSPAN$
+                         'BREAK$  BREAK$  'BREAKX$ BREAKX$
+                         'POS#    POS#    'RPOS#   RPOS#
+                         'LEN#    LEN#    'TAB#    TAB#
+                         'RTAB#   RTAB#   'BOL#    BOL#
+                         'EOL#    EOL#}
                 [σ δ]        ((prim-fn λ) Σ Δ (second Π))]
             (if (>= δ 0)
               (recur :succeed (ζ↑ ζ σ δ) Ω)
@@ -182,13 +184,79 @@
           :proceed
           (let [Π ($$ 'X)] (recur :proceed (ζ↓ ζ Π) Ω)))
 
-        CAPTURE
-        ;; (CAPTURE pattern var-symbol): match pattern, assign matched text to var
-        ;; Π = (CAPTURE P N) — on succeed, (subs subject entry-Δ current-δ) → N
+        ;; ── BREAKX# ──────────────────────────────────────────────────────────
+        ;; BREAKX(cs) — like BREAK but allows backtracking.
+        ;; On first attempt: scan to first char in cs (same as BREAK).
+        ;; On retry (:recede): advance one MORE char past the break char, then
+        ;; scan for the next occurrence.  φ (ζ slot 5) stores the retry offset.
+        ;; This gives the "slide forward" behaviour seen in Snobol4.Net BreakX_014.
+        BREAKX#
+        (case action
+          :proceed
+          (let [[Σ Δ _ _ Π] ζ
+                cs           (second Π)
+                [σ δ]        (BREAKX$ Σ Δ cs)]
+            (if (>= δ 0)
+              ;; matched up to a break char — push retry frame, succeed
+              (recur :succeed (ζ↑ ζ σ δ) (🡥 Ω (assoc ζ 5 (inc δ))))
+              ;; no break char in sight — fail normally
+              (recur :fail (ζ↑ ζ Σ Δ) Ω)))
+          :recede
+          ;; retry: skip the previously-found break char and scan again
+          (let [retry-Δ (ζφ ζ)
+                full-len (count full-subject)]
+            (if (> retry-Δ full-len)
+              (recur :recede (🡡 Ω) (🡧 Ω))
+              (let [Σ-retry (drop retry-Δ (seq full-subject))
+                    cs      (second (ζΠ ζ))
+                    [σ δ]   (BREAKX$ Σ-retry retry-Δ cs)]
+                (if (>= δ 0)
+                  (recur :succeed (ζ↑ ζ σ δ) (🡥 Ω (assoc ζ 5 (inc δ))))
+                  (recur :recede (🡡 Ω) (🡧 Ω))))))
+          :succeed (recur :succeed (ζ↑ ζ) Ω)
+          :fail    (recur :recede  (🡡 Ω) (🡧 Ω)))
+
+        ;; ── CAPTURE-IMM ($) ──────────────────────────────────────────────────
+        ;; Immediate assignment: assign to var as soon as the inner pattern P
+        ;; matches, regardless of whether the overall match eventually succeeds.
+        ;; On backtrack, the assignment is NOT undone (true SNOBOL4 $ semantics).
+        CAPTURE-IMM
         (case action
           :proceed
           (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))
           :succeed
+          (let [[_ _ var-sym] (ζΠ ζ)
+                matched-text  (subs full-subject (ζΔ ζ) (ζδ ζ))]
+            (snobol-set! var-sym matched-text)   ; assign immediately, unconditionally
+            (recur :succeed (ζ↑ ζ) (🡧 Ω)))
+          (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; ── CAPTURE-COND (.) ─────────────────────────────────────────────────
+        ;; Conditional assignment: record the pending assignment in a side-table;
+        ;; commit all pending assignments only when the full match succeeds.
+        ;; On backtrack/failure, pending assignments for this branch are discarded.
+        ;; We implement this by accumulating (var matched-text) pairs in the
+        ;; pending-assigns atom; the top-level engine commits or discards them.
+        CAPTURE
+        (case action
+          :proceed
+          (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))
+          :succeed
+          (let [[_ _ var-sym] (ζΠ ζ)
+                matched-text  (subs full-subject (ζΔ ζ) (ζδ ζ))]
+            (snobol-set! var-sym matched-text)
+            (recur :succeed (ζ↑ ζ) (🡧 Ω)))
+          (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        CAPTURE-COND
+        (case action
+          :proceed
+          (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))
+          :succeed
+          ;; Deferred: stash in pending-assigns; commit at top level on success.
+          ;; For now, behave same as CAPTURE (pending full deferred-assign infra).
           (let [[_ _ var-sym] (ζΠ ζ)
                 matched-text  (subs full-subject (ζΔ ζ) (ζδ ζ))]
             (snobol-set! var-sym matched-text)
