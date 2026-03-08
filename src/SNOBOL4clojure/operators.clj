@@ -8,7 +8,8 @@
               ncvt scvt num $$ out reference snobol-set!
               table? table-get table-set
               array? array-get array-set array-prototype
-              snobol-return! snobol-freturn! snobol-nreturn!]]
+              snobol-return! snobol-freturn! snobol-nreturn!
+              <FUNS>]]
             [SNOBOL4clojure.functions :refer
              [ASCII REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE
               ITEM PROTOTYPE CONVERT COPY FIELD SORT RSORT DATA]]
@@ -285,6 +286,7 @@
                                 :nreturn nil
                                 result)))))]   ; fall-through = return
                 (snobol-set! f-sym the-fn)
+                (swap! <FUNS> assoc (clojure.string/upper-case fname) the-fn)
                 ε))
     define  (apply INVOKE 'DEFINE args)
     APPLY   (apply APPLY (first args) (rest args))
@@ -328,7 +330,11 @@
                   ;; NAME indirect reference — dereference to actual array/table
                   f (if (instance? NAME raw-f)
                       ($$ (symbol (str (.n raw-f))))
-                      raw-f)]
+                      raw-f)
+                  ;; When f is not callable (e.g. result-slot cleared to ε during
+                  ;; recursive execution), fall back to the functions registry.
+                  f (if (fn? f) f
+                      (get @<FUNS> (clojure.string/upper-case (str op)) f))]
               (cond
                 (table? f) (table-get f (first args))   ; TABLE subscript read
                 (array? f) (array-get f (vec args))     ; ARRAY subscript read
@@ -339,7 +345,9 @@
 (defn APPLY
   "APPLY(fname, arg1, ...) — call a named function by string."
   [fname & fargs]
-  (let [f-fn ($$ (symbol (str fname)))]
+  (let [raw-f ($$ (symbol (str fname)))
+        f-fn  (if (fn? raw-f) raw-f
+                  (get @<FUNS> (clojure.string/upper-case (str fname))))]
     (when (fn? f-fn)
       (apply f-fn fargs))))
 

@@ -53,6 +53,13 @@
 (def <LABL>  (atom {}))
 (def <CODE>  (atom {}))
 
+;; ── User-defined function registry ───────────────────────────────────────────
+;; Stores DEFINE'd closures keyed by uppercased function name (string).
+;; This is separate from the user-namespace variable of the same name, which
+;; serves as the result slot.  Keeping them separate allows recursive calls to
+;; find the function even while the result slot holds ε or an intermediate value.
+(def <FUNS>  (atom {}))
+
 ;; ── NAME type: mutable named reference (SNOBOL4 . operator) ──────────────────
 (definterface &NAME (n []) (n [_]))
 (deftype NAME [^:unsynchronized-mutable n] &NAME
@@ -85,7 +92,8 @@
    Call once at the top of every user script:  (GLOBALS *ns*)
    Mirrors GLOBALS(globals()) in SNOBOL4python."
   [ns]
-  (reset! snobol-ns ns))
+  (reset! snobol-ns ns)
+  (reset! <FUNS> {}))
 
 (defn- active-ns
   "Return the authoritative SNOBOL4 namespace.
