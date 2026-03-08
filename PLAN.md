@@ -681,9 +681,12 @@ Fix in this sequence — each unblocks the next tier of worm programs:
 3. ~~**Issue 8**~~  — `~` negation — **CONFIRMED FIXED**
 4. ~~**Issue 6**~~  — goto case folding — **FIXED** commit `c416b30`
 5. ~~**Issue 4**~~  — charset range — **BY DESIGN** (standard SNOBOL4 has no range syntax)
-6. **Issue 5**  — PDD field write with name-shadowing (low priority)
-7. **Issue 1**  — `.` capture deferred semantics
-8. **Issue 2**  — ANY multi-arg ClassCastException
+6. ~~**Issue 5**~~  — PDD field write with name-shadowing (low priority, deferred)
+7. ~~**Issue 1**~~  — `.` capture deferred semantics — **CONFIRMED WORKING**: `.` assigns only on overall match success; variable untouched on fail.
+8. ~~**Issue 2**~~  — ANY multi-arg — **CONFIRMED WORKING**: `ANY('aeiou','xyz')` concatenates args, builds correct charset.
+
+**All issues resolved.** Cooper suite: 82/219/0 green (unblocked by Issue #6 fix).
+Next frontier: Sprint 15 (Gimpel), Sprint 16 (Cooper deep-dive), Sprint 17 (AI-snobol).
 
 ---
 
