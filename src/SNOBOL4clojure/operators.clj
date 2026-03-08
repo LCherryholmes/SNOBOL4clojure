@@ -153,11 +153,14 @@
               (if (every? #(== (Math/floor %) %) ns)
                 (long (apply clojure.core/*' ns))
                 (apply clojure.core/* ns)))
-    /       (let [ns (map num args)
-                  result (apply clojure.core// ns)]
-              (if (== (Math/floor result) result)
-                (long result)
-                result))
+    /       (let [ns  (map num args)
+                  d   (last ns)]
+              (if (zero? d)
+                (throw (ex-info "Division by zero" {:snobol/error 14}))
+                (let [result (apply clojure.core// ns)]
+                  (if (== (Math/floor result) result)
+                    (long result)
+                    result))))
     ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args]
               (cond
@@ -191,8 +194,16 @@
                   out-val)
                 :else
                 (do (snobol-set! N r) r)))
-    ?=      (let [[n _p R] args, r (EVAL! R)]
-              (snobol-set! n r) r)
+    ?=      (let [[n p R] args
+                  subject (str (or ($$ n) ""))
+                  pat     (EVAL! p)
+                  repl    (str (or (EVAL! R) ""))]
+              (when-let [[start end] (SEARCH subject pat)]
+                (let [result (str (subs subject 0 start)
+                                  repl
+                                  (subs subject end))]
+                  (snobol-set! n result)
+                  result)))
     DEFINE  (let [[proto entry-arg] args
                   ;; Parse: 'fname(p1,p2,...)l1,l2,...'  or  'fname(p1,...)'
                   lp        (.indexOf ^String proto "(")

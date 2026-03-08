@@ -1,9 +1,10 @@
 (ns SNOBOL4clojure.harness
-  "Sprint 14: SPITBOL/SNOBOL4clojure diff harness.
+  "Sprint 14: SPITBOL/CSNOBOL4/SNOBOL4clojure diff harness.
 
-   run-spitbol  — run source string through SPITBOL binary, return outcome map
-   run-clojure  — run source string through SNOBOL4clojure, return outcome map
-   diff-run     — run both, compare, return corpus record
+   Three oracles:
+     run-spitbol  — SPITBOL v4.0f  (/usr/local/bin/spitbol)
+     run-csnobol4 — CSNOBOL4 2.3.3 (/usr/local/bin/snobol4)
+     run-clojure  — SNOBOL4clojure (this implementation)
 
    Outcome map:
      {:stdout \"...\"   ; captured stdout, whitespace-normalised
@@ -13,7 +14,9 @@
    Corpus record:
      {:src        \"...snobol4 source...\"
       :spitbol    outcome-map
+      :csnobol4   outcome-map
       :clojure    outcome-map
+      :oracle     :spitbol | :csnobol4 | :both | :disagree
       :status     :pass | :pass-class | :fail | :timeout | :skip
       :length     (count src)
       :depth      nil}   ; filled in by generator
@@ -26,6 +29,7 @@
 
 ;; ── Configuration ─────────────────────────────────────────────────────────────
 (def ^:dynamic *spitbol-bin*  "/usr/local/bin/spitbol")
+(def ^:dynamic *csnobol4-bin* "/usr/local/bin/snobol4")
 (def ^:dynamic *timeout-ms*   5000)   ; 5 s wall-clock per run
 (def ^:dynamic *stlimit*      10000)  ; SNOBOL4 step limit injected into every program
 
@@ -56,6 +60,24 @@
          :exit   0}
         {:stdout ""
          :stderr (normalise (:out result))
+         :exit   (:exit result)}))
+    (catch Exception e
+      {:stdout "" :stderr (.getMessage e) :exit :crashed})))
+
+;; ── CSNOBOL4 side ────────────────────────────────────────────────────────────
+(defn run-csnobol4
+  "Run src through CSNOBOL4. Returns {:stdout :stderr :exit}."
+  [src]
+  (try
+    (let [result (sh/sh *csnobol4-bin* "-"
+                        :in src
+                        :env {"PATH" "/usr/local/bin:/usr/bin:/bin"})]
+      (if (zero? (:exit result))
+        {:stdout (normalise (:out result))
+         :stderr (normalise (:err result))
+         :exit   0}
+        {:stdout ""
+         :stderr (normalise (str (:out result) (:err result)))
          :exit   (:exit result)}))
     (catch Exception e
       {:stdout "" :stderr (.getMessage e) :exit :crashed})))
@@ -103,45 +125,66 @@
        :exit   :error
        :thrown (str (class e) ": " (.getMessage e))})))
 
+;; ── Oracle agreement ─────────────────────────────────────────────────────────
+(defn- oracle-stdout
+  "Return the agreed oracle stdout, or nil if oracles disagree.
+   Also returns which oracle(s) are considered authoritative."
+  [sp cs]
+  (let [sp-ok (zero? (:exit sp))
+        cs-ok (zero? (:exit cs))]
+    (cond
+      (and sp-ok cs-ok (= (:stdout sp) (:stdout cs)))
+      {:stdout (:stdout sp) :oracle :both}
+
+      (and sp-ok cs-ok (not= (:stdout sp) (:stdout cs)))
+      {:stdout (:stdout sp) :oracle :disagree}  ; use SPITBOL, flag disagreement
+
+      sp-ok  {:stdout (:stdout sp) :oracle :spitbol}
+      cs-ok  {:stdout (:stdout cs) :oracle :csnobol4}
+      :else  {:stdout ""           :oracle :both-error})))
+
 ;; ── Status classification ─────────────────────────────────────────────────────
 (defn- classify
-  "Compare spitbol and clojure outcomes; return status keyword."
-  [sp cl]
+  "Compare oracle stdout against clojure outcome; return status keyword."
+  [oracle-out cl]
   (cond
-    ;; Either side timed out (step limit hit) — record but don't fail
-    (or (= (:exit sp) :timeout) (= (:exit cl) :timeout))
-    :timeout
+    (= (:exit cl) :timeout)    :timeout
+    (= :both-error (:oracle oracle-out)) ; both oracles errored — skip
+    (if (= (:exit cl) :error) :pass-class :skip)
 
-    ;; SPITBOL itself crashed (bad input to oracle) — discard
-    (= (:exit sp) :crashed)
-    :skip
-
-    ;; Both produced identical stdout — pass
-    (= (:stdout sp) (:stdout cl))
+    (= (:stdout oracle-out) (:stdout cl))
     :pass
 
-    ;; Both errored (non-zero/error exit) — pass at class level
-    (and (not= (:exit sp) 0) (= (:exit cl) :error))
+    (and (not= (:oracle oracle-out) :both)
+         (not= (:oracle oracle-out) :spitbol)
+         (not= (:oracle oracle-out) :csnobol4)
+         (= (:exit cl) :error))
     :pass-class
 
-    ;; Otherwise — genuine divergence
-    :else
-    :fail))
+    ;; Both oracle and clojure errored (non-zero exits)
+    (and (= :both-error (:oracle oracle-out)) (= (:exit cl) :error))
+    :pass-class
+
+    :else :fail))
 
 ;; ── Main entry point ──────────────────────────────────────────────────────────
 (defn diff-run
-  "Run src through both sides. Returns a corpus record."
+  "Run src through all three sides. Returns a corpus record."
   ([src] (diff-run src nil))
   ([src depth]
    (let [sp     (run-spitbol src)
+         cs     (run-csnobol4 src)
          cl     (run-clojure src)
-         status (classify sp cl)]
-     {:src     src
-      :spitbol sp
-      :clojure cl
-      :status  status
-      :length  (count src)
-      :depth   depth})))
+         oracle (oracle-stdout sp cs)
+         status (classify oracle cl)]
+     {:src      src
+      :spitbol  sp
+      :csnobol4 cs
+      :clojure  cl
+      :oracle   (:oracle oracle)
+      :status   status
+      :length   (count src)
+      :depth    depth})))
 
 ;; ── Corpus I/O ────────────────────────────────────────────────────────────────
 (defn save-corpus!
