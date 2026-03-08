@@ -16,8 +16,8 @@
  <pattern>  ::=  (<'?' _>)? and
  <replace>  ::=  (<_> expr)?
   jmp       ::=  target
-  sjmp      ::=  <'S'> target
-  fjmp      ::=  <'F'> target
+  sjmp      ::=  <'S' | 's'> target
+  fjmp      ::=  <'F' | 'f'> target
  <target>   ::=  <'('> expr <')'>
   comment   ::=  <'*'> #'.*' <eol>
   control   ::=  <'-'> #'[^;\\n]*' <eos>

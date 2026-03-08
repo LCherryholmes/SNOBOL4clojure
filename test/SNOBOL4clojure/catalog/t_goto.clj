@@ -102,3 +102,45 @@
     (is (= "no" ($$ (quote R))))
 )
 
+;; ─────────────────────────────────────────────────────────────────────────────
+;; Lowercase goto — regression tests for Issue #6
+;; Fixed: grammar now accepts 's'/'f' as well as 'S'/'F' in goto clauses.
+;; ─────────────────────────────────────────────────────────────────────────────
+
+(deftest lowercase_s_goto_taken
+  "GT(5,0) :s(HIT) — lowercase :s — branch taken"
+  (prog
+    "        I = 5"
+    "        R = 'no'"
+    "        GT(I,0) :s(HIT)"
+    "        :(DONE)"
+    "HIT"
+    "        R = 'yes'"
+    "DONE    end")
+  (is (= "yes" ($$ 'R))))
+
+(deftest lowercase_f_goto_taken
+  "LT(5,0) :f(MISS) — lowercase :f — branch taken on failure"
+  (prog
+    "        I = 5"
+    "        R = 'no'"
+    "        LT(I,0) :f(MISS)"
+    "        :(DONE)"
+    "MISS"
+    "        R = 'missed'"
+    "DONE    end")
+  (is (= "missed" ($$ 'R))))
+
+(deftest mixed_lower_upper_goto
+  "GT(0,5) :s(HIT)f(MISS) — mixed case s/F"
+  (prog
+    "        R = 'no'"
+    "        GT(0,5) :s(HIT)f(MISS)"
+    "        :(DONE)"
+    "HIT"
+    "        R = 'hit'"
+    "        :(DONE)"
+    "MISS"
+    "        R = 'miss'"
+    "DONE    end")
+  (is (= "miss" ($$ 'R))))
