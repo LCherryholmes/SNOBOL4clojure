@@ -164,11 +164,17 @@
                     result))))
     ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args]
+              ;; nil replacement = sub-expression failure → statement fails
+              (when-not (nil? r)
               (cond
                 ;; subscript assignment: (= (A k...) val) — mutate TABLE, ARRAY, or PDD
                 (and (list? N) (>= (count N) 2))
                 (let [[container-sym & ks] N
-                      container ($$ container-sym)]
+                      raw-container ($$ container-sym)
+                      ;; NAME indirect reference — dereference to the actual array/table
+                      container (if (instance? NAME raw-container)
+                                  ($$ (symbol (str (.n raw-container))))
+                                  raw-container)]
                   (cond
                     (table? container)
                     (table-set container (first ks) r)
@@ -199,7 +205,7 @@
                           r)]
                   (snobol-set! N v)
                   (fire-value! N v)
-                  v)))
+                  v))))
     ?=      (let [[n p R] args
                   subject (str (or ($$ n) ""))
                   pat     p                       ; already evaluated by EVAL! dispatch
@@ -311,7 +317,11 @@
     DATATYPE  (SNOBOL4clojure.env/DATATYPE (first args))
     datatype  (SNOBOL4clojure.env/DATATYPE (first args))
     quote   ($$ (second op))
-            (let [f ($$ op)]
+            (let [raw-f ($$ op)
+                  ;; NAME indirect reference — dereference to actual array/table
+                  f (if (instance? NAME raw-f)
+                      ($$ (symbol (str (.n raw-f))))
+                      raw-f)]
               (cond
                 (table? f) (table-get f (first args))   ; TABLE subscript read
                 (array? f) (array-get f (vec args))     ; ARRAY subscript read
@@ -336,7 +346,11 @@
       (string? E)  E
       (integer? E) E
       (symbol? E)  ($$ E)
-      (vector? E)  (apply list 'SEQ (map EVAL! E))
+      (vector? E)  (let [evaled (map EVAL! E)]
+                    ;; nil in any SEQ element = sub-expression failed → whole SEQ fails
+                    (if (some nil? evaled)
+                      nil
+                      (apply list 'SEQ evaled)))
       (list? E)
       (let [[op & parms] E]
         (cond
