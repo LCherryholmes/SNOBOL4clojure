@@ -64,7 +64,7 @@
 (defn ?=    ([n s p]    (match-replace n s p)))
 (defn &     ([_n]       nil)                     ; unary  — keyword
             ([_x _y]    η))                      ; binary — programmable
-(defn at    ([n]        (list 'cursor n))        ; unary  — cursor assign
+(defn at    ([n]        (list 'CURSOR-IMM! n))   ; unary  — cursor assign
             ([_x _y]    η))
 (defn +     ([x]        (n-1 Σ+ x))
             ([x y]      (n-2 Σ+ x y))
@@ -76,7 +76,7 @@
             ([_x _y]    η))
 (defn /     ([_x]       η)
             ([x y]      (n-2 divide x y)))
-(defn *     ([x]        (uneval x))              ; unary  — defer eval
+(defn *     ([x]        (list 'DEFER! (fn [] x)))    ; unary  — defer eval
             ([x y]      (n-2 multiply x y))
             ([x y & zs] (n-n multiply x y zs)))
 (defn %     ([_x]       η)
@@ -90,7 +90,7 @@
 (defn .     ([x]        (NAME. x))                    ; unary  — name
             ([x y]      (x-2 'CAPTURE-COND x y))      ; binary — conditional capture
             ([x y & zs] (x-n 'CAPTURE-COND x y zs)))
-(defn tilde ([x]        (list 'lie x))           ; unary  — negate
+(defn tilde ([x]        (list 'ALT x ε))              ; unary  — optional (~P = P | ε)
             ([_x _y]    η))
 (defn |     ([_x]       η)                       ; unary  — programmable
             ([x y]      (x-2 'ALT x y))          ; binary — alternation

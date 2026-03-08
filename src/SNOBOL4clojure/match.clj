@@ -400,6 +400,54 @@
             (swap! bag conj [(ζΔ ζ) (ζδ ζ)])
             (recur :recede (🡡 Ω) (🡧 Ω)))
           (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; -- CURSOR-IMM! ---------------------------------------------------------
+        ;; (@N): assign the current cursor position (integer) to variable N.
+        ;; Zero-width: succeeds without consuming input.  No backtrack alternative.
+        CURSOR-IMM!
+        (case action
+          (:proceed :succeed)
+          (do (snobol-set! (second (ζΠ ζ)) (ζδ ζ))
+              (recur :succeed (ζ↑ ζ (ζΣ ζ) (ζδ ζ)) Ω))
+          (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; -- CONJ! ---------------------------------------------------------------
+        ;; (CONJ! P Q): both P and Q must match same start-to-end span.
+        ;; Uses two synchronous engine calls rather than Omega frames.
+        ;; :proceed — run P via engine; if matched, run Q from same start;
+        ;;            if Q's end matches P's end, recur :succeed; else :fail.
+        ;; No :succeed/:fail/:recede cases — node is self-contained in :proceed.
+        CONJ!
+        (case action
+          :proceed
+          (let [[_ P Q] (ζΠ ζ)
+                pos0    (ζΔ ζ)
+                chars0  (ζΣ ζ)
+                p-result (engine chars0 pos0 P pos0 full-subject)]
+            (if p-result
+              (let [p-end (second p-result)
+                    q-result (engine chars0 pos0 Q pos0 full-subject)]
+                (if (clojure.core/= q-result p-result)
+                  (recur :succeed (ζ↑ ζ chars0 p-end) Ω)
+                  (recur :fail    (ζ↑ ζ (ζΣ ζ) pos0) Ω)))
+              (recur :fail (ζ↑ ζ (ζΣ ζ) pos0) Ω)))
+          (:succeed :fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; -- DEFER! --------------------------------------------------------------
+        ;; (*expr): deferred pattern — thunk is a (fn [] pattern) evaluated at
+        ;; match time, not build time.  Fixes eager-evaluation of guards like
+        ;; (EQ N 2) inside ALT branches.
+        DEFER!
+        (case action
+          :proceed
+          (let [thunk (second (ζΠ ζ))
+                P     (if (fn? thunk) (thunk) thunk)]
+            (recur :proceed (ζ↓ ζ P) (🡥 Ω ζ)))
+          :succeed (recur :succeed (ζ↑ ζ) Ω)
+          (:fail :recede)
           (recur :recede (🡡 Ω) (🡧 Ω)))))))
 
 ;; ── Public API ────────────────────────────────────────────────────────────────

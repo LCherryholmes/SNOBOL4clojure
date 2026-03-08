@@ -29,6 +29,15 @@
   ([]  (list 'FENCE!))
   ([P] (list 'FENCE! P)))
 
+;; ── Cursor assignment ─────────────────────────────────────────────────────────
+(defn CURSOR [N] (list 'CURSOR-IMM! N))  ; @N — assign cursor position to N
+
+;; ── Conjunction ───────────────────────────────────────────────────────────────
+(defn CONJ [P Q] (list 'CONJ! P Q))     ; P & Q — both must match same span
+
+;; ── Deferred pattern ──────────────────────────────────────────────────────────
+(defn DEFER [thunk] (list 'DEFER! thunk)) ; *expr — evaluate thunk at match time
+
 ;; ── Constant pattern values ───────────────────────────────────────────────────
 (def ARB     (list 'ARB!))
 (def BAL     (list 'BAL!))
