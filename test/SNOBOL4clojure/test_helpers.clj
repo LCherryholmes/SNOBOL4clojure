@@ -81,7 +81,7 @@
       (bisect-divergence src 1 100 'I #(clojure.core/= % 5))
   "
   (:require [clojure.test :refer [is]]
-            [SNOBOL4clojure.core :refer [RUN CODE CODE-memo]]))
+            [SNOBOL4clojure.core :refer [RUN CODE CODE-memo preprocess-includes]]))
 
 ;; ── Low-level timed executor ───────────────────────────────────────────────────
 
@@ -144,6 +144,23 @@
    Drop-in replacement for the bare (prog ...) macro in test files."
   [& lines]
   `(prog-timeout 2000 ~@lines))
+
+(defmacro prog-include
+  "Like prog but resolves -INCLUDE directives relative to include-dirs.
+   include-dirs is a seq of directory path strings (evaluated at runtime).
+   src is a single source string expression (evaluated at runtime).
+
+   Example:
+     (prog-include [\"corpus/gimpel/SNOBOL4\"]
+       \"-INCLUDE 'push.inc'\\n        OUTPUT = 'hello'\\nEND\")"
+  [include-dirs src]
+  `(let [raw#  ~src
+         src#  (preprocess-includes raw# ~include-dirs)
+         r#    (run-with-timeout src# 5000)]
+     (is (not (#{:timeout :step-limit} (:exit r#)))
+         (str "prog-include timed out or hit step-limit: "
+              (pr-str (first (clojure.string/split-lines raw#)))))
+     r#))
 
 (defmacro prog-infinite
   "Document that a program is EXPECTED to run forever.

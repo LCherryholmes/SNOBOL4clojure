@@ -165,6 +165,8 @@
 (def clear-memo!       comp/clear-memo!)
 (def memo-stats        comp/memo-stats)
 (def precompile-corpus! comp/precompile-corpus!)
+;; Sprint 25A — -INCLUDE preprocessor
+(def preprocess-includes comp/preprocess-includes)
 
 ;; ── -main ─────────────────────────────────────────────────────────────────────
 (defn -main "SNOBOL4/Clojure." [& _args]

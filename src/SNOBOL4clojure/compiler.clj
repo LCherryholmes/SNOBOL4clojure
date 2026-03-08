@@ -67,50 +67,108 @@
             :else
             (recur (inc i) (.append cur ch) stmts in-sq in-dq)))))))
 
+;; -- -INCLUDE preprocessor ----------------------------------------------------
+
+(defn preprocess-includes
+  "Recursively expand -INCLUDE 'file' (or -INCLUDE \"file\") directives.
+
+   Scans source line-by-line.  When a line matches (case-insensitive)
+     -INCLUDE 'filename'   or   -INCLUDE \"filename\"
+   it reads that file relative to each directory in search-path (first match
+   wins) and splices its content inline.  The include file is itself
+   preprocessed recursively.
+
+   Guards against infinite recursion via a seen-files set.
+
+   Parameters:
+     src          – SNOBOL4 source string
+     search-path  – seq of directory path strings; default [\".\"]
+     seen-files   – (internal) set of absolute paths already included
+
+   Returns the fully expanded source string."
+  ([src] (preprocess-includes src ["."]))
+  ([src search-path] (preprocess-includes src search-path #{}))
+  ([src search-path seen-files]
+   (let [include-re #"(?i)^\s*-include\s+['\"]([^'\"]+)['\"]"]
+     (->> (string/split-lines src)
+          (mapcat (fn [line]
+                    (if-let [[_ fname] (re-find include-re line)]
+                      ;; Locate the file on the search-path
+                      (let [found (some (fn [dir]
+                                         (let [f (clojure.java.io/file dir fname)]
+                                           (when (.exists f) f)))
+                                        search-path)]
+                        (if (nil? found)
+                          ;; File not found — keep the directive as a comment
+                          ;; so the compiler sees a harmless *-line
+                          [(str "* -INCLUDE not found: " fname)]
+                          (let [abs (.getCanonicalPath found)]
+                            (if (seen-files abs)
+                              [(str "* -INCLUDE skipped (cycle): " fname)]
+                              ;; Recursively expand the included file
+                              (string/split-lines
+                                (preprocess-includes
+                                  (slurp found)
+                                  ;; Add the include file's own directory to path
+                                  (distinct (cons (.getParent found) search-path))
+                                  (conj seen-files abs)))))))
+                      [line])))
+          (string/join "\n")))))
+
 ;; -- CODE! — parse source into {CODES NOS LABELS} ----------------------------
-(defn CODE! [S]
-  (let [raw-stmts (split-source (str S))]
-    (loop [stmts raw-stmts NO 1 CODES {} NOS {} LABELS {}]
-      (if (empty? stmts)
-        [CODES NOS LABELS]
-        (let [command (first stmts)]
-          (cond
-            (comment? command)(recur (rest stmts) NO CODES NOS LABELS)
-            (control? command)(recur (rest stmts) NO CODES NOS LABELS)
-            :else
-            (let [stmt   (string/replace command #"\r" "")
-                  ast    (parse-statement stmt)
-                  code   (emitter ast)]
-              (if (and (map? code) (:reason code))
-                (recur (rest stmts) (inc NO) (assoc CODES NO (error-node code)) NOS LABELS)
-                (let [label  (:label code)
-                      body   (:body  code)
-                      goto   (:goto  code)
-                      key    (if label label NO)
-                      code   (reduce #(conj %1 %2) [] [body goto])
-                      nos    (if (keyword? key) (assoc NOS   key NO) NOS)
-                      labels (if (keyword? key) (assoc LABELS NO key) LABELS)
-                      codes  (assoc CODES key code)]
-                  (recur (rest stmts) (inc NO) codes nos labels))))))))))
+(defn CODE!
+  "Compile SNOBOL4 source S into a [codes nos labels] triple.
+   Optional include-path is a seq of directory strings used to resolve
+   -INCLUDE directives (default [\".\"])."
+  ([S] (CODE! S ["."]))
+  ([S include-path]
+   (let [expanded  (preprocess-includes (str S) include-path)
+         raw-stmts (split-source expanded)]
+     (loop [stmts raw-stmts NO 1 CODES {} NOS {} LABELS {}]
+       (if (empty? stmts)
+         [CODES NOS LABELS]
+         (let [command (first stmts)]
+           (cond
+             (comment? command)(recur (rest stmts) NO CODES NOS LABELS)
+             (control? command)(recur (rest stmts) NO CODES NOS LABELS)
+             :else
+             (let [stmt   (string/replace command #"\r" "")
+                   ast    (parse-statement stmt)
+                   code   (emitter ast)]
+               (if (and (map? code) (:reason code))
+                 (recur (rest stmts) (inc NO) (assoc CODES NO (error-node code)) NOS LABELS)
+                 (let [label  (:label code)
+                       body   (:body  code)
+                       goto   (:goto  code)
+                       key    (if label label NO)
+                       code   (reduce #(conj %1 %2) [] [body goto])
+                       nos    (if (keyword? key) (assoc NOS   key NO) NOS)
+                       labels (if (keyword? key) (assoc LABELS NO key) LABELS)
+                       codes  (assoc CODES key code)]
+                   (recur (rest stmts) (inc NO) codes nos labels)))))))))))
 
 ;; -- CODE — compile and load into the global statement store ------------------
-(defn CODE [S]
-  (let [[codes nos labels] (CODE! S)
-        start              (inc @STNO)]
-    (loop [NO 1]
-      (if (> NO (count codes))
-        (if (and (@<LABL> start) (@<CODE> (@<LABL> start)))
-          (@<LABL> start)
-          (when (@<CODE> start) start))
-        (do
-          (swap! STNO inc)
-          (if-let [label (labels NO)]
-            (do
-              (swap! <CODE> #(assoc % label (codes label)))
-              (swap! <LABL> #(assoc % @STNO label))
-              (swap! <STNO> #(assoc % label @STNO)))
-            (swap! <CODE> #(assoc % @STNO (codes NO))))
-          (recur (inc NO)))))))
+(defn CODE
+  "Compile S and load into the global statement store.
+   Optional include-path is a seq of directory strings (default [\".\"])."
+  ([S] (CODE S ["."]))
+  ([S include-path]
+   (let [[codes nos labels] (CODE! S include-path)
+         start              (inc @STNO)]
+     (loop [NO 1]
+       (if (> NO (count codes))
+         (if (and (@<LABL> start) (@<CODE> (@<LABL> start)))
+           (@<LABL> start)
+           (when (@<CODE> start) start))
+         (do
+           (swap! STNO inc)
+           (if-let [label (labels NO)]
+             (do
+               (swap! <CODE> #(assoc % label (codes label)))
+               (swap! <LABL> #(assoc % @STNO label))
+               (swap! <STNO> #(assoc % label @STNO)))
+             (swap! <CODE> #(assoc % @STNO (codes NO))))
+           (recur (inc NO))))))))
 
 ;; -- Stage 23A: EDN serialisation --------------------------------------------
 
@@ -153,12 +211,14 @@
 
 (defn compile-to-file
   "Compile SNOBOL4 source src and write the IR as EDN to path.
+   Optional include-path is a seq of directory strings (default [\".\"])
    Returns the [codes nos labels] triple."
-  [src path]
-  (let [ir (CODE! src)]
-    (clojure.java.io/make-parents path)
-    (spit path (ir->edn ir))
-    ir))
+  ([src path] (compile-to-file src path ["."]))
+  ([src path include-path]
+   (let [ir (CODE! src include-path)]
+     (clojure.java.io/make-parents path)
+     (spit path (ir->edn ir))
+     ir)))
 
 (defn load-ir
   "Load a pre-compiled [codes nos labels] triple from an EDN file at path."
@@ -168,12 +228,14 @@
 (defn CODE-cached
   "Compile src and load into the statement store, using a disk EDN cache.
    If path exists: load from disk (skip grammar + emitter).
-   If path absent: compile src, save to path, then load."
-  [src path]
-  (let [ir (if (.exists (clojure.java.io/file path))
-              (load-ir path)
-              (compile-to-file src path))]
-    (CODE-ir ir)))
+   If path absent: compile src, save to path, then load.
+   Optional include-path is a seq of directory strings (default [\".\"])."
+  ([src path] (CODE-cached src path ["."]))
+  ([src path include-path]
+   (let [ir (if (.exists (clojure.java.io/file path))
+               (load-ir path)
+               (compile-to-file src path include-path))]
+     (CODE-ir ir))))
 
 ;; -- Stage 23A: In-memory memoised cache -------------------------------------
 ;;
@@ -187,18 +249,22 @@
 (defn CODE-memo
   "Memoised CODE: compile src exactly once per JVM session, then reuse the IR.
    Thread-safe. Drop-in replacement for CODE in test fixtures and harness.
+   Optional include-path is a seq of directory strings (default [\".\"])
 
    Side effects (loading into <CODE>/<STNO>/<LABL>) still happen on every call
    so that reset-runtime! between tests works correctly."
-  [src]
-  (let [cached (get-in @memo-cache [:cache src])]
-    (if cached
-      (do (swap! memo-cache update :hits inc)
-          (CODE-ir cached))
-      (do (swap! memo-cache update :misses inc)
-          (let [ir (CODE! src)]
-            (swap! memo-cache update :cache assoc src ir)
-            (CODE-ir ir))))))
+  ([src] (CODE-memo src ["."]))
+  ([src include-path]
+   ;; Cache key includes include-path so different paths compile separately
+   (let [cache-key [src include-path]
+         cached    (get-in @memo-cache [:cache cache-key])]
+     (if cached
+       (do (swap! memo-cache update :hits inc)
+           (CODE-ir cached))
+       (do (swap! memo-cache update :misses inc)
+           (let [ir (CODE! src include-path)]
+             (swap! memo-cache update :cache assoc cache-key ir)
+             (CODE-ir ir)))))))
 
 (defn clear-memo!
   "Evict all entries from the in-memory IR cache."
