@@ -16,7 +16,8 @@
             [SNOBOL4clojure.runtime    :as rt]
             [SNOBOL4clojure.trace      :as trace]
             [SNOBOL4clojure.transpiler :as xpile]
-            [SNOBOL4clojure.vm         :as vm])
+            [SNOBOL4clojure.vm         :as vm]
+            [SNOBOL4clojure.jvm-codegen :as jvmc])
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── Re-export env ─────────────────────────────────────────────────────────────
@@ -192,6 +193,15 @@
 (def OP-EXEC-SF         vm/OP-EXEC-SF)
 (def OP-JUMP            vm/OP-JUMP)
 (def OP-SIGNAL          vm/OP-SIGNAL)
+
+;; ── Re-export JVM codegen (Stage 23D) ───────────────────────────────────────
+(def compile-to-class    jvmc/compile-to-class)
+(def load-program        jvmc/load-program)
+(def run-jvm!            jvmc/run-jvm!)
+(def run-jvm-captured!   jvmc/run-jvm-captured!)
+(def bench-compare-jvm   jvmc/bench-compare-jvm)
+(def clear-class-cache!  jvmc/clear-class-cache!)
+(def jvm-gen-class-name  jvmc/gen-class-name)
 
 ;; ── Re-export trace API ───────────────────────────────────────────────────────
 ;; These are available to SNOBOL4 programs via INVOKE and to Clojure tests.
