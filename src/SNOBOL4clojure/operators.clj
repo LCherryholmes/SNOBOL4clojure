@@ -9,9 +9,9 @@
               table? table-get table-set
               array? array-get array-set array-prototype
               snobol-return! snobol-freturn! snobol-nreturn!
-              <FUNS>]]
+              <FUNS> <FDEFS>]]
             [SNOBOL4clojure.functions :refer
-             [ASCII REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE
+             [ASCII CHAR DATE TIME REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE SUBSTR
               ITEM PROTOTYPE CONVERT COPY FIELD SORT RSORT DATA]]
             [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH]]
             [SNOBOL4clojure.patterns  :refer
@@ -288,7 +288,9 @@
                                 :nreturn nil
                                 result)))))]   ; fall-through = return
                 (snobol-set! f-sym the-fn)
-                (swap! <FUNS> assoc (clojure.string/upper-case fname) the-fn)
+                (swap! <FUNS>  assoc (clojure.string/upper-case fname) the-fn)
+                (swap! <FDEFS> assoc (clojure.string/upper-case fname)
+                               {:params params :locals locals})
                 ε))
     define  (apply INVOKE 'DEFINE args)
     APPLY   (apply APPLY (first args) (rest args))
@@ -307,8 +309,6 @@
     TRIM    (TRIM   (first args))
     DUPL    (DUPL   (first args) (second args))
     REVERSE (REVERSE (first args))
-    LPAD    (LPAD   (first args) (second args))
-    RPAD    (RPAD   (first args) (second args))
     ITEM      (ITEM      (first args) (second args))
     item      (ITEM      (first args) (second args))
     PROTOTYPE (PROTOTYPE (first args))
@@ -327,6 +327,41 @@
     data      (DATA      (first args))
     DATATYPE  (SNOBOL4clojure.env/DATATYPE (first args))
     datatype  (SNOBOL4clojure.env/DATATYPE (first args))
+    ;; String functions missing from original dispatch
+    CHAR      (CHAR      (first args))
+    char      (CHAR      (first args))
+    SUBSTR    (SUBSTR    (first args) (second args) (nth args 2))
+    substr    (SUBSTR    (first args) (second args) (nth args 2))
+    DATE      (DATE)
+    date      (DATE)
+    TIME      (TIME)
+    time      (TIME)
+    ;; LPAD/RPAD with optional 3rd fill-char arg (functions.clj handles both arities)
+    LPAD      (apply LPAD args)
+    lpad      (apply LPAD args)
+    RPAD      (apply RPAD args)
+    rpad      (apply RPAD args)
+    ;; String comparisons (lexicographic) — were defined by primitive macro but missing here
+    LEQ       (LEQ    (first args) (second args))
+    leq       (LEQ    (first args) (second args))
+    LNE       (LNE    (first args) (second args))
+    lne       (LNE    (first args) (second args))
+    LLE       (LLE    (first args) (second args))
+    lle       (LLE    (first args) (second args))
+    LLT       (LLT    (first args) (second args))
+    llt       (LLT    (first args) (second args))
+    LGE       (LGE    (first args) (second args))
+    lge       (LGE    (first args) (second args))
+    ;; ARG(fname, n) — nth parameter name of function fname (1-based)
+    ARG       (let [[fname n] args
+                    meta (get @<FDEFS> (clojure.string/upper-case (str fname)))]
+                (when meta (nth (:params meta) (dec (long n)) nil)))
+    arg       (apply INVOKE 'ARG args)
+    ;; LOCAL(fname, n) — nth local variable name of function fname (1-based)
+    LOCAL     (let [[fname n] args
+                    meta (get @<FDEFS> (clojure.string/upper-case (str fname)))]
+                (when meta (nth (:locals meta) (dec (long n)) nil)))
+    local     (apply INVOKE 'LOCAL args)
     quote   ($$ (second op))
             (let [raw-f ($$ op)
                   ;; NAME indirect reference — dereference to actual array/table

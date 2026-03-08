@@ -16,9 +16,21 @@
 (defn DUPL    [x i]   (apply str (repeat i x)))  ; string only for now
 (defn TRIM    [s]     (clojure.string/trimr (str s)))
 (defn REVERSE [s]     (apply str (clojure.string/reverse s)))
-(defn LPAD    [s n]   (clojure.string/join (concat (repeat (subtract n (count s)) \space) [s])))
-(defn RPAD    [s n]   (clojure.string/join (concat [s] (repeat (subtract n (count s)) \space))))
-(defn SUBSTR  [s i j] (subs s i j))
+(defn LPAD
+  ([s n]        (LPAD s n " "))
+  ([s n fill]   (let [s-str  (str s)
+                      pad    (clojure.core/- (long n) (count s-str))
+                      fill-c (str (first (str fill)))]
+                  (if (clojure.core/<= pad 0) s-str
+                    (str (apply str (repeat pad fill-c)) s-str)))))
+(defn RPAD
+  ([s n]        (RPAD s n " "))
+  ([s n fill]   (let [s-str  (str s)
+                      pad    (clojure.core/- (long n) (count s-str))
+                      fill-c (str (first (str fill)))]
+                  (if (clojure.core/<= pad 0) s-str
+                    (str s-str (apply str (repeat pad fill-c)))))))
+(defn SUBSTR  [s i j] (subs (str s) (dec (long i)) (clojure.core/+ (dec (long i)) (long j))))
 (defn CONVERT [x t]
   "CONVERT(x, type) — coerce x to the named SNOBOL4 type.
    Returns nil (failure) if the conversion is not defined."
@@ -273,12 +285,21 @@
         f-fn  (SNOBOL4clojure.env/$$ f-sym)]
     (when (fn? f-fn)
       (apply f-fn fargs))))
-(defn ARG    [] nil)
-(defn DEFINE [] nil)
-(defn LOAD   [] nil)
-(defn LOCAL  [] nil)
-(defn OPSYN  [] nil)
-(defn UNLOAD [] nil)
+(defn ARG
+  "ARG(fname, n) — return the name of the nth parameter of function fname (1-based).
+   Returns nil (statement failure) if fname unknown or n out of range."
+  [fname n]
+  (when-let [meta (get @SNOBOL4clojure.env/<FDEFS>
+                       (clojure.string/upper-case (str fname)))]
+    (nth (:params meta) (dec (long n)) nil)))
+
+(defn LOCAL
+  "LOCAL(fname, n) — return the name of the nth local variable of function fname (1-based).
+   Returns nil (statement failure) if fname unknown or n out of range."
+  [fname n]
+  (when-let [meta (get @SNOBOL4clojure.env/<FDEFS>
+                       (clojure.string/upper-case (str fname)))]
+    (nth (:locals meta) (dec (long n)) nil)))
 
 ;; ── Table / array functions ───────────────────────────────────────────────────
 (defn ITEM

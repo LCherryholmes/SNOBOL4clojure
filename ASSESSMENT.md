@@ -1,8 +1,8 @@
 # SNOBOL4clojure — Feature Assessment
 
-**Baseline:** 1865 tests / 4018 assertions / 0 failures  
-**Commit:** `875762c` (Stage 23D — JVM bytecode generation)  
-**Last updated:** Session 13d
+**Baseline:** 1906 tests / 4100 assertions / 0 failures  
+**Commit:** `ce19ae6` → Sprint 24 (complete function parity)  
+**Last updated:** Session 13e
 
 ---
 
@@ -47,8 +47,8 @@
 | `TRIM` | ✅ | `t_string.clj` — 3 cases |
 | `REVERSE` | ✅ | `t_string.clj` — 3 cases |
 | `DUPL` | ✅ | `t_string.clj` — 3 cases |
-| `LPAD` `RPAD` | ✅ | `test_cooper.clj` — 3 cases each; 3-arg fill-char form |
-| `SUBSTR` | 🟡 | Works; used throughout `t_worm_*` but no dedicated catalog file |
+| `LPAD` `RPAD` | ✅ | `test_cooper.clj` + `t_missing.clj` — 2-arg and 3-arg fill-char form |
+| `SUBSTR` | ✅ | `t_missing.clj` — 6 cases including loop |
 | `REPLACE` | ✅ | `t_convert.clj` — 5 cases |
 
 ---
@@ -173,12 +173,15 @@
 
 ## Gap Summary
 
-### Needs INVOKE wiring (exists, just not dispatched)
-`LEQ` `LNE` `LLE` `LLT` `LGE` — defined via `primitive` macro, not in the `INVOKE` case table.
-Any SNOBOL4 program calling these falls through to user-function lookup (accidentally works but fragile).
-
-### Genuine stubs (no-ops, silently accepted)
-`ARG`, `LOCAL`, `BACKSPACE`, `DETACH`, `EJECT`, `ENDFILE`, `REWIND`, `COLLECT`, `DUMP`, `CLEAR`, `EXIT`, `HOST`, `SETEXIT`, `STOPTR`, `LOAD`, `UNLOAD`, `OPSYN`
+### Remaining stubs (no-ops, silently accepted)
+`BACKSPACE`, `DETACH`, `EJECT`, `ENDFILE`, `REWIND`, `COLLECT`, `DUMP`, `CLEAR`, `EXIT`, `HOST`, `SETEXIT`, `STOPTR`, `LOAD`, `UNLOAD`, `OPSYN`
 
 ### No dedicated catalog tests (works, only incidentally exercised)
-`SUBSTR`, `NSPAN`, `LEQ`/`LNE`/`LLE`/`LLT`/`LGE`
+`NSPAN`
+
+### Fixed this session (Sprint 24)
+- `LEQ` `LNE` `LLE` `LLT` `LGE` — added to INVOKE dispatch; 15 catalog tests
+- `CHAR` `SUBSTR` `DATE` `TIME` — added to INVOKE dispatch; 9 catalog tests
+- `LPAD` `RPAD` 3-arg form — functions.clj upgraded to accept fill-char; 6 catalog tests
+- `SUBSTR` — fixed to be 1-based with length arg (was 0-based); 6 catalog tests
+- `ARG` `LOCAL` — fully implemented using `<FDEFS>` registry populated at DEFINE time; 8 catalog tests

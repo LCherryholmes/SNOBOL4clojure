@@ -60,6 +60,11 @@
 ;; find the function even while the result slot holds ε or an intermediate value.
 (def <FUNS>  (atom {}))
 
+;; Registry of function parameter and local-variable metadata.
+;; Populated by DEFINE; read by ARG() and LOCAL().
+;; Shape: {"FNAME" {:params ["P1" "P2"] :locals ["L1"]}}
+(def <FDEFS> (atom {}))
+
 ;; ── NAME type: mutable named reference (SNOBOL4 . operator) ──────────────────
 (definterface &NAME (n []) (n [_]))
 (deftype NAME [^:unsynchronized-mutable n] &NAME
@@ -93,7 +98,8 @@
    Mirrors GLOBALS(globals()) in SNOBOL4python."
   [ns]
   (reset! snobol-ns ns)
-  (reset! <FUNS> {}))
+  (reset! <FUNS>  {})
+  (reset! <FDEFS> {}))
 
 (defn- active-ns
   "Return the authoritative SNOBOL4 namespace.
