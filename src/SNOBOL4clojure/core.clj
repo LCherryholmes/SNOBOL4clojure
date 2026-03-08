@@ -121,6 +121,7 @@
 (def EVAL  ops/EVAL)
 (def EVAL! ops/EVAL!)
 (def INVOKE ops/INVOKE)
+(def APPLY  ops/APPLY)
 
 ;; ── Re-export functions ───────────────────────────────────────────────────────
 (def SIZE    fns/SIZE)

@@ -7,7 +7,8 @@
              [ε η equal not-equal Σ+ subtract multiply divide
               ncvt scvt num $$ out reference snobol-set!
               table? table-get table-set
-              array? array-get array-set array-prototype]]
+              array? array-get array-set array-prototype
+              snobol-return! snobol-freturn! snobol-nreturn!]]
             [SNOBOL4clojure.functions :refer
              [ASCII REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE
               ITEM PROTOTYPE CONVERT COPY FIELD SORT RSORT DATA]]
@@ -22,6 +23,8 @@
 ;; ── Numeric conversion macros ─────────────────────────────────────────────────
 (defmacro numcvt [x] `(ncvt ~x))
 (defmacro uneval [x] `(if (list? ~x) ~x (list 'identity ~x)))
+
+(declare APPLY)
 
 ;; ── Operator helpers ──────────────────────────────────────────────────────────
 (defn annihilate    [_x]        nil)
@@ -187,31 +190,68 @@
                 (do (snobol-set! N r) r)))
     ?=      (let [[n _p R] args, r (EVAL! R)]
               (snobol-set! n (trace r)) r)
-    DEFINE  (let [[proto] args
-                  spec    (apply vector (re-seq #"[0-9A-Z_a-z]+" proto))
-                  fname   (first spec)
-                  params  (subvec spec 1)
-                  f-sym   (symbol fname)
-                  ;; Store fn under a private key so result slot doesn't clobber it
-                  fn-key  (symbol (str fname "__fn__"))
-                  entry   (keyword fname)]
+    DEFINE  (let [[proto entry-arg] args
+                  ;; Parse: 'fname(p1,p2,...)l1,l2,...'  or  'fname(p1,...)'
+                  lp        (.indexOf ^String proto "(")
+                  rp        (.indexOf ^String proto ")")
+                  fname     (if (>= lp 0) (.substring ^String proto 0 lp) proto)
+                  inner     (if (and (>= lp 0) (>= rp 0))
+                              (.substring ^String proto (inc lp) rp) "")
+                  after-rp  (if (>= rp 0) (.substring ^String proto (inc rp)) "")
+                  params    (if (clojure.string/blank? inner) []
+                              (mapv clojure.string/trim
+                                    (clojure.string/split inner #",")))
+                  locals    (if (clojure.string/blank? after-rp) []
+                              (let [s (clojure.string/trim after-rp)]
+                                (if (clojure.string/blank? s) []
+                                  (mapv clojure.string/trim
+                                        (clojure.string/split s #",")))))
+                  f-sym     (symbol fname)
+                  ;; Entry point: explicit .label arg, or keyword from fname
+                  entry     (if (and (>= (count args) 2) entry-arg)
+                              ;; entry-arg may be a NAME (symbol) from (.label) notation
+                              (if (symbol? entry-arg)
+                                (keyword (str (name entry-arg)))
+                                (keyword (str entry-arg)))
+                              (keyword fname))
+                  all-saved (into params locals)]
               (letfn [(the-fn [& call-args]
-                        ;; Bind each parameter to its argument value
-                        (doseq [i (range (count params))]
-                          (snobol-set! (symbol (params i))
-                                       (nth call-args i ε)))
-                        ;; Clear the result slot (function name var holds return value)
-                        (snobol-set! f-sym ε)
-                        ;; Run from entry label
-                        (when-let [run-fn (ns-resolve 'SNOBOL4clojure.runtime 'RUN)]
-                          ((var-get run-fn) entry))
-                        ;; Return value of function-name variable
-                        (let [result ($$ f-sym)]
-                          ;; Restore fn reference so future calls work
-                          (snobol-set! f-sym the-fn)
-                          result))]
+                        ;; Save current values of params + locals
+                        (let [saved (zipmap all-saved (map #($$ (symbol %)) all-saved))]
+                          ;; Bind parameters to call arguments
+                          (doseq [i (range (count params))]
+                            (snobol-set! (symbol (params i))
+                                         (nth call-args i ε)))
+                          ;; Clear locals
+                          (doseq [l locals]
+                            (snobol-set! (symbol l) ε))
+                          ;; Clear the result slot
+                          (snobol-set! f-sym ε)
+                          ;; Run from entry label; catch RETURN/FRETURN/NRETURN
+                          (let [run-fn  (ns-resolve 'SNOBOL4clojure.runtime 'RUN)
+                                outcome (try
+                                          (when run-fn ((var-get run-fn) entry))
+                                          :return   ; normal fall-through = return
+                                          (catch clojure.lang.ExceptionInfo e
+                                            (get (ex-data e) :snobol/signal :return)))]
+                            ;; Collect result before restoring
+                            (let [result ($$ f-sym)]
+                              ;; Restore saved values
+                              (doseq [[k v] saved]
+                                (snobol-set! (symbol k) v))
+                              ;; Restore fn reference
+                              (snobol-set! f-sym the-fn)
+                              ;; Dispatch on outcome
+                              (case outcome
+                                :return  result
+                                :freturn nil    ; nil → statement failure → :F branch
+                                :nreturn nil
+                                result)))))]   ; fall-through = return
                 (snobol-set! f-sym the-fn)
                 ε))
+    define  (apply INVOKE 'DEFINE args)
+    APPLY   (apply APPLY (first args) (rest args))
+    apply   (apply APPLY (first args) (rest args))
     REPLACE (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))
     TABLE   (apply SNOBOL4clojure.env/TABLE args)
     table   (apply SNOBOL4clojure.env/TABLE args)
@@ -253,6 +293,14 @@
                 (array? f) (array-get f (vec args))     ; ARRAY subscript read
                 (fn? f)    (apply f args)
                 :else      ε))))
+
+;; ── APPLY ─────────────────────────────────────────────────────────────────────
+(defn APPLY
+  "APPLY(fname, arg1, ...) — call a named function by string."
+  [fname & fargs]
+  (let [f-fn ($$ (symbol (str fname)))]
+    (when (fn? f-fn)
+      (apply f-fn fargs))))
 
 ;; ── EVAL! / EVAL ─────────────────────────────────────────────────────────────
 (defn EVAL! [E]

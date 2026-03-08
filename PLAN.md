@@ -87,9 +87,9 @@ namespace the user handed it via `env/GLOBALS`, `env/active-ns`,
 | Sprint 10 | `5a89477` | 139/431 | ~P optional, @N cursor, CONJ P&Q, *expr deferred |
 | Sprint 11a | `506d66f` | 151/447 | TABLE: atom-backed, subscript read/write <>/[], ITEM, PROTOTYPE |
 | Sprint 11b | `d75986c` | 166/467 | ARRAY: SnobolArray, multi-dim, bounds-checked, default value, PROTOTYPE |
-| Sprint 12  | `3af1ffb` | 206/529 | CONVERT full matrix, DATA/FIELD (map-based PDD), SORT/RSORT, COPY, DATATYPE via INVOKE |
+| Sprint 13  | TBD        | 220/548 | RETURN/FRETURN/END signals, DEFINE locals, APPLY, num nil-guard, uppercase-only keyword rule |
 
-**Current baseline**: 206 tests / 529 assertions / 0 failures
+**Current baseline**: 220 tests / 548 assertions / 0 failures
 
 ---
 
@@ -156,12 +156,11 @@ variable operations. Tests call it in a `:each` fixture:
 
 | # | Issue | File |
 |---|-------|------|
-| 1 | CAPTURE-COND deferred semantics -- . assigns immediately like $; deferred-assign infra not yet built | match.clj |
-| 2 | ANY(multi-arg) inside EVAL string -- ClassCastException | operators.clj |
-| 3 | File I/O -- DETACH, REWIND, ENDFILE are stubs | functions.clj |
-| 4 | charset range expansion -- (charset "A-Za-z") treats - as literal | primitives.clj |
-| 5 | goto case-insensitive -- :s(x) / :f(x) lowercase not parsed | grammar.clj |
-| 6 | PDD field write when accessor name shadows Clojure fn (e.g. REAL) — works via INVOKE but raw `(REAL x)` eval would shadow | operators.clj |
+| 1 | CAPTURE-COND deferred semantics — `.` assigns immediately like `$`; deferred-assign infra not yet built | match.clj |
+| 2 | ANY(multi-arg) inside EVAL string — ClassCastException | operators.clj |
+| 3 | File I/O — DETACH, REWIND, ENDFILE are stubs | functions.clj |
+| 4 | Charset range expansion — `ANY("A-Z")` treats `-` as literal | primitives.clj |
+| 6 | PDD field write when accessor name shadows Clojure fn (e.g. REAL) | operators.clj |
 
 ---
 
@@ -185,17 +184,203 @@ TABLE → sorted Nx2 ARRAY (ascending/descending by value string representation)
 
 ---
 
-## Sprint 13 Plan -- I/O & Runtime
+## Sprint 13 — I/O & Runtime  ✅ COMPLETE (220/548)
 
-FRETURN, NRETURN, APPLY, ENDFILE/REWIND/DETACH, END label,
-goto case-insensitive fix.
+### Design decision (this sprint)
+**All SNOBOL4 language keywords are UPPERCASE. No case folding. Ever.**
+`:(RETURN)` `:(FRETURN)` `:(NRETURN)` `:(END)` `:S(x)` `:F(x)` — uppercase only.
+Variable names are case-sensitive (`x` ≠ `X`) but that is the user's concern.
+This was a deliberate simplification that removes an entire class of ambiguity.
+
+### What was done
+- `:(RETURN)` / `:(FRETURN)` / `:(NRETURN)` — exception-based signals
+  (`snobol-return!` / `snobol-freturn!` / `snobol-nreturn!` in `env.clj`)
+- DEFINE — full local variable save/restore; parses `'F(params)locals'`
+- APPLY — call any function (built-in or DEFINE'd) by name-string
+- `:(END)` / bare `end` label — halts execution cleanly
+- `num` guarded against nil input (→ `##NaN`) — fixes NPE on wrong-arity calls
+- Reverted grammar case-insensitive change (uppercase-only is the rule)
 
 ---
 
-## Sprint 14 Plan -- Full Program Validation
+## Sprint 14 — SPITBOL Harness  ⬜ PLANNED
 
-Port a non-trivial reference SNOBOL4 program end-to-end and validate output
-against the C or .NET reference implementation.
+### Goal
+A working diff harness: given any `.sbl` source file, run it under both
+SPITBOL and SNOBOL4clojure, capture output, diff, record pass/fail.
+
+### Context
+- SPITBOL binary: `/usr/local/bin/spitbol` (installed from x64-main, v4.0f)
+- Run as: `echo "$src" | spitbol -b -` → stdout is the oracle
+- SNOBOL4clojure side: `(CODE src)` then `(RUN 1)`, capture `OUTPUT$`/`TERMINAL$`
+
+### Tasks
+- [ ] 14.1  Shell wrapper `tools/spitbol-run.sh` — takes `.sbl` file, returns
+      normalised stdout (trim trailing whitespace, normalise line endings)
+- [ ] 14.2  Clojure harness ns `SNOBOL4clojure.harness` —
+      `(run-spitbol src)` / `(run-clojure src)` / `(diff-run src)`
+- [ ] 14.3  OUTPUT capture — wire `OUTPUT$` writes to a StringBuilder so
+      `run-clojure` returns a string matching SPITBOL stdout
+- [ ] 14.4  Step limit — honour `&STLIMIT` (default 250 000) to kill
+      infinite loops in generated programs
+- [ ] 14.5  Smoke test harness against 5 hand-picked `.sbl` programs
+- [ ] 14.6  Commit + push
+
+---
+
+## Sprint 15 — Gimpel Corpus  ⬜ PLANNED
+
+### Goal
+Run the ~100 Gimpel SPITBOL algorithms through the harness; record
+pass/fail; fix regressions found.
+
+### Context
+- Source: `/tmp/gimpel/SPITBOL/*.INC` and `*.SPT`
+- These use `-INCLUDE` directives — harness must inline includes before
+  passing to SNOBOL4clojure (SNOBOL4clojure has no preprocessor yet)
+- Many programs use `OPSYN`, `LOAD`, file I/O — these will fail; that is
+  expected and should be recorded as known-skip, not regression
+
+### Tasks
+- [ ] 15.1  Include inliner — `tools/inline-includes.sh` or Clojure fn
+      that recursively expands `-INCLUDE 'file'` directives
+- [ ] 15.2  Batch runner — iterate all `*.SPT` files; run harness; write
+      `reports/gimpel-results.edn` with `{:file :spitbol-out :clojure-out :status}`
+- [ ] 15.3  Triage results — categorise each failure:
+      (a) missing built-in, (b) I/O, (c) OPSYN/LOAD, (d) genuine bug
+- [ ] 15.4  Fix category (d) bugs; re-run; iterate
+- [ ] 15.5  Simple standalone programs that pass become permanent regression tests
+- [ ] 15.6  Commit corpus results + any fixes
+
+### Programs most likely to work early (no I/O, no OPSYN)
+`HSORT.INC`, `BSORT.INC`, `MSORT.INC`, `SSORT.INC`, `LSORT.INC`,
+`TSORT.INC`, `FRSORT.INC`, `REVERSE.INC`, `ROMAN.INC`, `HEX.INC`,
+`BASE10.INC`, `BASEB.INC`, `COMB.INC`, `PERM.INC`, `FACTORIAL` variants
+
+---
+
+## Sprint 16 — Shafto AI Corpus  ⬜ PLANNED
+
+### Goal
+Run the Shafto AI programs (SNOLISPIST, Wang, ATN, Kalah, HSORT) through
+the harness with sample input files.
+
+### Context
+- Source: `/tmp/aisnobol/*.SPT`
+- Input files: `*.IN` (e.g. `WANG.IN`, `ATN.IN`, `HSORT.IN`)
+- These are larger, more complex programs; many use SNOLISPIST core/library
+- SPITBOL versions (`.SPT`) are the ones to target
+
+### Tasks
+- [ ] 16.1  Run `WANG.SPT` + `WANG.IN` through harness (theorem prover — pure computation)
+- [ ] 16.2  Run `HSORT.SPT` + `HSORT.IN` (standalone sort — simplest)
+- [ ] 16.3  Run `ENDING.SPT` + `ENDING.IN` (word endings — string manipulation)
+- [ ] 16.4  Attempt `TEST.SPT` (SNOLISPIST test suite — needs core + lib inlined)
+- [ ] 16.5  Fix regressions found; commit
+
+---
+
+## Sprint 17 — Grammar-Based Test Generator  ⬜ PLANNED
+
+### Design — two-tier (from Expressions.py reference)
+
+The generator mirrors the structure of `Expressions.py` (L. Cherryholmes):
+
+**Tier 1 — `rand-*` probabilistic sampling** (weighted toward terminals):
+```clojure
+(rand-expr)    ; random expression, biased 70% terminal / 30% recurse
+(rand-stmt)    ; random statement
+(rand-program) ; 1..N statements + "end"
+```
+
+**Tier 2 — `gen-*` exhaustive lazy sequences** (systematic, every form):
+```clojure
+(gen-literal)  ; "42", "3.14", "'hello'", "''"
+(gen-varname)  ; "A", "B", "X", "Y"  (short uppercase names)
+(gen-expr)     ; lazy-seq of all expressions at increasing depth
+(gen-pattern)  ; LEN(n), ANY('abc'), literal, concatenation
+(gen-stmt)     ; assignment | match | match-replace | bare subject
+(gen-program)  ; lazy-seq of complete programs
+```
+
+**Outcome schema** — captures ALL possible outcomes, not just pass/value:
+```clojure
+{:src        "        X = 1/0\nend"
+ :spitbol    {:stdout "" :stderr "...division by zero..." :exit 1}
+ :clojure    {:stdout "" :thrown "ArithmeticException" :exit :error}
+ :status     :pass          ; :pass :pass-class :fail :timeout :skip
+ :length     7
+ :depth      2}
+```
+
+**Status classes:**
+- `:pass`       — stdout identical
+- `:pass-class` — both errored (messages may differ)
+- `:fail`       — one succeeded, one failed (or different output)
+- `:timeout`    — either side exceeded `&STLIMIT` (recorded, not a failure)
+- `:skip`       — SPITBOL itself crashed (discard from corpus)
+
+**Termination guard**: inject `&STLIMIT = 10000` at top of every generated program.
+
+### Tasks
+- [ ] 17.1  `src/SNOBOL4clojure/generator.clj` — `rand-*` + `gen-*` fns
+- [ ] 17.2  `src/SNOBOL4clojure/harness.clj` — `run-spitbol` / `run-clojure` / `diff-run`
+- [ ] 17.3  Length-filtered sampler — `(sample-programs depth-range length-bands K)`
+- [ ] 17.4  Corpus store — `resources/golden-corpus.edn`
+- [ ] 17.5  Corpus test loader — auto-generates `deftest` per golden entry
+- [ ] 17.6  Initial run: depth 1-4, all length bands, K=50 → ~1000 programs
+- [ ] 17.7  Commit corpus + generator
+
+---
+
+## Sprint 18 — I/O & File Channels  ⬜ PLANNED
+
+### Goal
+Real file I/O: INPUT/OUTPUT channel association, ENDFILE, REWIND, DETACH.
+Required before many Gimpel programs can run end-to-end.
+
+### Tasks
+- [ ] 18.1  `INPUT(varname, channel, filename)` — associate var with file read
+- [ ] 18.2  `OUTPUT(varname, channel, filename)` — associate var with file write
+- [ ] 18.3  Channel read — on `$$ 'varname'` for an input-associated var,
+      read next line from file
+- [ ] 18.4  `ENDFILE(channel)` — close + signal EOF
+- [ ] 18.5  `REWIND(channel)` — seek to start of file
+- [ ] 18.6  `DETACH(varname)` — disassociate variable from channel
+- [ ] 18.7  Re-run Gimpel batch; record new pass count
+- [ ] 18.8  Commit
+
+---
+
+## Sprint 19 — OPSYN & LOAD  ⬜ PLANNED
+
+### Goal
+`OPSYN` (operator/function aliasing) and `LOAD` (external function load).
+Required for several Gimpel programs that redefine operators.
+
+### Tasks
+- [ ] 19.1  `OPSYN(new, old, nargs)` — create alias in INVOKE dispatch table
+- [ ] 19.2  `LOAD(spec, libpath)` — stub that fails gracefully (real DL load
+      is out of scope; many Gimpel SPT versions avoid OPSYN already)
+- [ ] 19.3  Re-run Gimpel batch; record improvement
+- [ ] 19.4  Commit
+
+---
+
+## Sprint 20 — Full Validation & Release  ⬜ PLANNED
+
+### Goal
+Passing rate ≥ 80% of Gimpel programs that don't require LOAD.
+Golden corpus ≥ 5 000 programs, all green.
+PLAN.md complete. README written. Tag v1.0.
+
+### Tasks
+- [ ] 20.1  Final Gimpel batch run; triage all remaining failures
+- [ ] 20.2  Final Shafto batch run
+- [ ] 20.3  Generator: depth 5-6, expand corpus to ~6 000
+- [ ] 20.4  All open issues resolved or explicitly deferred with rationale
+- [ ] 20.5  README.md written: what it is, how to run, known limitations
+- [ ] 20.6  Tag v1.0, push
 
 ---
 

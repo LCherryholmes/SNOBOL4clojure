@@ -266,7 +266,13 @@
 (defn TRACE   [] nil)
 
 ;; ── Function definition stubs ─────────────────────────────────────────────────
-(defn APPLY  [] nil)
+(defn APPLY
+  "APPLY(fname, arg1, ...) — call a named function by string/symbol."
+  [fname & fargs]
+  (let [f-sym (symbol (str fname))
+        f-fn  (SNOBOL4clojure.env/$$ f-sym)]
+    (when (fn? f-fn)
+      (apply f-fn fargs))))
 (defn ARG    [] nil)
 (defn DEFINE [] nil)
 (defn LOAD   [] nil)

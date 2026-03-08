@@ -59,9 +59,10 @@
 ;; ── Numeric conversion ────────────────────────────────────────────────────────
 (defn num [x]
   (cond
+    (nil? x)   ##NaN
     (double? x)  x
     (integer? x) (.doubleValue x)
-    true (try (Double/parseDouble x)
+    true (try (Double/parseDouble (str x))
            (catch NumberFormatException _ ##NaN))))
 
 (defn  ncvt [x] (list 'num x))
@@ -181,7 +182,13 @@
   (clojure.string/join "," (map (fn [[lo hi]] (str lo ":" hi)) (:dims arr))))
 
 
-;; ── DATATYPE dispatch ─────────────────────────────────────────────────────────
+;; ── SNOBOL4 control-flow signals ────────────────────────────────────────────
+;; Used to unwind the call stack from :(RETURN), :(FRETURN), :(NRETURN), :(END)
+;; These are ex-info maps thrown as exceptions and caught by DEFINE's wrapper.
+(defn snobol-return!  [] (throw (ex-info "RETURN"  {:snobol/signal :return})))
+(defn snobol-freturn! [] (throw (ex-info "FRETURN" {:snobol/signal :freturn})))
+(defn snobol-nreturn! [] (throw (ex-info "NRETURN" {:snobol/signal :nreturn})))
+(defn snobol-end!     [] (throw (ex-info "END"     {:snobol/signal :end})))
 ;; Maps JVM class names to SNOBOL4 type names.
 (defmulti  DATATYPE (fn [X] (str (class X))))
 (defmethod DATATYPE "class java.lang.Character"                   [_] "STRING")
