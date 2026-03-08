@@ -176,7 +176,8 @@ reading the source is faster and more reliable than trial and error.
 | ARBNO node execution in SPITBOL | `spitbol-src/.../bootstrap/sbl.asm` `p_aba`/`p_abc`/`p_abd` ~line 4694 |
 | FENCE/ABORT/BAL nodes | `csnobol4-src/.../test/v311.sil` lines ~8250+ |
 | Pattern match dispatcher | `csnobol4-src/.../snobol4.c` `PATNOD()` ~line 3529 |
-| Any operator (CONJ, ARBNO, etc.) | `csnobol4-src/.../snobol4.c` -- search ALL-CAPS function name |
+| Any operator (ARBNO, BAL, etc.) | `csnobol4-src/.../snobol4.c` -- search ALL-CAPS function name |
+| CONJ | **No reference source** — SNOBOL4clojure extension; not in SPITBOL, CSNOBOL4, or standard SNOBOL4. Semantics defined by design decision — see Key Semantic Notes. |
 
 **When to lead with each:**
 
@@ -208,6 +209,20 @@ Wrong mental models waste sessions.  The source is always available.
 ### FENCE semantics
 - `FENCE(P)`: commits to P's match; backtracking INTO P blocked; outer ALT OK.
 - `FENCE()` bare: any backtrack past this point aborts the entire match (nil).
+
+### CONJ semantics (SNOBOL4clojure extension — no reference source)
+- `CONJ(P, Q)` — both P and Q must succeed from the **same cursor position**.
+- **P determines the span** — cursor advances to P's end position.
+- **Q is a pure assertion** — it must succeed but its span is irrelevant.
+- This is the most general "pattern AND": boolean conjunction, not span intersection.
+- To enforce equal-span or length constraints, add a `CHECK!` immediate-action
+  node after CONJ — do NOT bake the constraint into CONJ itself.
+- `CONJ(LEN(3), LEN(2))` on "abc" → **succeeds**, span [0,3].
+  (P=LEN(3) matches; Q=LEN(2) asserts that 2 chars exist at pos 0 — passes.)
+- `CONJ(LEN(3), LEN(5))` on "abc" → **fails**.
+  (P=LEN(3) matches; Q=LEN(5) fails — only 3 chars, assertion fails.)
+- NOT in SPITBOL, CSNOBOL4, Catspaw SNOBOL4+, or standard SNOBOL4.
+  Exhaustive search of both source trees and all documentation confirmed absence.
 
 ### $ vs . capture operators
 - `P $ V` — CAPTURE-IMM: assigns V immediately when P matches.

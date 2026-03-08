@@ -488,10 +488,16 @@
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
         ;; -- CONJ! ---------------------------------------------------------------
-        ;; (CONJ! P Q): both P and Q must match the exact same span [start, end].
-        ;; Uses two synchronous engine calls rather than Omega frames.
-        ;; Reference: test_sprint10 test-conj-fail-length-mismatch confirms
-        ;; that CONJ(LEN(3), LEN(2)) on "abc" must fail (different end positions).
+        ;; (CONJ! P Q): both P and Q must succeed from the same cursor position.
+        ;; P determines the span advanced; Q is a pure assertion (must succeed
+        ;; from the same start but its matched length is irrelevant).
+        ;; This is the most general "AND" for patterns.  Length-equality is NOT
+        ;; required — use an immediate-action node (e.g. CHECK!) after CONJ to
+        ;; enforce additional span constraints if needed.
+        ;;
+        ;; CONJ is NOT in SPITBOL, CSNOBOL4, or standard SNOBOL4 — it is a
+        ;; SNOBOL4clojure extension.  No reference source exists; semantics are
+        ;; defined here by design decision.
         CONJ!
         (case action
           :proceed
@@ -500,10 +506,10 @@
                 chars0  (ζΣ ζ)
                 p-result (engine chars0 pos0 P pos0 full-subject)]
             (if p-result
-              (let [p-end (second p-result)
+              (let [p-end    (second p-result)
                     q-result (engine chars0 pos0 Q pos0 full-subject)]
-                (if (clojure.core/= q-result p-result)
-                  (recur :succeed (ζ↑ ζ chars0 p-end) Ω)
+                (if q-result                          ; Q must succeed (assertion)
+                  (recur :succeed (ζ↑ ζ chars0 p-end) Ω)   ; span = P's span
                   (recur :fail    (ζ↑ ζ (ζΣ ζ) pos0) Ω)))
               (recur :fail (ζ↑ ζ (ζΣ ζ) pos0) Ω)))
           (:succeed :fail :recede)

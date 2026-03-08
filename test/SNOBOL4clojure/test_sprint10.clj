@@ -58,20 +58,24 @@
 ;; ── CONJ P&Q conjunction ──────────────────────────────────────────────────────
 
 (deftest test-conj-basic
-  ;; Both must match same span: ARB(1) ∩ "ab" = "ab" at pos 0
+  ;; CONJ(P,Q): P determines span, Q is pure assertion from same start.
+  ;; LEN(2) matches "ab", "ab" asserts "ab" is there → span [0 2]
   (is (= [0 2] (SEARCH "abcd" (CONJ (LEN 2) "ab"))))
-  ;; No position where LEN(2) and "xyz" agree → nil
+  ;; Q fails → whole CONJ fails
   (is (nil? (SEARCH "abcd" (CONJ (LEN 2) "xyz")))))
 
 (deftest test-conj-span-and-literal
-  ;; SPAN("hello") ∩ "hello" — both produce the same span [0 5]
+  ;; SPAN("helo") matches "hello" [0,5]; "hello" also asserts match → [0 5]
   (is (= [0 5] (SEARCH "hello world" (CONJ (SPAN "helo") "hello"))))
-  ;; SPAN("helo") doesn't include 'w','r','d' so won't agree with "world"
+  ;; Q="world" fails at pos 0 → nil
   (is (nil? (SEARCH "hello world" (CONJ (SPAN "helo") "world")))))
 
-(deftest test-conj-fail-length-mismatch
-  ;; P matches 3 chars, Q matches 2 chars — ends disagree → nil
-  (is (nil? (SEARCH "abc" (CONJ (LEN 3) (LEN 2))))))
+(deftest test-conj-q-is-assertion-not-span
+  ;; P=LEN(3) determines span [0,3]; Q=LEN(2) succeeds (2 chars exist at pos 0)
+  ;; Q does NOT need to match same length — it is a pure assertion.
+  (is (= [0 3] (SEARCH "abc" (CONJ (LEN 3) (LEN 2)))))
+  ;; Q=LEN(5) fails on "abc" (only 3 chars) → CONJ fails
+  (is (nil? (SEARCH "abc" (CONJ (LEN 3) (LEN 5))))))
 
 ;; ── *expr deferred guard ──────────────────────────────────────────────────────
 
