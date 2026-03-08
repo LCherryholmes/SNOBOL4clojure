@@ -73,19 +73,32 @@
                   spec    (apply vector (re-seq #"[0-9A-Z_a-z]+" proto))
                   fname   (first spec)
                   params  (subvec spec 1)
+                  locals  (subvec spec (inc (count params)) (count spec))
                   f-sym   (symbol fname)
-                  fn-key  (symbol (str fname "__fn__"))
-                  entry   (keyword fname)]
+                  entry   (keyword (clojure.string/upper-case fname))]
               (letfn [(the-fn [& call-args]
-                        (doseq [i (range (count params))]
-                          (snobol-set! (symbol (params i))
-                                       (nth call-args i ε)))
-                        (snobol-set! f-sym ε)
-                        (when-let [run-fn (ns-resolve 'SNOBOL4clojure.runtime 'RUN)]
-                          ((var-get run-fn) entry))
-                        (let [result ($$ f-sym)]
-                          (snobol-set! f-sym the-fn)
-                          result))]
+                        ;; Save locals and params, bind call args
+                        (let [saved-params (mapv #($$ (symbol %)) params)
+                              saved-locals (mapv #($$ (symbol %)) locals)]
+                          (doseq [i (range (count params))]
+                            (snobol-set! (symbol (params i))
+                                         (nth call-args i ε)))
+                          (doseq [l locals]
+                            (snobol-set! (symbol l) ε))
+                          (snobol-set! f-sym ε)
+                          (when-let [run-fn (ns-resolve 'SNOBOL4clojure.runtime 'RUN)]
+                            (try ((var-get run-fn) entry)
+                                 (catch clojure.lang.ExceptionInfo e
+                                   (when-not (= :return (get (ex-data e) :snobol/signal))
+                                     (throw e)))))
+                          (let [result ($$ f-sym)]
+                            ;; Restore saved params and locals
+                            (doseq [i (range (count params))]
+                              (snobol-set! (symbol (params i)) (saved-params i)))
+                            (doseq [i (range (count locals))]
+                              (snobol-set! (symbol (locals i)) (saved-locals i)))
+                            (snobol-set! f-sym the-fn)
+                            result)))]
                 (snobol-set! f-sym the-fn)
                 ε))
     REPLACE (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))

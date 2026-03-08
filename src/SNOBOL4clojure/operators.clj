@@ -234,18 +234,19 @@
                               (mapv clojure.string/trim
                                     (clojure.string/split inner #",")))
                   locals    (if (clojure.string/blank? after-rp) []
-                              (let [s (clojure.string/trim after-rp)]
-                                (if (clojure.string/blank? s) []
-                                  (mapv clojure.string/trim
-                                        (clojure.string/split s #",")))))
+                              (let [s (-> after-rp clojure.string/trim
+                                          (clojure.string/replace #"^," ""))]
+                                (filterv (complement clojure.string/blank?)
+                                         (mapv clojure.string/trim
+                                               (clojure.string/split s #",")))))
                   f-sym     (symbol fname)
-                  ;; Entry point: explicit .label arg, or keyword from fname
+                  ;; Entry point: explicit .label arg, or keyword from fname (uppercased to match label table)
                   entry     (if (and (>= (count args) 2) entry-arg)
                               ;; entry-arg may be a NAME (symbol) from (.label) notation
                               (if (symbol? entry-arg)
-                                (keyword (str (name entry-arg)))
-                                (keyword (str entry-arg)))
-                              (keyword fname))
+                                (keyword (clojure.string/upper-case (str (name entry-arg))))
+                                (keyword (clojure.string/upper-case (str entry-arg))))
+                              (keyword (clojure.string/upper-case fname)))
                   all-saved (into params locals)]
               (letfn [(the-fn [& call-args]
                         ;; Save current values of params + locals

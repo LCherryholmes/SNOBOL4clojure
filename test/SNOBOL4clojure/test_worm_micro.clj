@@ -1304,7 +1304,8 @@
     "        J = safe_div(10,0)"
     "end")
   (is (clojure.core/= 5 ($$ 'I)))
-  (is (clojure.core/= -1 ($$ 'J))))
+  (is (clojure.core/= 10 ($$ 'J))))  ; J stays at fixture 10 — FRETURN makes statement fail
+
 
 ;; ─────────────────────────────────────────────────────────────────────────────
 ;; TIER 4c — ARBNO
@@ -1434,7 +1435,8 @@
     "        J = safe_div(10,0)"
     "end")
   (is (clojure.core/= 5 ($$ 'I)))
-  (is (clojure.core/= -1 ($$ 'J))))
+  (is (clojure.core/= 10 ($$ 'J))))  ; J stays at fixture 10 — FRETURN makes statement fail
+
 
 ;; ─────────────────────────────────────────────────────────────────────────────
 ;; TIER 5 — Output-verified oracle tests
