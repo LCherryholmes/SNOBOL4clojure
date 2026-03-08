@@ -900,3 +900,47 @@
     (is (= "123" ($$ (quote R))))
 )
 
+;; ─────────────────────────────────────────────────────────────────────────────
+;; RTAB / TAB — regression tests for Issue #9 (RTAB/TAB missing from INVOKE)
+;; Fixed: added TAB and RTAB to INVOKE case table in operators.clj
+;; ─────────────────────────────────────────────────────────────────────────────
+
+(deftest rtab_capture_full_string
+  "RTAB(0) . T captures entire subject"
+  (prog
+    "        S = 'hello'"
+    "        S RTAB(0) . T"
+    "end")
+  (is (= "hello" ($$ 'T))))
+
+(deftest rtab_capture_prefix
+  "RTAB(3) . T captures first 2 chars of 'hello' (leaves 3 remaining)"
+  (prog
+    "        S = 'hello'"
+    "        S RTAB(3) . T"
+    "end")
+  (is (= "he" ($$ 'T))))
+
+(deftest rtab_capture_imm_full
+  "RTAB(0) $ T captures entire subject (immediate)"
+  (prog
+    "        S = 'world'"
+    "        S RTAB(0) $ T"
+    "end")
+  (is (= "world" ($$ 'T))))
+
+(deftest tab_advance_to_pos
+  "TAB(3) advances cursor to position 3; LEN(2) then captures chars 3-4"
+  (prog
+    "        S = 'abcde'"
+    "        S TAB(3) LEN(2) . T"
+    "end")
+  (is (= "de" ($$ 'T))))
+
+(deftest rtab_then_len_capture
+  "TAB(2) skips 2, RTAB(1) scans to 1 remaining, . captures middle"
+  (prog
+    "        S = 'abcde'"
+    "        S TAB(2) RTAB(1) . T"
+    "end")
+  (is (= "cd" ($$ 'T))))

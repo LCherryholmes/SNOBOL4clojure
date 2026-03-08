@@ -138,7 +138,7 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Sprint 18B (catalog) | `(pending)` | 1488/3249/0 | Catalog migration complete — 13 files, 510 tests |
 | Session 11 | `555bd39` | 1749/3786/0 | Fix recursive DEFINE — `<FUNS>` registry. `fact(5)=120`. Issue #7 closed. |
 
-**Current baseline**: 1749 tests / 3786 assertions / 0 failures
+**Current baseline**: 1761 tests / 3810 assertions / 0 failures
 **Last confirmed**: 2026-03-08 (session 11)
 
 ### Sprint 18C (step-probe) complete
@@ -295,9 +295,9 @@ on values that came from args.
 | 5 | PDD field write when accessor name shadows Clojure fn (e.g. REAL) | operators.clj |
 | 6 | Goto case folding — Snobol4.Net uses lowercase `:s(label)` which fails our parser | grammar.clj |
 | 7 | ~~DEFINE return value wrong~~ — **FIXED** commit `555bd39`: `<FUNS>` registry decouples function closure from result-slot variable. Recursive calls (`fact(5)=120`) now work. | operators.clj / env.clj |
-| 8 | `~` negation operator broken — `~EQ(5,5)` takes S branch; oracle takes F | operators.clj |
-| 9 | RTAB/RPOS return empty string — `'hello' RTAB(0) . T` captures `""` not `"hello"` | primitives.clj |
-| 10 | Loop fallthrough wrong — `LT(I,5)` after body with I=11 loops instead of falling through | runtime.clj |
+| 8 | ~~`~` negation operator broken~~ — **FIXED** (was already working via `tilde` INVOKE handler; root cause was diagnostic confusion with unrelated label/OUTPUT bug). Regression tests added to `t_compare.clj`. | operators.clj |
+| 9 | ~~RTAB/RPOS return empty string~~ — **FIXED** commit `(next)`: `RTAB` and `TAB` were missing from the INVOKE case table. EVAL! fell through to namespace lookup, found nothing, returned ε. Added `TAB` and `RTAB` entries to INVOKE. `RTAB(0) . T` now correctly captures full subject. Regression tests added to `t_patterns_prim.clj`. | operators.clj |
+| 10 | ~~Loop fallthrough wrong~~ — **CONFIRMED FIXED** (already working; PLAN.md description was stale). `LT(I,N)` fails correctly and falls through to next statement. Regression tests added to `t_loops.clj`. | runtime.clj |
 
 Issues 7 and 8 (div-by-zero, pattern replace prefix) were fixed in Sprint 14.
 Session 10 fixes: `divide` now uses `quot` (integer truncation toward zero), verified against v311.sil;
@@ -673,9 +673,9 @@ worm bands are green.
 
 Fix in this sequence — each unblocks the next tier of worm programs:
 
-1. **Issue 10** — loop fallthrough (`LT(I,N)` guard loops instead of exits)
-2. **Issue 9**  — RTAB/RPOS capture empty string instead of matched span
-3. **Issue 8**  — `~` negation operator inverts S/F branches
+1. ~~**Issue 10**~~ — loop fallthrough — **CONFIRMED FIXED** (was already working)
+2. ~~**Issue 9**~~  — RTAB/TAB missing from INVOKE — **FIXED** commit `555bd39`+
+3. ~~**Issue 8**~~  — `~` negation — **CONFIRMED FIXED** (tilde INVOKE handler was correct)
 4. **Issue 4**  — `ANY("A-Z")` charset range not expanded
 5. **Issue 6**  — goto case folding (Cooper suite uses lowercase `:s(label)`)
 6. **Issue 1**  — `.` capture deferred semantics

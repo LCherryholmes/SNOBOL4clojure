@@ -805,3 +805,52 @@
     (is (= "yes" ($$ (quote R))))
 )
 
+;; ─────────────────────────────────────────────────────────────────────────────
+;; ~ negation operator — regression tests for Issue #8
+;; ~P fails if P succeeds; ~P succeeds if P fails.
+;; Fixed: tilde in INVOKE correctly inverts nil<->ε.
+;; ─────────────────────────────────────────────────────────────────────────────
+
+(deftest tilde_eq_success_negated
+  "~EQ(5,5) should FAIL (EQ succeeds, ~ negates to failure)"
+  (prog
+    "        R = 'no'"
+    "        ~EQ(5,5) :S(HIT)"
+    "        :(DONE)"
+    "HIT"
+    "        R = 'yes'"
+    "DONE    end")
+  (is (= "no" ($$ 'R))))
+
+(deftest tilde_eq_failure_negated
+  "~EQ(3,5) should SUCCEED (EQ fails, ~ negates to success)"
+  (prog
+    "        R = 'no'"
+    "        ~EQ(3,5) :S(HIT)"
+    "        :(DONE)"
+    "HIT"
+    "        R = 'yes'"
+    "DONE    end")
+  (is (= "yes" ($$ 'R))))
+
+(deftest tilde_lt_success_negated
+  "~LT(3,5) should FAIL (LT(3,5) succeeds, ~ negates)"
+  (prog
+    "        R = 'no'"
+    "        ~LT(3,5) :S(HIT)"
+    "        :(DONE)"
+    "HIT"
+    "        R = 'yes'"
+    "DONE    end")
+  (is (= "no" ($$ 'R))))
+
+(deftest tilde_lt_failure_negated
+  "~LT(5,3) should SUCCEED (LT(5,3) fails, ~ negates to success)"
+  (prog
+    "        R = 'no'"
+    "        ~LT(5,3) :S(HIT)"
+    "        :(DONE)"
+    "HIT"
+    "        R = 'yes'"
+    "DONE    end")
+  (is (= "yes" ($$ 'R))))

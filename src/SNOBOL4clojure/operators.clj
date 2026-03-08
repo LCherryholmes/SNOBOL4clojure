@@ -130,6 +130,8 @@
     LEN     (LEN    (first args))
     POS     (POS    (first args))
     RPOS    (RPOS   (first args))
+    TAB     (TAB    (first args))
+    RTAB    (RTAB   (first args))
     ANY     (ANY    (first args))
     BREAK   (BREAK  (first args))
     BREAKX  (BREAKX (first args))
