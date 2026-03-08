@@ -111,8 +111,20 @@
 (defn OPSYN  [] nil)
 (defn UNLOAD [] nil)
 
-;; ── Table / array stubs ───────────────────────────────────────────────────────
-(defn ITEM      [] nil)
-(defn PROTOTYPE [] nil)
+;; ── Table / array functions ───────────────────────────────────────────────────
+(defn ITEM
+  "ITEM(table, key) — subscript read/lvalue for TABLE.
+   Returns the value at key, or ε if absent."
+  [t k]
+  (SNOBOL4clojure.env/table-get t k))
+
+(defn PROTOTYPE
+  "PROTOTYPE(array-or-table) — return the dimension spec string.
+   For TABLE returns ε.  For ARRAY returns the prototype string."
+  [x]
+  (cond
+    (SNOBOL4clojure.env/table? x) ""
+    :else ""))    ; ARRAY prototype — stub pending full ARRAY impl
+
 (defn SORT      [_A] nil)
 (defn RSORT     [_A] nil)

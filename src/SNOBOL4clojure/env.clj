@@ -101,8 +101,15 @@
 
 ;; ── Arrays and Tables ─────────────────────────────────────────────────────────
 (defn ARRAY     [_proto] (object-array 10))
-(defn TABLE     [] (hash-map))
+(defn TABLE     ([]      (atom {}))
+                ([_n]    (atom {}))
+                ([_n _d] (atom {})))
 (defn SET       [] (hash-set))
+
+(defn table?    [x] (and (instance? clojure.lang.IDeref x)
+                         (map? @x)))
+(defn table-get [t k]        (get @t k ε))
+(defn table-set [t k v]      (swap! t assoc k v) v)
 
 ;; ── DATATYPE dispatch ─────────────────────────────────────────────────────────
 ;; Maps JVM class names to SNOBOL4 type names.
@@ -113,7 +120,9 @@
 (defmethod DATATYPE "class java.lang.Double"                      [_] "REAL")
 (defmethod DATATYPE "class [Ljava.lang.Object;"                   [_] "ARRAY")
 (defmethod DATATYPE "class [LLjava.lang.Object;"                  [_] "ARRAY")
+(defmethod DATATYPE "class clojure.lang.Atom"                     [_] "TABLE")
 (defmethod DATATYPE "class clojure.lang.PersistentArrayMap"       [_] "TABLE")
+(defmethod DATATYPE "class clojure.lang.PersistentHashMap"        [_] "TABLE")
 (defmethod DATATYPE "class clojure.lang.PersistentVector"         [_] "PATTERN")
 (defmethod DATATYPE "class clojure.lang.Symbol"                   [_] "NAME")
 (defmethod DATATYPE "class clojure.lang.PersistentList"           [X]

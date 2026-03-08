@@ -5,9 +5,11 @@
   (:require [clojure.tools.trace      :refer :all]
             [SNOBOL4clojure.env       :refer
              [ε η equal not-equal Σ+ subtract multiply divide
-              ncvt scvt num $$ out reference snobol-set!]]
+              ncvt scvt num $$ out reference snobol-set!
+              table? table-get table-set]]
             [SNOBOL4clojure.functions :refer
-             [ASCII REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE]]
+             [ASCII REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE
+              ITEM PROTOTYPE]]
             [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH]]
             [SNOBOL4clojure.patterns  :refer
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
@@ -153,13 +155,22 @@
                 (long result)
                 result))
     ?       (let [[s p] args] (SEARCH (str s) p))
-    =       (let [[N r] args
-                  val  r]
-              (when-not (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
-                (snobol-set! N val))
-              (when (clojure.core/= N 'OUTPUT)   (println val))
-              (when (clojure.core/= N 'TERMINAL) (println val))
-              val)
+    =       (let [[N r] args]
+              (cond
+                ;; subscript assignment: (= (A key) val) — mutate TABLE or ARRAY
+                (and (list? N) (clojure.core/= 2 (count N)))
+                (let [[container-sym k] N
+                      container ($$ container-sym)]
+                  (when (table? container)
+                    (table-set container k r))
+                  r)
+                ;; normal variable assignment
+                (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
+                (do (when (clojure.core/= N 'OUTPUT)   (println r))
+                    (when (clojure.core/= N 'TERMINAL) (println r))
+                    r)
+                :else
+                (do (snobol-set! N r) r)))
     ?=      (let [[n _p R] args, r (EVAL! R)]
               (snobol-set! n (trace r)) r)
     DEFINE  (let [[proto] args
@@ -188,6 +199,10 @@
                 (snobol-set! f-sym the-fn)
                 ε))
     REPLACE (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))
+    TABLE   (apply SNOBOL4clojure.env/TABLE args)
+    table   (apply SNOBOL4clojure.env/TABLE args)
+    ARRAY   (apply SNOBOL4clojure.env/ARRAY args)
+    array   (apply SNOBOL4clojure.env/ARRAY args)
     ASCII   (ASCII  (first args))
     REMDR   (REMDR  (first args) (second args))
     INTEGER (INTEGER (first args))
@@ -199,9 +214,16 @@
     REVERSE (REVERSE (first args))
     LPAD    (LPAD   (first args) (second args))
     RPAD    (RPAD   (first args) (second args))
+    ITEM      (ITEM      (first args) (second args))
+    item      (ITEM      (first args) (second args))
+    PROTOTYPE (PROTOTYPE (first args))
+    prototype (PROTOTYPE (first args))
     quote   ($$ (second op))
             (let [f ($$ op)]
-              (if (fn? f) (apply f args) ε))))
+              (cond
+                (table? f) (table-get f (first args))  ; TABLE subscript read
+                (fn? f)    (apply f args)
+                :else      ε))))
 
 ;; ── EVAL! / EVAL ─────────────────────────────────────────────────────────────
 (defn EVAL! [E]
@@ -219,7 +241,13 @@
         (cond
           (equal op '.)     (let [[P N]   parms] (INVOKE '. (EVAL! P) N))
           (equal op '$)     (let [[P N]   parms] (INVOKE '$ (EVAL! P) N))
-          (equal op '=)     (let [[N R]   parms] (INVOKE '= N (EVAL! R)))
+          (equal op '=)     (let [[N R]   parms
+                                  ;; If N is a subscript call (container key),
+                                  ;; evaluate the key but not the container symbol
+                                  N' (if (and (list? N) (clojure.core/= 2 (count N)))
+                                       (list (first N) (EVAL! (second N)))
+                                       N)]
+                              (INVOKE '= N' (EVAL! R)))
           (equal op '?=)    (let [[N P R] parms] (INVOKE '?= N (EVAL! P) R))
           (equal op '&)     (let [[N]     parms
                                   kw-sym  (symbol (str "&" N))
