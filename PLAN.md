@@ -26,6 +26,7 @@ compiler from SNOBOL4 source text to a labeled statement table.
 | Date | Baseline | What Happened |
 |------|----------|---------------|
 | 2026-03-08 | 220/548/0 | Repo cloned fresh; lein installed; baseline confirmed. PLAN.md rewritten. SPITBOL x64-main.zip and CSNOBOL4 snobol4-2.3.3.tar.gz uploaded and extracted to `/home/claude/spitbol-src/` and `/home/claude/csnobol4-src/`. Eureka grammar-worm harness design documented. |
+| 2026-03-08 (session 2) | 220/548/0 | Gimpel.zip + Cooper zip extracted. `test_cooper.clj` (82 tests) and `test_bootstrap.clj` (130 tests, 7 length bands) written by hand. **Bug fixed**: PDD field-setter crash — `VAL(N) = x` was evaluating the instance arg to a map, losing the symbol name; fixed in `operators.clj` EVAL! `=` branch to keep raw symbol for fn? containers. **Bug fixed**: REPLACE multi-line continuation. **Key strategy decision**: Claude acts as the worm generator first — hand-write 1000 exhaustive primitive-first tests before building automated generator. `test_worm1000.clj` generated (521 tests, not yet triaged). Oracle binaries not installed — harness runs Clojure side only. **Next session**: run test_worm1000, triage failures, fix bugs to 0, then build automated 100k generator. |
 
 ---
 
@@ -434,7 +435,7 @@ every grammatical path systematically, running fast enough for CI.
 
 ---
 
-## Sprint 15 — Gimpel Corpus  PLANNED
+## Sprint 15 — Gimpel Corpus  PARTIAL
 
 ### Goal
 Run the ~100 Gimpel SPITBOL algorithms through the harness; record
@@ -457,7 +458,7 @@ pass/fail; fix regressions found.
 
 ---
 
-## Sprint 16 — Cooper / Snobol4.Net Test Suite  PLANNED
+## Sprint 16 — Cooper / Snobol4.Net Test Suite  PARTIAL
 
 ### Goal
 Mine Jeffrey Cooper's test suite for low/high-level test coverage. Generate
@@ -483,19 +484,33 @@ Target `WANG.SPT`, `HSORT.SPT`, `ENDING.SPT` first (pure computation).
 
 ---
 
-## Sprint 18 — Grammar-Worm Bootstrap Suite  PLANNED
+## Sprint 18 — Grammar-Worm Bootstrap Suite  IN PROGRESS
 
 ### Goal
 Implement the Eureka length-band grammar-worm generator. Build a corpus of
 1000+ tiny programs covering all constructs at lengths 0-64.
 
+### Strategy (revised)
+
+**Phase A — Claude as worm (current)**: Hand-generate 1000+ exhaustive
+primitive-first tests covering every SNOBOL4 construct at its simplest.
+Fix every failure before moving to automation. This flushes fundamental
+bugs that would otherwise corrupt the automated corpus.
+
+**Phase B — Automated generator**: Once Phase A is green, build a generator
+in `generator.clj` that produces 100,000 programs on the fly, runs them
+through the Clojure runtime, and pins every novel failure as a regression test.
+
 ### Tasks
-- [ ] 18.1  Add `gen-by-length` to `generator.clj` — lazy seq of programs per char count
-- [ ] 18.2  Add `rand-statement` — random walk of statement grammar using canonical pools
-- [ ] 18.3  Add error-class programs — syntax/semantic/runtime/normal variants per length
-- [ ] 18.4  Run full batch through harness; save to `resources/bootstrap-corpus.edn`
-- [ ] 18.5  Fix any failures; iterate to 100% pass (or known-skip)
-- [ ] 18.6  Add `test_bootstrap.clj` — loads corpus, asserts all `:pass` / `:pass-class`
+- [x] 18.6  `test_bootstrap.clj` — 130 hand-written tests, 7 length bands, 0 failures
+- [x] 18.A  `test_worm1000.clj` — 521 tests generated (Python worm); needs run + triage
+- [ ] 18.A2 Run test_worm1000; fix all failures to 0
+- [ ] 18.A3 Expand to true 1000 tests (fill gaps: BREAKX, FENCE, ABORT, CURSOR, CONJ, BAL, ARBNO deeper)
+- [ ] 18.1  `gen-by-length` in `generator.clj` — lazy seq of programs per char count
+- [ ] 18.2  `rand-statement` — random walk of statement grammar using canonical pools
+- [ ] 18.3  Error-class programs per length band (syntax/semantic/runtime/normal)
+- [ ] 18.4  Automated batch runner — 100k programs, pin failures as regression tests
+- [ ] 18.5  Fix all failures; iterate to 100% pass (or documented known-skip)
 - [ ] 18.7  Commit
 
 ---

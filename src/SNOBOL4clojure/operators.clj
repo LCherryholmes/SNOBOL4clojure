@@ -337,9 +337,17 @@
           (equal op '$)     (let [[P N]   parms] (INVOKE '$ (EVAL! P) N))
           (equal op '=)     (let [[N R]   parms
                                   ;; If N is a subscript call (container key...),
-                                  ;; evaluate all keys but not the container symbol
+                                  ;; evaluate the keys — EXCEPT for PDD field setters
+                                  ;; where the first key must remain a symbol so
+                                  ;; snobol-set! can rebind the instance variable.
                                   N' (if (and (list? N) (>= (count N) 2))
-                                       (apply list (first N) (map EVAL! (rest N)))
+                                       (let [container-sym (first N)
+                                             container-val  ($$ container-sym)]
+                                         (if (fn? container-val)
+                                           ;; PDD setter: keep keys as raw symbols
+                                           N
+                                           ;; TABLE/ARRAY: evaluate keys
+                                           (apply list container-sym (map EVAL! (rest N)))))
                                        N)]
                               (INVOKE '= N' (EVAL! R)))
           (equal op '?=)    (let [[N P R] parms] (INVOKE '?= N (EVAL! P) R))
