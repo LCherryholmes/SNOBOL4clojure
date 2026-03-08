@@ -2,12 +2,11 @@
   "Sprint 9 — BREAKX backtracking, NSPAN, BOL/EOL, $ vs . capture semantics.
    Test cases derived from Snobol4.Net reference suite (jcooper0/Snobol4.Net)."
   (:require [clojure.test             :refer :all]
-            [SNOBOL4clojure.match-api :refer [SEARCH FULLMATCH MATCH]]
+            [SNOBOL4clojure.match     :refer [SEARCH FULLMATCH MATCH]]
             [SNOBOL4clojure.patterns  :refer [SPAN NSPAN BREAK BREAKX NOTANY
                                               FENCE LEN ARB ARBNO POS RPOS
                                               ABORT FAIL REM BOL EOL]]
-            [SNOBOL4clojure.invoke :refer [INVOKE]]
-            [SNOBOL4clojure.operators :refer [| .]]
+            [SNOBOL4clojure.operators :refer [INVOKE | .]]
             [SNOBOL4clojure.env       :refer [GLOBALS ε snobol-set! $$]]))
 
 (use-fixtures :each (fn [f] (GLOBALS (find-ns 'SNOBOL4clojure.test-sprint9)) (f)))

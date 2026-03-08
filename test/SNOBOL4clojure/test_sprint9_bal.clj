@@ -1,7 +1,7 @@
 (ns SNOBOL4clojure.test-sprint9-bal
   "BAL tests derived from Snobol4.Net TestSnobol4/Function/Pattern/Bal.cs"
   (:require [clojure.test         :refer :all]
-            [SNOBOL4clojure.match-api :refer [SEARCH COLLECT!]]
+            [SNOBOL4clojure.match :refer [SEARCH COLLECT!]]
             [SNOBOL4clojure.patterns :refer [BAL POS]]
             [SNOBOL4clojure.env   :refer [GLOBALS]]))
 

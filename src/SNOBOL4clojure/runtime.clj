@@ -3,7 +3,7 @@
   ;; Walks the loaded statement table produced by CODE, evaluating
   ;; each statement body and dispatching on success/failure gotos.
   (:require [SNOBOL4clojure.env      :refer [<STNO> <LABL> <CODE>]]
-            [SNOBOL4clojure.invoke    :refer [EVAL!]]))
+            [SNOBOL4clojure.operators :refer [EVAL!]]))
 
 (defn RUN [at]
   (letfn

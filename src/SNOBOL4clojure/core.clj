@@ -7,10 +7,8 @@
             [SNOBOL4clojure.env        :as env]
             [SNOBOL4clojure.primitives :as prim]
             [SNOBOL4clojure.match      :as match]
-            [SNOBOL4clojure.match-api  :as match-api]
             [SNOBOL4clojure.patterns   :as pat]
             [SNOBOL4clojure.operators  :as ops]
-            [SNOBOL4clojure.invoke     :as invoke]
             [SNOBOL4clojure.functions  :as fns]
             [SNOBOL4clojure.grammar    :as gram]
             [SNOBOL4clojure.emitter    :as emit]
@@ -82,11 +80,11 @@
 (def SUCCEED pat/SUCCEED)
 
 ;; ── Re-export match engine ────────────────────────────────────────────────────
-(def MATCH      match-api/MATCH)
-(def SEARCH     match-api/SEARCH)
-(def FULLMATCH  match-api/FULLMATCH)
-(def REPLACE    match-api/REPLACE)
-(def COLLECT!   match-api/COLLECT!)
+(def MATCH      match/MATCH)
+(def SEARCH     match/SEARCH)
+(def FULLMATCH  match/FULLMATCH)
+(def REPLACE    match/REPLACE)
+(def COLLECT!  match/COLLECT!)
 
 ;; ── Re-export operators / EVAL ────────────────────────────────────────────────
 (def =     ops/=)
@@ -120,9 +118,9 @@
 (def LGT   ops/LGT)
 (def IDENT  ops/IDENT)
 (def DIFFER ops/DIFFER)
-(def EVAL  invoke/EVAL)
-(def EVAL! invoke/EVAL!)
-(def INVOKE invoke/INVOKE)
+(def EVAL  ops/EVAL)
+(def EVAL! ops/EVAL!)
+(def INVOKE ops/INVOKE)
 
 ;; ── Re-export functions ───────────────────────────────────────────────────────
 (def SIZE    fns/SIZE)
