@@ -8,7 +8,7 @@
               ncvt scvt num $$ out reference snobol-set!]]
             [SNOBOL4clojure.functions :refer
              [ASCII REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE]]
-            [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH]]
+            [SNOBOL4clojure.match-api :refer [SEARCH]]
             [SNOBOL4clojure.patterns  :refer
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
               LEN POS RPOS RTAB TAB FAIL]]
@@ -90,7 +90,7 @@
 (defn .     ([x]        (NAME. x))                    ; unary  — name
             ([x y]      (x-2 'CAPTURE-COND x y))      ; binary — conditional capture
             ([x y & zs] (x-n 'CAPTURE-COND x y zs)))
-(defn tilde ([x]        (list 'lie x))           ; unary  — negate
+(defn tilde ([x]        (list 'ALT x ε))           ; unary  — negate
             ([_x _y]    η))
 (defn |     ([_x]       η)                       ; unary  — programmable
             ([x y]      (x-2 'ALT x y))          ; binary — alternation
@@ -109,131 +109,3 @@
 (defmacro CHOP   [] `(defn CHOP  [x]
                        (let [_x ~(numcvt 'x)]
                          (if (< _x 0.0) (Math/ceil _x) (Math/floor _x)))))
-
-;; ── INVOKE ────────────────────────────────────────────────────────────────────
-(declare EVAL!)
-
-(defn INVOKE [op & args]
-  (case op
-    |       (apply | args)
-    $       (apply $ args)
-    .       (apply . args)
-    LEN     (LEN    (first args))
-    POS     (POS    (first args))
-    RPOS    (RPOS   (first args))
-    ANY     (ANY    (first args))
-    BREAK   (BREAK  (first args))
-    BREAKX  (BREAKX (first args))
-    NOTANY  (NOTANY (first args))
-    SPAN    (SPAN   (first args))
-    FENCE   (if (seq args) (FENCE (first args)) (FENCE))
-    EQ      (EQ     (first args) (second args))
-    NE      (NE     (first args) (second args))
-    LE      (LE     (first args) (second args))
-    LT      (LT     (first args) (second args))
-    GE      (GE     (first args) (second args))
-    GT      (GT     (first args) (second args))
-    FAIL    FAIL
-    ;; Arithmetic — coerce to SNOBOL numeric type (integer if both integer, else real)
-    +       (let [ns (map num args)]
-              (if (every? #(== (Math/floor %) %) ns)
-                (long (apply clojure.core/+' ns))
-                (apply clojure.core/+ ns)))
-    -       (let [ns (map num args)]
-              (if (every? #(== (Math/floor %) %) ns)
-                (long (apply clojure.core/-' ns))
-                (apply clojure.core/- ns)))
-    *       (let [ns (map num args)]
-              (if (every? #(== (Math/floor %) %) ns)
-                (long (apply clojure.core/*' ns))
-                (apply clojure.core/* ns)))
-    /       (let [ns (map num args)
-                  result (apply clojure.core// ns)]
-              (if (== (Math/floor result) result)
-                (long result)
-                result))
-    ?       (let [[s p] args] (SEARCH (str s) p))
-    =       (let [[N r] args
-                  val  r]
-              (when-not (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
-                (snobol-set! N val))
-              (when (clojure.core/= N 'OUTPUT)   (println val))
-              (when (clojure.core/= N 'TERMINAL) (println val))
-              val)
-    ?=      (let [[n _p R] args, r (EVAL! R)]
-              (snobol-set! n (trace r)) r)
-    DEFINE  (let [[proto] args
-                  spec    (apply vector (re-seq #"[0-9A-Z_a-z]+" proto))
-                  fname   (first spec)
-                  params  (subvec spec 1)
-                  f-sym   (symbol fname)
-                  ;; Store fn under a private key so result slot doesn't clobber it
-                  fn-key  (symbol (str fname "__fn__"))
-                  entry   (keyword fname)]
-              (letfn [(the-fn [& call-args]
-                        ;; Bind each parameter to its argument value
-                        (doseq [i (range (count params))]
-                          (snobol-set! (symbol (params i))
-                                       (nth call-args i ε)))
-                        ;; Clear the result slot (function name var holds return value)
-                        (snobol-set! f-sym ε)
-                        ;; Run from entry label
-                        (when-let [run-fn (ns-resolve 'SNOBOL4clojure.runtime 'RUN)]
-                          ((var-get run-fn) entry))
-                        ;; Return value of function-name variable
-                        (let [result ($$ f-sym)]
-                          ;; Restore fn reference so future calls work
-                          (snobol-set! f-sym the-fn)
-                          result))]
-                (snobol-set! f-sym the-fn)
-                ε))
-    REPLACE (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))
-    ASCII   (ASCII  (first args))
-    REMDR   (REMDR  (first args) (second args))
-    INTEGER (INTEGER (first args))
-    REAL    (REAL    (first args))
-    STRING  (STRING  (first args))
-    SIZE    (SIZE   (first args))
-    TRIM    (TRIM   (first args))
-    DUPL    (DUPL   (first args) (second args))
-    REVERSE (REVERSE (first args))
-    LPAD    (LPAD   (first args) (second args))
-    RPAD    (RPAD   (first args) (second args))
-    quote   ($$ (second op))
-            (let [f ($$ op)]
-              (if (fn? f) (apply f args) ε))))
-
-;; ── EVAL! / EVAL ─────────────────────────────────────────────────────────────
-(defn EVAL! [E]
-  (when E
-    (cond
-      (nil? E)     E
-      (char? E)    E
-      (float? E)   E
-      (string? E)  E
-      (integer? E) E
-      (symbol? E)  ($$ E)
-      (vector? E)  (apply list 'SEQ (map EVAL! E))
-      (list? E)
-      (let [[op & parms] E]
-        (cond
-          (equal op '.)     (let [[P N]   parms] (INVOKE '. (EVAL! P) N))
-          (equal op '$)     (let [[P N]   parms] (INVOKE '$ (EVAL! P) N))
-          (equal op '=)     (let [[N R]   parms] (INVOKE '= N (EVAL! R)))
-          (equal op '?=)    (let [[N P R] parms] (INVOKE '?= N (EVAL! P) R))
-          (equal op '&)     (let [[N]     parms
-                                  kw-sym  (symbol (str "&" N))
-                                  ;; &-keywords are defs in env.clj; fall back to user ns
-                                  v       (or (when-let [vr (ns-resolve (find-ns 'SNOBOL4clojure.env) kw-sym)]
-                                                (var-get vr))
-                                              ($$ kw-sym))]
-                              (if (instance? clojure.lang.IDeref v) @v v))
-          (equal op 'quote) (first parms)
-          true (let [args (apply vector (map EVAL! parms))]
-                 (apply INVOKE op args))))
-      true "Yikes! What is E?")))
-
-(defn EVAL [X]
-  (cond
-    (string? X) (EVAL! (first (emitter (parse-expression X))))
-    true        (EVAL! X)))

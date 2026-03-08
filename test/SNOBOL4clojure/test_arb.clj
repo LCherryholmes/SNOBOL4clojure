@@ -1,6 +1,6 @@
 (ns SNOBOL4clojure.test-arb
   (:require [clojure.test :refer :all]
-            [SNOBOL4clojure.match    :refer [SEARCH FULLMATCH] :as m]
+            [SNOBOL4clojure.match-api :refer [SEARCH FULLMATCH] :as m]
             [SNOBOL4clojure.patterns :refer [POS RPOS SPAN ARB ARBNO]]
             [SNOBOL4clojure.env      :refer [GLOBALS]]))
 

@@ -1,122 +1,16 @@
 (ns SNOBOL4clojure.match
-  "The SNOBOL4 pattern match engine.
-
-  An explicit iterative state machine over a 7-element frame vector:
-    [Σ Δ σ δ Π φ Ψ]
-    Σ/Δ — subject chars + position on entry to this frame
-    σ/δ — subject chars + position as updated by scanning
-    Π   — current pattern node
-    φ   — index into Π (for ALT/SEQ child iteration)
-    Ψ   — parent frame stack
-  Actions: :proceed :succeed :recede :fail
-
-  Public API (three entry points, matching the Python/C# siblings):
-
-    SEARCH    s pat  — slide pattern across subject; return [start end] or nil
-    MATCH     s pat  — anchor at position 0;         return [start end] or nil
-    FULLMATCH s pat  — anchor at both ends;           return [start end] or nil
-
-  [start end] is a half-open span: (subs s start end) extracts the match.
-  nil means the pattern did not match.
-
-  Tracing: bind *trace* to true to enable per-step animation output."
-  (:require [SNOBOL4clojure.env        :refer [ε equal out $$ snobol-set!]]
-            [SNOBOL4clojure.primitives :refer
+  "SNOBOL4 pattern match engine — core loop and public API.
+  Frame infrastructure is in engine-frame.clj."
+  (:require [SNOBOL4clojure.env          :refer [ε equal $$ snobol-set!]]
+            [SNOBOL4clojure.primitives   :refer
              [LIT$ ANY$ NOTANY$ SPAN$ NSPAN$ BREAK$ BREAKX$
               POS# RPOS# LEN# TAB# RTAB# BOL# EOL#
               SUCCEED! FAIL! ARB! BAL! ARBNO! ABORT!]]
-            [SNOBOL4clojure.patterns   :refer [POS RPOS]])
+            [SNOBOL4clojure.patterns     :refer [POS RPOS]]
+            [SNOBOL4clojure.engine-frame :refer
+             [*trace* ζΣ ζΔ ζσ ζδ ζΠ ζφ ζΨ ζλ ζα ζω animate
+              ζ↓ ζ↑ ζ→ ζ← 🡡 🡥 🡧]])
   (:refer-clojure :exclude [= + - * / num]))
-
-;; ── Tracing (off by default) ──────────────────────────────────────────────────
-(def ^:dynamic *trace* false)
-
-;; ── Frame accessors ───────────────────────────────────────────────────────────
-(defn ζΣ [ζ] (if ζ (ζ 0)))  ; subject chars on entry to this frame
-(defn ζΔ [ζ] (if ζ (ζ 1)))  ; position on entry
-(defn ζσ [ζ] (if ζ (ζ 2)))  ; subject chars (current)
-(defn ζδ [ζ] (if ζ (ζ 3)))  ; current position
-(defn ζΠ [ζ] (if ζ (ζ 4)))  ; pattern node
-(defn ζφ [ζ] (if ζ (ζ 5)))  ; child index (1-based)
-(defn ζΨ [ζ] (if ζ (ζ 6)))  ; parent stack
-
-(defn- ζα [ζ] (<= (ζφ ζ) 1))
-(defn- ζω [ζ] (>= (ζφ ζ) (count (ζΠ ζ))))
-
-(defn ζλ [ζ]   ; current operation symbol
-  (cond
-    (nil?        ζ)  nil
-    (nil?    (ζΠ ζ)) nil
-    (string? (ζΠ ζ)) 'LIT$
-    (symbol? (ζΠ ζ)) (ζΠ ζ)
-    (list?   (ζΠ ζ)) (first (ζΠ ζ))
-    (seq?    (ζΠ ζ)) (first (ζΠ ζ))
-    true     (out ["ζλ? " (type (ζΠ ζ)) (ζΠ ζ)])))
-
-;; ── Stack helpers ─────────────────────────────────────────────────────────────
-(defn- top  [Ψ]   (last Ψ))
-(defn- push [Ψ ζ] (if Ψ (conj Ψ ζ)))
-(defn- pull [Ψ]   (if Ψ (if-not (empty? Ψ) (pop Ψ))))
-(defn- 🡡 [Ω]     (top Ω))
-(defn- 🡥 [Ω ζ]   (push Ω ζ))
-(defn- 🡧 [Ω]     (pull Ω))
-
-;; ── Frame transitions ─────────────────────────────────────────────────────────
-(defn- ζ↓
-  ([ζ Π]  (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ Σ Δ Π         1       Ψ]))
-  ([ζ]    (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ (nth Π φ) 1       (🡥 Ψ ζ)])))
-
-(defn- ζ↑
-  ([ζ σ δ] (let [[Σ Δ _ _ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ)) (🡧 Ψ)]))
-  ([ζ]     (let [[Σ Δ σ δ _ _ Ψ] ζ] [Σ Δ σ δ (ζΠ (🡡 Ψ)) (ζφ (🡡 Ψ)) (🡧 Ψ)])))
-
-(defn- ζ→ [ζ] (let [[_ _ σ δ Π φ Ψ] ζ] [σ δ σ δ Π (inc φ) Ψ]))
-(defn- ζ← [ζ] (let [[Σ Δ _ _ Π φ Ψ] ζ] [Σ Δ Σ Δ Π (inc φ) Ψ]))
-
-;; ── Trace helpers ─────────────────────────────────────────────────────────────
-(defn- preview
-  ([action X φ] (preview action X 0 0 φ))
-  ([action X pos depth φ]
-   (str
-     (if (> pos 0) " " "")
-     (cond
-       (nil? X)     "nil"
-       (char? X)    (str "\\" X)
-       (string? X)  (str "\"" X "\"")
-       (integer? X) (str X)
-       (symbol? X)  (str X)
-       (float? X)   (str X)
-       (>= depth 3) "_"
-       (vector? X)  (str "[" (reduce str (map #(preview action %1 %2 (inc depth) 0) X (range))) "]")
-       (list? X)    (str "("
-                      (reduce str
-                        (map #(cond
-                                (equal %2 0) (str %1 " ")
-                                (> φ 0)
-                                (cond
-                                  (< %2 φ)                            "."
-                                  (> %2 (clojure.core/+ φ 2))        "?"
-                                  (>= %2 (clojure.core/+ φ 2))       " ?"
-                                  (and (equal %2 φ)
-                                       (identical? action :succeed))  "."
-                                  true (preview action %1 (dec %2) (inc depth) 0))
-                                true (preview action %1 (dec %2) (inc depth) 0))
-                          X (range)))
-                      ")")
-       (set? X)     (str "\"" (apply str X) "\"")
-       true         (str " Yikes!!! " (type X))))))
-
-(defn- animate [action full-subject ζ]
-  (when (and *trace* full-subject ζ)
-    (println
-      (format "%2s %-8s %16s %3d %16s %-9s %s"
-        (count (ζΨ ζ))
-        (str (ζλ ζ) "/" (ζφ ζ))
-        (str "\"" (apply str (take (ζΔ ζ) full-subject)) "\"")
-        (ζΔ ζ)
-        (str "\"" (apply str (reverse (ζΣ ζ))) "\"")
-        (str " " action)
-        (preview action (ζΠ ζ) (ζφ ζ))))))
 
 ;; ── Core engine ───────────────────────────────────────────────────────────────
 ;; Returns [start end] on success, nil on failure.
@@ -124,7 +18,7 @@
 ;; Δ       — start position (integer)
 ;; Π       — pattern node
 ;; start-Δ — the anchor position for the returned span start
-(defn- engine [Σ Δ Π start-Δ full-subject]
+(defn engine [Σ Δ Π start-Δ full-subject]
   (loop [action :proceed, ζ [Σ Δ ε ε Π 1 []], Ω []]
     (let [λ (ζλ ζ)]
       (animate action full-subject ζ)
@@ -400,57 +294,44 @@
             (swap! bag conj [(ζΔ ζ) (ζδ ζ)])
             (recur :recede (🡡 Ω) (🡧 Ω)))
           (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; -- CURSOR-IMM! ---------------------------------------------------------
+        ;; (@N): assign current cursor position to variable N.  Zero-width.
+        CURSOR-IMM!
+        (case action
+          (:proceed :succeed)
+          (do (snobol-set! (second (ζΠ ζ)) (ζδ ζ))
+              (recur :succeed (ζ↑ ζ (ζΣ ζ) (ζδ ζ)) Ω))
+          (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; -- CONJ! ---------------------------------------------------------------
+        ;; (CONJ P Q): P and Q must both match from same start, same end position.
+        CONJ!
+        (case action
+          :proceed
+          (let [P (nth (ζΠ ζ) 1)]
+            (recur :proceed (ζ↓ ζ P) (🡥 Ω ζ)))
+          :succeed
+          (let [conj-frame (🡡 Ω)
+                p-end      (ζδ ζ)
+                Q          (nth (ζΠ conj-frame) 2)
+                pos0       (ζΔ conj-frame)
+                Q-frame    [(ζΣ conj-frame) pos0 (ζΣ conj-frame) pos0 Q 1
+                            (ζΨ conj-frame)]]
+            (recur :proceed Q-frame (🡥 (🡧 Ω) (assoc conj-frame 5 p-end))))
+          (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; -- DEFER! --------------------------------------------------------------
+        ;; (*expr): deferred pattern — thunk evaluated at match time.
+        DEFER!
+        (case action
+          :proceed
+          (let [thunk (second (ζΠ ζ))
+                P     (if (fn? thunk) (thunk) thunk)]
+            (recur :proceed (ζ↓ ζ P) (🡥 Ω ζ)))
+          :succeed (recur :succeed (ζ↑ ζ) Ω)
+          (:fail :recede)
           (recur :recede (🡡 Ω) (🡧 Ω)))))))
-
-;; ── Public API ────────────────────────────────────────────────────────────────
-
-(defn SEARCH
-  "Slide pattern P across string S, trying each start position 0..n.
-   Returns [start end] for the first match found, nil if none.
-   (subs S start end) extracts the matched substring."
-  [S P]
-  (let [chars (seq S)
-        n     (count S)]
-    (loop [i 0]
-      (when (<= i n)
-        (let [result (engine (drop i chars) i P i S)]
-          (if result
-            result
-            (recur (inc i))))))))
-
-(defn MATCH
-  "Match pattern P against string S anchored at position 0.
-   Returns [start end] on success, nil on failure.
-   Equivalent to SEARCH with POS(0) prepended."
-  [S P]
-  (engine (seq S) 0 (list 'SEQ (POS 0) P) 0 S))
-
-(defn FULLMATCH
-  "Match pattern P against the entirety of string S (anchored both ends).
-   Returns [0 (count S)] on success, nil on failure.
-   Equivalent to SEARCH with POS(0) prepended and RPOS(0) appended."
-  [S P]
-  (engine (seq S) 0 (list 'SEQ (POS 0) P (RPOS 0)) 0 S))
-
-(defn REPLACE
-  "Match pattern P against S; if matched, replace the matched span with R.
-   Returns the new string on success, nil on failure.
-   Example: (REPLACE \"hello world\" \"world\" \"Clojure\") => \"hello Clojure\""
-  [S P R]
-  (when-let [[start end] (SEARCH S P)]
-    (str (subs S 0 start) R (subs S end))))
-
-(defn COLLECT!
-  "Exhaustively collect every match [start end] of pattern P across string S,
-   including all multi-yield backtrack alternatives (e.g. BAL, ARB, ARBNO).
-   Mirrors the SNOBOL4 idiom  P $ X FAIL  — each match is captured then the
-   engine is forced to recede, driving P through all its Omega retry frames.
-   Returns a vector of [start end] pairs in scan order."
-  [S P]
-  (let [chars (seq S)
-        n     (count S)
-        bag   (atom [])
-        node  (list 'COLLECT! bag P)]
-    (doseq [i (range (inc n))]
-      (engine (drop i chars) i node i S))
-    @bag))

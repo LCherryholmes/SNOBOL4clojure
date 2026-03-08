@@ -3,7 +3,7 @@
   ;; These are the three entry points matching the Python/C# siblings.
   ;; Tests also exercise the engine internals via structural patterns.
   (:require [clojure.test :refer :all]
-            [SNOBOL4clojure.match    :refer [SEARCH MATCH FULLMATCH REPLACE]]
+            [SNOBOL4clojure.match-api :refer [SEARCH MATCH FULLMATCH REPLACE]]
             [SNOBOL4clojure.patterns :refer [ANY SPAN POS RPOS LEN]]))
 
 ;; ── SEARCH — slides pattern across subject ────────────────────────────────────

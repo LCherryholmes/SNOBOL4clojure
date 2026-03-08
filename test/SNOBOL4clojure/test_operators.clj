@@ -2,6 +2,7 @@
   ;; Tests for SNOBOL4 operators and the EVAL/EVAL!/INVOKE evaluator.
   (:require [clojure.test :refer :all]
             [SNOBOL4clojure.operators :refer :all]
+            [SNOBOL4clojure.invoke    :refer [INVOKE EVAL! EVAL]]
             [SNOBOL4clojure.env       :refer [ε &LCASE &UCASE &DIGITS]])
   (:refer-clojure :exclude [= + - * / num]))
 

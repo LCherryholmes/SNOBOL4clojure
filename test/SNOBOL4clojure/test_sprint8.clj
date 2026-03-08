@@ -2,11 +2,12 @@
   "Sprint 8 — ABORT, bare FENCE(), REM, ASCII, CHAR, REMDR, INTEGER, REAL, STRING.
    Test cases derived from Snobol4.Net reference suite (jcooper0/Snobol4.Net)."
   (:require [clojure.test             :refer :all]
-            [SNOBOL4clojure.match     :refer [SEARCH FULLMATCH MATCH]]
+            [SNOBOL4clojure.match-api :refer [SEARCH FULLMATCH MATCH]]
             [SNOBOL4clojure.patterns  :refer [SPAN BREAK FENCE LEN ARB ARBNO
                                               ABORT FAIL REM POS RPOS]]
             [SNOBOL4clojure.functions :refer [ASCII CHAR REMDR INTEGER REAL STRING]]
-            [SNOBOL4clojure.operators :refer [INVOKE |]]
+            [SNOBOL4clojure.invoke :refer [INVOKE]]
+            [SNOBOL4clojure.operators :refer [|]]
             [SNOBOL4clojure.env       :refer [GLOBALS ε]]))
 
 (use-fixtures :each (fn [f] (GLOBALS (find-ns 'SNOBOL4clojure.test-sprint8)) (f)))

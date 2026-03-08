@@ -3,7 +3,7 @@
   ;; Verifies the representation they produce AND that MATCH drives them correctly.
   (:require [clojure.test :refer :all]
             [SNOBOL4clojure.patterns :refer :all]
-            [SNOBOL4clojure.match    :refer [SEARCH MATCH FULLMATCH]]))
+            [SNOBOL4clojure.match-api :refer [SEARCH MATCH FULLMATCH]]))
 
 ;; ── Constructor representation ────────────────────────────────────────────────
 (deftest test-constructors-produce-lists
