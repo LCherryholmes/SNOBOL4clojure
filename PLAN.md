@@ -155,6 +155,7 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Session 12c | `fa19688` | 1865/4018/0 | Add t_worm_patterns(23), t_worm_algorithms(12), t_worm_expr_parser(19). All green. |
 | Session 13  | `b20f754` | 1865/4018/0 | Sprint 18 automation. CSNOBOL4 2.3.3 and SPITBOL v4.0f built from source and installed in container. `generator.clj` extended with: `gen-by-length` (4,705 systematic programs by source length), `gen-by-length-annotated` (with :band 0..5 metadata), `rand-statement` (random single-statement programs), `gen-error-class-programs` (div-zero/bad-goto/syntax coverage), `run-worm-batch`/`run-systematic-batch` (batch runner via harness), `corpus-record->deftest`/`emit-regression-tests` (auto-pin failures as deftests). Validated: 1,500/4,705 systematic programs run through three-oracle harness — 1,499 :pass, 1 :skip, 0 :fail. Engine is clean. No new test files added (no failures to pin). Sprint 23+ architectural vision documented in PLAN.md. |
 | Session 13b | `b30f383` | 1865/4018/0 | **Stage 23A: Pre-compiled EDN cache.** Benchmark showed CODE! (grammar+emitter) costs 10.93ms = 95% of total per-program cost. `compiler.clj` extended with: `ir->edn`/`edn->ir` (lossless serialisation), `CODE-ir` (load pre-compiled IR, skip grammar), `CODE-memo` (in-memory memoised cache), `CODE-cached` (disk-backed cache), `compile-to-file`/`load-ir`, `clear-memo!`/`memo-stats`, `precompile-corpus!`. All Stage 23A functions exported from `core.clj`. `harness.clj` and `test_helpers.clj` wired to use `CODE-memo`. **Result: 22x speedup** (12.3ms → 0.556ms per program). Test suite: 30s wall clock, down from 45s (33% faster). All validation tests pass. |
+| Session 13c | `d9e4203` | 1865/4018/0 | **Stage 23B + 23C: Transpiler and Stack Machine.** `transpiler.clj` (335 lines): SNOBOL4 IR → Clojure source; each program becomes a `loop/case` fn in a generated namespace; JVM JIT compiles hot paths to native. Fixed label-slot redirect bug (integer slot 2 missing from case). Validated 500/500 worm programs. Benchmark: 3.5x (loop), 6x (arithmetic). `vm.clj` (326 lines): flat bytecode vector with 7 integer opcodes (HALT/EXEC/EXEC-S/EXEC-F/EXEC-SF/JUMP/SIGNAL), two-pass compiler (PC assignment + instruction emission), `run-vm!` dispatch loop. Validated 1000/1000 worm programs. Benchmark: 5.7x (simple), 2.5x (loop), 4x (branch). All Stage 23B+23C API exported from `core.clj`. Cumulative speedup from cold start: ~190x. |
 
 **Current baseline**: 1865 tests / 4018 assertions / 0 failures
 **Last confirmed**: 2026-03-08 (session 13)
@@ -892,10 +893,10 @@ performance optimisation that must produce identical output on every test.
 | Stage | Effort | Payoff | Gate condition | Status |
 |-------|--------|--------|----------------|--------|
 | 23A — EDN cache | 1 session | 3-5x test speed | Worm corpus complete | **DONE** commit `b30f383` — actual 22x per-program, 33% suite |
-| 23B — Transpiler | 2 sessions | 5-20x runtime | EDN cache working | NEXT |
-| 23C — Stack machine | 2 sessions | 2-5x + clean IR | Transpiler working | PLANNED |
-| 23D — JVM codegen | 3-4 sessions | 10-100x | Stack machine working | PLANNED |
-| 23E — Full JIT | ongoing | SPITBOL-class | All prior stages | VISION |
+| 23B — Transpiler | 2 sessions | 5-20x runtime | EDN cache working | **DONE** commit `4ed6b7e` — 3.5-6x, 500/500 worm validation |
+| 23C — Stack machine | 2 sessions | 2-5x + clean IR | Transpiler working | **DONE** commit `d9e4203` — 2-6x, 1000/1000 worm validation |
+| 23D — JVM bytecode generation | 3-4 sessions | 10-100x | Stack machine working | **NEXT** |
+| 23E — Full SPITBOL-class JIT | ongoing | native speed | All prior stages | VISION |
 
 **Start with 23A** — it is pure mechanical work (add serialisation to existing
 IR), delivers immediate speedup to every test run, and exercises the full IR
