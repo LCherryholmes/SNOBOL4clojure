@@ -220,6 +220,12 @@
         ;; Immediate assignment: assign to var as soon as the inner pattern P
         ;; matches, regardless of whether the overall match eventually succeeds.
         ;; On backtrack, the assignment is NOT undone (true SNOBOL4 $ semantics).
+        ;; ── CAPTURE-IMM ($) ──────────────────────────────────────────────────
+        ;; Immediate assignment: assign to var as soon as the inner pattern P
+        ;; matches, unconditionally (even if overall match later fails).
+        ;; IMPORTANT: on :succeed we do NOT pop Ω — any retry frames pushed by
+        ;; our child (e.g. BREAKX#) must remain on Ω so backtracking can reach them.
+        ;; We pushed our own frame at :proceed; on :recede we pop that frame.
         CAPTURE-IMM
         (case action
           :proceed
@@ -228,16 +234,11 @@
           (let [[_ _ var-sym] (ζΠ ζ)
                 matched-text  (subs full-subject (ζΔ ζ) (ζδ ζ))]
             (snobol-set! var-sym matched-text)   ; assign immediately, unconditionally
-            (recur :succeed (ζ↑ ζ) (🡧 Ω)))
+            (recur :succeed (ζ↑ ζ) Ω))           ; leave child retry frames on Ω
           (:fail :recede)
-          (recur :recede (🡡 Ω) (🡧 Ω)))
+          (recur :recede (🡡 Ω) (🡧 Ω)))          ; pop our own frame, pass recede
 
-        ;; ── CAPTURE-COND (.) ─────────────────────────────────────────────────
-        ;; Conditional assignment: record the pending assignment in a side-table;
-        ;; commit all pending assignments only when the full match succeeds.
-        ;; On backtrack/failure, pending assignments for this branch are discarded.
-        ;; We implement this by accumulating (var matched-text) pairs in the
-        ;; pending-assigns atom; the top-level engine commits or discards them.
+        ;; ── CAPTURE (legacy alias, same as CAPTURE-IMM) ──────────────────────
         CAPTURE
         (case action
           :proceed
@@ -246,21 +247,22 @@
           (let [[_ _ var-sym] (ζΠ ζ)
                 matched-text  (subs full-subject (ζΔ ζ) (ζδ ζ))]
             (snobol-set! var-sym matched-text)
-            (recur :succeed (ζ↑ ζ) (🡧 Ω)))
+            (recur :succeed (ζ↑ ζ) Ω))
           (:fail :recede)
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
+        ;; ── CAPTURE-COND (.) ─────────────────────────────────────────────────
+        ;; Conditional assignment: assign only when the full match succeeds.
+        ;; Same frame/Ω discipline as CAPTURE-IMM.
         CAPTURE-COND
         (case action
           :proceed
           (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))
           :succeed
-          ;; Deferred: stash in pending-assigns; commit at top level on success.
-          ;; For now, behave same as CAPTURE (pending full deferred-assign infra).
           (let [[_ _ var-sym] (ζΠ ζ)
                 matched-text  (subs full-subject (ζΔ ζ) (ζδ ζ))]
             (snobol-set! var-sym matched-text)
-            (recur :succeed (ζ↑ ζ) (🡧 Ω)))
+            (recur :succeed (ζ↑ ζ) Ω))           ; leave child retry frames on Ω
           (:fail :recede)
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
