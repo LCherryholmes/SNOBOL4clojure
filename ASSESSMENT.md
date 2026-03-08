@@ -1,8 +1,8 @@
-# SNOBOL4clojure — Feature Assessment & Sprint Plan
+# SNOBOL4clojure — Feature Assessment
 
-**Baseline:** 82 tests / 314 assertions / 0 failures  
-**Commit:** `4813ae8` (Stage 7c — ARB/ARBNO)  
-**Reference materials:** `_backend_pure.py`, `_backend_c.py`, `SNOBOL4functions.py`, `snobol4ref/`, `x64ref/`
+**Baseline:** 1865 tests / 4018 assertions / 0 failures  
+**Commit:** `875762c` (Stage 23D — JVM bytecode generation)  
+**Last updated:** Session 13d
 
 ---
 
@@ -10,319 +10,175 @@
 
 | Symbol | Meaning |
 |--------|---------|
-| ✅ | Implemented and tested |
-| 🟡 | Partially implemented / stub exists |
-| ❌ | Missing / stub returns nil or wrong value |
-| 🔒 | Out of scope (intentional) |
+| ✅ | Implemented, tested, catalog coverage |
+| 🟡 | Implemented but no dedicated catalog tests, or minor gaps |
+| ⚠️  | Exists but wiring/dispatch gap or no tests at all |
+| ❌ | Stub — returns nil / ε silently |
 
 ---
 
-## 1. Pattern Engine
+## 1. Arithmetic Operators
 
-### 1a. Primitive Scanners (`primitives.clj`)
-
-| Primitive | Status | Notes |
-|-----------|--------|-------|
-| `LIT$` | ✅ | |
-| `ANY$` | ✅ | |
-| `NOTANY$` | ✅ | |
-| `SPAN$` | ✅ | |
-| `BREAK$` | ✅ | |
-| `BREAKX$` | ❌ | Stub. Like BREAK but also yields at each char inside the break set — used for breakout-and-retry patterns. One scanner function needed. |
-| `NSPAN$` | ❌ | Missing entirely. Like SPAN but matches zero chars (greedy, longest, no backtrack). Add to primitives + patterns. |
-| `LEN#` | ✅ | |
-| `TAB#` | ✅ | |
-| `RTAB#` | ✅ | |
-| `POS#` | ✅ | |
-| `RPOS#` | ✅ | |
-| `REM!` | ✅ | Matches rest of string to end |
-| `SUCCEED!` | ✅ | |
-| `FAIL!` | ✅ | |
-| `ABORT!` | ❌ | Stub. Must immediately abort the entire match (no backtrack). Engine case needed. |
-
-### 1b. Engine Node Types (`match.clj`)
-
-| Node | Status | Notes |
-|------|--------|-------|
-| `SEQ` | ✅ | Concatenation with backtrack |
-| `ALT` | ✅ | Alternation with backtrack |
-| `LIT$` | ✅ | |
-| `ANY$…RTAB#` | ✅ | All primitive dispatch |
-| `CAPTURE` | ✅ | `P . N` conditional assignment |
-| `ARB!` | ✅ | Shortest-first any-string |
-| `ARBNO!` | ✅ | Zero-or-more repetitions, lazy expansion |
-| `FENCE!` | 🟡 | `FENCE(P)` (fence_function) works. Bare `FENCE()` (fence_simple / abort-on-backtrack) uses recede not abort — semantics incomplete. |
-| `BREAKX$` | ❌ | Needs engine case once primitive exists |
-| `BAL!` | ❌ | Stub. Matches balanced parenthesised strings. Well-defined algorithm in `_backend_pure.py`. |
-| `ABORT!` | ❌ | Stub. Must return `nil` immediately from engine loop. |
-| `X` | ✅ | Indirect pattern lookup via `$$` |
-| Immediate assign `$` | 🟡 | `CAPTURE` handles conditional (`.`). The `$` (immediate during match) path is not differentiated — both use the same CAPTURE node. `$` should assign on each match attempt; `.` only on overall success. |
-
-### 1c. Pattern Constructors (`patterns.clj`)
-
-| Constructor | Status | Notes |
-|-------------|--------|-------|
-| `ANY`, `NOTANY`, `SPAN`, `BREAK` | ✅ | |
-| `BREAKX` | 🟡 | Constructor exists, calls stub primitive |
-| `NSPAN` | ❌ | Not in patterns.clj at all |
-| `LEN`, `TAB`, `RTAB`, `POS`, `RPOS` | ✅ | |
-| `ARB`, `REM` | ✅ | |
-| `ARBNO` | ✅ | |
-| `FENCE` | 🟡 | `FENCE(P)` correct. Bare `FENCE()` abort semantics missing |
-| `FAIL` | ✅ | |
-| `BAL` | ❌ | Constructor exists, calls stub engine node |
-| `ABORT` | ❌ | Constructor exists, engine stub |
-| `α` / BOL | ❌ | Not in patterns.clj. Matches at start of line (pos=0 or after `\n`) |
-| `ω` / EOL | ❌ | Not in patterns.clj. Matches at end of line (pos=end or before `\n`) |
+| Operator | Arity | Status | Notes |
+|---|---|---|---|
+| `+` `-` `*` `/` | binary | ✅ | Integer-preserving; `/` throws on zero |
+| `+` `-` | unary | ✅ | Numeric sign |
+| `**` | binary | ✅ | Power via `Math/pow` |
+| `~` | unary | ✅ | Logical negation — flips S/F |
 
 ---
 
-## 2. Pattern Operators (`operators.clj` / `emitter.clj`)
+## 2. Numeric Comparison Functions
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Concatenation (juxtaposition → SEQ) | ✅ | |
-| Alternation `\|` | ✅ | |
-| Immediate assign `P $ N` | 🟡 | Emitter maps to CAPTURE; `$` and `.` treated same |
-| Conditional assign `P . N` | 🟡 | Same as above |
-| Immediate cursor `@N` / `Θ` | ❌ | `@N` in grammar as `uop`; not emitted as cursor-assign pattern |
-| Conditional cursor `%N` / `θ` | ❌ | Grammar has `%`; emitter maps to `pct`; not a pattern cursor |
-| Guard `*expr` / `Λ` | ❌ | Not emitted as a deferred guard node. EQ guards evaluated eagerly. |
-| Optional `~P` / `π` | 🟡 | `~` in grammar as `ttl`/`uop`; emitter maps to `tilde`; no `INVOKE 'tilde` |
-| Conjunction `P & Q` / `ρ` | 🟡 | `&` parsed; emitter maps to `and`; `INVOKE 'and` not in INVOKE table |
-| Regex `Φ`/`φ` | ❌ | Not planned — Python-specific |
+| Function | Status | Test Coverage |
+|---|---|---|
+| `EQ` `NE` `LT` `LE` `GT` `GE` | ✅ | `t_compare.clj` — 9 cases each, all sign combinations |
+| `IDENT` `DIFFER` | ✅ | `t_compare.clj` — 5 cases each |
+| `LGT` | ✅ | `t_compare.clj` — 5 cases |
+| `LEQ` `LNE` `LLE` `LLT` `LGE` | ⚠️ | Defined via `primitive` macro but **absent from INVOKE dispatch** — reachable only via accidental namespace fallthrough; no catalog tests |
 
 ---
 
-## 3. Built-in Functions
+## 3. String Functions
 
-### 3a. String Functions
+| Function | Status | Test Coverage |
+|---|---|---|
+| `SIZE` | ✅ | `t_string.clj` — 5 cases |
+| `TRIM` | ✅ | `t_string.clj` — 3 cases |
+| `REVERSE` | ✅ | `t_string.clj` — 3 cases |
+| `DUPL` | ✅ | `t_string.clj` — 3 cases |
+| `LPAD` `RPAD` | ✅ | `test_cooper.clj` — 3 cases each; 3-arg fill-char form |
+| `SUBSTR` | 🟡 | Works; used throughout `t_worm_*` but no dedicated catalog file |
+| `REPLACE` | ✅ | `t_convert.clj` — 5 cases |
+
+---
+
+## 4. Conversion & Type Functions
+
+| Function | Status | Test Coverage |
+|---|---|---|
+| `INTEGER` | ✅ | `t_convert.clj` — 3 cases (str, int, real) |
+| `REAL` | ✅ | `t_convert.clj` — 2 cases |
+| `STRING` | ✅ | `t_convert.clj` — 2 cases |
+| `ASCII` | ✅ | `t_convert.clj` — 7 cases |
+| `CHAR` | ✅ | `t_convert.clj` — 5 cases |
+| `CONVERT` | ✅ | `t_convert.clj` — via DATATYPE |
+| `REMDR` | ✅ | `t_arith.clj` |
+| `DATATYPE` | ✅ | `t_convert.clj` — 7 types (string, integer, real, pattern, array, table, user-defined) |
+
+---
+
+## 5. Pattern Primitives
+
+| Pattern | Status | Test Coverage |
+|---|---|---|
+| `LEN` `POS` `RPOS` `TAB` `RTAB` | ✅ | `t_patterns_prim.clj` |
+| `ANY` `NOTANY` `SPAN` `BREAK` | ✅ | `t_patterns_prim.clj` |
+| `NSPAN` | 🟡 | Implemented; exercised in worm tests; no dedicated catalog cases |
+| `BREAKX` | ✅ | `t_patterns_ext.clj` — 7 cases |
+| `BOL` `EOL` | ✅ | `t_patterns_prim.clj` |
+| `ARB` | ✅ | `t_patterns_prim.clj` |
+| `ARBNO` | ✅ | `t_patterns_ext.clj` — 6 cases |
+| `REM` | ✅ | `t_patterns_prim.clj` |
+| `BAL` | ✅ | `t_patterns_ext.clj` + `test_sprint9_bal.clj` |
+| `FENCE` bare + `FENCE(P)` | ✅ | `t_patterns_ext.clj` — 3 cases |
+| `ABORT` | ✅ | `t_patterns_ext.clj` — 2 cases |
+| `FAIL` `SUCCEED` | ✅ | `t_patterns_prim.clj` |
+
+---
+
+## 6. Pattern Operators
+
+| Operator | Status | Notes |
+|---|---|---|
+| Concatenation (juxtaposition) | ✅ | `SEQ` node |
+| `\|` alternation | ✅ | `ALT` node |
+| `~P` optional | ✅ | Sugar for `ALT P ε` |
+| `P . N` conditional capture | ✅ | `t_patterns_cap.clj` |
+| `P $ N` immediate capture | ✅ | `t_patterns_cap.clj` |
+| `@N` cursor assign | ✅ | `t_patterns_ext.clj` — 4 cases (`CURSOR-IMM!` node) |
+| `P & Q` conjunction / `CONJ` | ✅ | `t_patterns_ext.clj` — 2 cases |
+| `*expr` deferred eval | ✅ | `t_patterns_adv.clj` (`DEFER!` node) |
+
+---
+
+## 7. Data Structures
+
+| Feature | Status | Test Coverage |
+|---|---|---|
+| `TABLE` | ✅ | `t_array.clj`, `test_sprint12.clj` |
+| `ARRAY` (1D, multi-dim, non-1 origin) | ✅ | `test_sprint11_array.clj` |
+| `DATA` / `FIELD` (programmer-defined datatypes) | ✅ | `test_sprint12.clj` |
+| `ITEM` | ✅ | Subscript read dispatch |
+| `PROTOTYPE` | ✅ | `test_sprint11_array.clj` |
+| `SORT` / `RSORT` | ✅ | `test_sprint12.clj` |
+| `COPY` | ✅ | `test_bootstrap.clj` |
+
+---
+
+## 8. User-Defined Functions
+
+| Feature | Status | Test Coverage |
+|---|---|---|
+| `DEFINE` | ✅ | `t_define.clj` — 16 cases |
+| `RETURN` / `FRETURN` / `NRETURN` | ✅ | `t_define.clj` |
+| Recursion | ✅ | `t_algorithms.clj` |
+| `APPLY` | ✅ | In INVOKE dispatch |
+| `ARG` | ❌ | Stub — `(defn ARG [] nil)` |
+| `LOCAL` | ❌ | Stub — `(defn LOCAL [] nil)` |
+
+---
+
+## 9. System & I/O Functions
 
 | Function | Status | Notes |
-|----------|--------|-------|
-| `SIZE` | ✅ | |
-| `REPLACE` | ✅ | Char-by-char translation |
-| `DUPL` | ✅ | |
-| `TRIM` | ✅ | |
-| `REVERSE` | ✅ | |
-| `LPAD` | ✅ | |
-| `RPAD` | ✅ | |
-| `SUBSTR` | ✅ | |
-| `CHAR` | ✅ | |
-| `ASCII` | ❌ | Not in functions.clj. Trivial: `(int (first s))` |
-| `REMDR` | 🟡 | Macro stub exists, not wired through INVOKE |
-
-### 3b. Comparison Functions (numeric)
-
-| Function | Status | Notes |
-|----------|--------|-------|
-| `EQ`, `NE`, `LT`, `LE`, `GT`, `GE` | ✅ | In INVOKE table |
-
-### 3c. Comparison Functions (string/lexicographic)
-
-| Function | Status | Notes |
-|----------|--------|-------|
-| `LEQ`, `LNE`, `LLT`, `LLE`, `LGT`, `LGE` | ✅ | Defined via `primitive` macro |
-| `IDENT`, `DIFFER` | ✅ | Defined via `primitive` macro |
-
-### 3d. Type Conversion
-
-| Function | Status | Notes |
-|----------|--------|-------|
-| `INTEGER` | ❌ | Not in functions.clj. Convert to integer or fail |
-| `REAL` | ❌ | Not in functions.clj. Convert to real or fail |
-| `STRING` | ❌ | Not in functions.clj. Convert to string |
-| `CONVERT` | 🟡 | Stub — returns arg unchanged |
-| `DATATYPE` | ✅ | Fixed to return `"PATTERN"` for pattern list nodes |
-
-### 3e. I/O
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `OUTPUT =` (write line) | ✅ | `println` on assignment |
-| `TERMINAL =` (write line) | ✅ | Same as OUTPUT |
-| `INPUT` read | ❌ | `INPUT$` atom exists but never bound. Reading `INPUT` variable should call `read-line` |
-| `INPUT(n,u,...)` | ❌ | File I/O association stub |
-| `OUTPUT(n,u,...)` | ❌ | File I/O association stub |
-| `ENDFILE`, `REWIND`, `DETACH`, `BACKSPACE` | ❌ | All stubs |
-
-### 3f. Math
-
-| Function | Status | Notes |
-|----------|--------|-------|
-| `REMDR` | 🟡 | Macro exists, not wired |
-| `ABS` | ❌ | Not present. Trivial. |
-| `SQRT`, `EXP`, `LOG` etc. | ❌ | Not present. Low priority. |
-
-### 3g. Table / Array
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `TABLE` | 🟡 | Returns empty hashmap; indexed access via `ndx` not wired |
-| `ARRAY` | 🟡 | Returns Object array; indexed access via `ndx` not wired |
-| `ITEM` | ❌ | Stub |
-| `SORT`, `RSORT` | ❌ | Stubs |
-| `PROTOTYPE` | ❌ | Stub |
-
-### 3h. Data Structures (DATA)
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `DATA(proto)` | 🟡 | `DATA!` parses prototype, generates deftype. `DATA` wraps it. Dispatch in DATATYPE not wired for user types. |
-| `FIELD` | 🟡 | Returns `__slots__[i]` — needs proper accessor |
-| Custom DATATYPE dispatch | ❌ | `#_(is (= (DATATYPE (tree. ...)) "tree"))` still disabled |
-
-### 3i. Miscellaneous Functions
-
-| Function | Status | Notes |
-|----------|--------|-------|
-| `DATE` | ✅ | |
-| `TIME` | ✅ | |
-| `COPY` | 🟡 | Stub — returns arg |
-| `APPLY` | ❌ | Stub. Should call user function by name with args |
-| `COLLECT` | 🟡 | Stub — GC hint, acceptable |
-| `DUMP` | 🟡 | Stub |
+|---|---|---|
+| `OUTPUT` / `TERMINAL` | ✅ | Core print mechanism |
+| `INPUT` | ✅ | `READ-LINE!` |
+| `DATE` | ✅ | Returns `java.util.Date.toString()` |
+| `TIME` | ✅ | Returns `System/currentTimeMillis` |
+| `BACKSPACE` `DETACH` `EJECT` `ENDFILE` `REWIND` | ❌ | Stub — returns `ε` silently; no file I/O |
+| `COLLECT` `DUMP` `CLEAR` | ❌ | Stub — returns `ε` silently |
+| `EXIT` `HOST` | ❌ | Stub — returns `nil` |
+| `SETEXIT` `STOPTR` `TRACE` (fn form) | ❌ | Stub — returns `nil`; tracing handled separately via `trace.clj` |
+| `LOAD` `UNLOAD` `OPSYN` | ❌ | Stub — returns `nil`; dynamic loading not supported |
 
 ---
 
-## 4. Runtime (`runtime.clj`)
+## 10. Special Variables / Keywords
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| `GOTO` / `:(LABEL)` | ✅ | |
-| `:S(LABEL)` success goto | ✅ | |
-| `:F(LABEL)` failure goto | ✅ | |
-| `:S(L1) :F(L2)` combined | ✅ | |
-| `DEFINE` + user functions | ✅ | `:(RETURN)` goto works |
-| `FRETURN` | ❌ | Failure return from function |
-| `NRETURN` | ❌ | Null return |
-| `END` label termination | 🟡 | Works via GOTO `:END` convention |
-| Multi-statement labels | ✅ | |
-| Statement-level pattern match + replace | ✅ | |
+| Feature | Status |
+|---|---|
+| `&STLIMIT` / `&STCOUNT` | ✅ |
+| `&ANCHOR` | ✅ |
+| `&TRIM` | ✅ |
+| `&FULLSCAN` | ✅ |
+| `&TRACE` | ✅ |
+| `&ERRTYPE` | ✅ |
+| `&MAXLNGTH` | ✅ |
 
 ---
 
-## 5. Grammar / Emitter
+## 11. Performance Backends (Sprint 23)
 
-| Feature | Status | Notes |
-|---------|--------|-------|
-| Labels, GOTOs | ✅ | |
-| String/Integer/Real literals | ✅ | |
-| All arithmetic operators | ✅ | |
-| Pattern operators `$`, `.`, `\|` | ✅ | Parsed; `$`/`.` emit CAPTURE |
-| `@N` cursor assign | ❌ | Parsed as `uop`; emitter emits `(at N)` but no INVOKE handler |
-| `*expr` guard | ❌ | Parsed as unary `*`; emitter emits `(* expr)` but no guard handling |
-| `~P` optional | 🟡 | Parsed; emitter emits `(tilde P)` but no INVOKE handler |
-| `&` conjunction | 🟡 | Parsed; emitter emits `(and P Q)` but no INVOKE handler |
-| `#` hash operator | ❌ | Parsed; emitter emits `(sharp x)`; semantics unclear |
-| Conditional expr `(P, Q)` | 🟡 | Parsed; emits `[comma P Q]`; not in INVOKE |
-| Indirect ref `*N` | 🟡 | Unary `*` — probably means "value of variable named by N" |
+| Stage | File | Speedup | Status |
+|---|---|---|---|
+| 23A — EDN IR cache (`CODE-memo`) | `compiler.clj` | 22× per-program, 33% suite wall-time | ✅ |
+| 23B — IR→Clojure transpiler | `transpiler.clj` | 3.5–6× | ✅ |
+| 23C — Clojure stack machine | `vm.clj` | 2–6× | ✅ |
+| 23D — JVM bytecode generation | `jvm_codegen.clj` | 1.3–7.6× (7.6× dispatch, bounded by EVAL!) | ✅ |
+| 23E — Inline EVAL! (AOT expr codegen) | — | Target 10–50× on loops | **NEXT** |
 
 ---
 
-## Proposed Sprints
+## Gap Summary
 
-### Sprint 8 — Quick Wins (1 session)
-Small isolated fixes with high correctness payoff.
+### Needs INVOKE wiring (exists, just not dispatched)
+`LEQ` `LNE` `LLE` `LLT` `LGE` — defined via `primitive` macro, not in the `INVOKE` case table.
+Any SNOBOL4 program calling these falls through to user-function lookup (accidentally works but fragile).
 
-1. **`ABORT!` engine node** — 3 lines: return `nil` from engine loop on `:proceed`
-2. **Bare `FENCE()` abort** — differentiate abort vs recede in `:recede` handler
-3. **`ASCII` function** — 1 line in functions.clj
-4. **`REMDR` in INVOKE** — wire the existing macro to INVOKE table
-5. **`INTEGER`, `REAL`, `STRING` conversion functions** — type coercion with SNOBOL failure semantics
-6. **`INPUT` variable read** — wire `INPUT$` atom to `read-line`; handle in `=` INVOKE
+### Genuine stubs (no-ops, silently accepted)
+`ARG`, `LOCAL`, `BACKSPACE`, `DETACH`, `EJECT`, `ENDFILE`, `REWIND`, `COLLECT`, `DUMP`, `CLEAR`, `EXIT`, `HOST`, `SETEXIT`, `STOPTR`, `LOAD`, `UNLOAD`, `OPSYN`
 
-**Deliverable:** ~6 targeted fixes. No new architecture.
-
----
-
-### Sprint 9 — Pattern Completeness (1–2 sessions)
-Finish the scanner and engine gap.
-
-1. **`BREAKX`** — scanner: like BREAK but also yields each char in the break set as a position; engine case
-2. **`NSPAN`** — scanner + constructor: greedy span with no backtrack (matches 0+)
-3. **`BAL`** — engine node: balanced parentheses, multi-yield per Python reference
-4. **`α` / BOL and `ω` / EOL** — two zero-width positional nodes (line-aware POS/RPOS equivalents)
-5. **`$` vs `.` assign differentiation** — immediate (during match) vs conditional (on overall success); needs CAPTURE split into CAPTURE-IMM and CAPTURE-COND
-
-**Deliverable:** Pattern engine reaches parity with Python pure backend on all non-regex primitives.
-
----
-
-### Sprint 10 — Operator Completeness (1 session)
-Wire the parsed-but-unhandled operators.
-
-1. **`~P` optional** — `INVOKE 'tilde` → `(ALT P ε)` in INVOKE table
-2. **`P & Q` conjunction** — `INVOKE 'and` → match P and Q at same position, succeed if both match same span (ρ semantics)
-3. **`@N` cursor assign** — immediate position capture during match (Θ semantics); emit as `(CURSOR-IMM N)` node
-4. **`%N` conditional cursor** — conditional position capture (θ semantics)
-5. **`*expr` deferred guard** — wrap expression in a pattern node that evaluates at match time (Λ semantics); fixes EQ guard pruning
-
-**Deliverable:** All grammar operators have working INVOKE dispatch. Enables the commented-out `match-2` wolf test.
-
----
-
-### Sprint 11 — Data Structures & CONVERT (1 session)
-Make TABLE, ARRAY, and DATA production-ready.
-
-1. **TABLE indexed access** — `T<KEY>` and `T[KEY]` via `ndx` emitter path; INVOKE for table get/set
-2. **ARRAY indexed access** — `A[I]` integer-indexed; bounds check
-3. **`CONVERT`** — full implementation: string→integer, integer→string, etc. using SNOBOL failure semantics
-4. **`PROTOTYPE`** — return the prototype string of a DATA or ARRAY
-5. **`DATA` DATATYPE dispatch** — wire user-defined types into the DATATYPE multimethod
-6. **`FIELD`** — proper field accessor for DATA instances
-
-**Deliverable:** TABLE and ARRAY usable in real programs. DATA types fully introspectable.
-
----
-
-### Sprint 12 — I/O & Runtime Polish (1 session)
-Bring the runtime up to usable for real SNOBOL4 programs.
-
-1. **`INPUT` read** — `INPUT =` reads next line from `*in*`; `INPUT(N,U)` file association
-2. **`FRETURN`** — failure return from user function (jumps to caller's `:F` branch)
-3. **`NRETURN`** — null return (function fails, but not as FRETURN)
-4. **`APPLY`** — call user function by name string with arg list
-5. **`ENDFILE` / `REWIND` / `DETACH`** — basic file I/O lifecycle stubs upgraded to real streams
-6. **`END` label** — explicit end-of-program detection in `RUN`
-
-**Deliverable:** Standard SNOBOL4 programs that read stdin and use functions work end-to-end.
-
----
-
-### Sprint 13 — Full Program Validation (1–2 sessions)
-Port and run a real SNOBOL4 reference program.
-
-Candidates from `snobol4ref/`:
-- `test/atn.sno` — ATN parser (uses FENCE, ARBNO, DATA, tables, recursion)
-- `demos/eliza.txt` — ELIZA chatbot (pattern-heavy)
-- `snolib/not.sno` — NOT(P) implementation (uses FENCE, UNIQUE, DEFINE)
-
-**Deliverable:** At least one non-trivial reference program runs correctly, end-to-end, in SNOBOL4clojure.
-
----
-
-## Priority Matrix
-
-| Sprint | Effort | Value | Risk |
-|--------|--------|-------|------|
-| 8 — Quick Wins | Low | High | Low |
-| 9 — Pattern Completeness | Medium | High | Medium |
-| 10 — Operator Completeness | Medium | High | Medium (guard eval is architectural) |
-| 11 — Data Structures | Medium | Medium | Low |
-| 12 — I/O & Runtime | Medium | High | Low |
-| 13 — Full Program | High | Very High | Medium |
-
-**Recommended order:** 8 → 9 → 10 → 12 → 11 → 13
-
-Sprint 10's deferred guard (`*expr`) is the most architecturally interesting piece — it requires a new engine node type that evaluates a Clojure expression at match time, but the pattern for it (Λ in Python) is clear from the reference.
-
----
-
-## Currently Disabled Tests (re-enable as sprints complete)
-
-| Test | Sprint | Condition |
-|------|--------|-----------|
-| `match-2` wolf guard | 10 | `*expr` deferred guard (Λ) |
-| `match-define` ANY multi-arg | 9/10 | EVAL resolves `&UCASE &LCASE` concatenation |
-| `datatype-test` user DATA | 11 | DATA DATATYPE dispatch |
+### No dedicated catalog tests (works, only incidentally exercised)
+`SUBSTR`, `NSPAN`, `LEQ`/`LNE`/`LLE`/`LLT`/`LGE`
