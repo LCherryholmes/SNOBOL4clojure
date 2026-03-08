@@ -2,16 +2,15 @@
 
 > **For a new Claude session**: Read this file, then `ASSESSMENT.md` for the
 > full feature matrix. Transcripts are at `/mnt/transcripts/journal.txt`.
-> Start with `lein test` to confirm baseline.
+> Start with `lein test` to confirm baseline (should be 120 tests / 403 assertions).
 
 ---
 
 ## What This Project Is
 
-A complete SNOBOL4 implementation in Clojure. The goal is full semantic
-fidelity with the SNOBOL4 standard — not a regex wrapper, but a proper
-pattern-match engine with backtracking, captures, alternation, and the full
-SNOBOL4 pattern calculus.
+A complete SNOBOL4 implementation in Clojure. Full semantic fidelity with the
+SNOBOL4 standard — not a regex wrapper, but a proper pattern-match engine with
+backtracking, captures, alternation, and the full SNOBOL4 pattern calculus.
 
 **Repository**: https://github.com/LCherryholmes/SNOBOL4clojure.git  
 **Location on disk**: `/home/claude/SNOBOL4clojure`  
@@ -70,78 +69,52 @@ Key subdirectory: `Function/Pattern/` — one `.cs` file per pattern primitive.
 | Stage 7b | `99b2563` | — | DATATYPE returns PATTERN for list nodes |
 | Stage 7c | `4813ae8` | 82/314 | ARB and ARBNO engine implementation |
 | Sprint 8 | `69a6f48` | 102/379 | ABORT!, bare FENCE(), REM engine node, ASCII, CHAR, REMDR, INTEGER, REAL, STRING |
-| Sprint 9 | WIP | 120/403 | BREAKX#, NSPAN, BOL, EOL, CAPTURE-IMM/CAPTURE-COND — 1 test failing |
+| Sprint 9 | `8ddb358` | 120/403 | BREAKX#, NSPAN, BOL, EOL, CAPTURE-IMM/CAPTURE-COND + Ω discipline fix |
 
 ---
 
-## Sprint 9 — Current Status (WIP, UNCOMMITTED)
+## Sprint 9 — COMPLETE ✅
 
-### What was implemented this session
+All items done:
+- **BREAKX#** engine node with correct backtrack/retry Ω discipline
+- **NSPAN** (0-or-more span)
+- **BOL / EOL** zero-width anchors
+- **CAPTURE-IMM ($) / CAPTURE-COND (.)** split
 
-1. **`BREAKX#` engine node** (`match.clj`) — backtracking form of BREAK.
-   On `:proceed`: scans to first break-set char, pushes retry frame onto Ω
-   with next-position stored in slot 5 (φ).
-   On `:recede`: pops retry frame, advances one past the previous break char,
-   scans again. This is the SNOBOL4 "slide" behaviour.
+**Key bug fixed**: CAPTURE's `:succeed` was calling `(🡧 Ω)`, which discarded
+child retry frames (e.g. from BREAKX#). Fix: leave Ω untouched on `:succeed`;
+only pop on `:fail/:recede` to remove the CAPTURE frame itself.
 
-2. **`NSPAN$` primitive** (`primitives.clj`) — 0-or-more span (SPAN requires ≥1).
-
-3. **`BOL#` / `EOL#` primitives** (`primitives.clj`) — zero-width anchors.
-   BOL succeeds only at Δ=0; EOL succeeds only when Σ is empty.
-
-4. **`CAPTURE-IMM` engine node** (`match.clj`) — immediate assignment (`$` operator).
-   Assigns matched text to a variable as soon as inner pattern P matches,
-   even if the overall match later fails.
-
-5. **`CAPTURE-COND` engine node** (`match.clj`) — conditional assignment (`.` operator).
-   Currently behaves same as CAPTURE-IMM (deferred-assign infra not yet built).
-   True semantics: assign ONLY on overall match success.
-
-6. **`operators.clj`** — `$` now emits `CAPTURE-IMM`, `.` now emits `CAPTURE-COND`.
-
-7. **`patterns.clj`** — added `NSPAN`, `BOL`, `EOL`; `BREAKX` now emits `BREAKX#`.
-
-8. **`core.clj`** — re-exports `NSPAN`, `BOL`, `EOL`.
-
-### Known failing test: `breakx-014-canonical-discriminator`
-
-The canonical BREAK vs BREAKX discriminator from Snobol4.Net BreakX_014:
-
-```
-subject = "EXCEPTIONS-ARE-AS-TRUE-AS-RULES"
-pattern = POS(0) BREAKX('A') . R2  'AS'
-expected = SUCCESS, match = [0,17], R2 = "EXCEPTIONS-ARE-"
-```
-
-BREAKX# is returning nil. The `:recede` retry logic in `match.clj` may have a
-frame-bookkeeping bug. The `:recede` branch rebuilds `Σ-retry` from
-`(drop retry-Δ (seq full-subject))` — verify that `ζ↑` is being called with
-the correct frame and that `full-subject` is in scope at that point.
-
-**To debug**: add `println` to the BREAKX# `:proceed` and `:recede` cases in
-the engine loop in `match.clj`.
+**Still pending from Sprint 9**: **BAL** — balanced parentheses. Still a stub.
+Carrying forward into Sprint 10.
 
 ---
 
-## Sprint 9 — Remaining Work
+## Sprint 10 — NEXT (Operator Completeness + BAL)
 
-1. **Fix BREAKX# `:recede` bug** — make `breakx-014-canonical-discriminator` pass.
-2. **CAPTURE-COND deferred semantics** — collect pending assigns in an atom,
-   commit on overall match success, discard on failure. Low priority; document
-   as known gap until Sprint 10.
-3. **BAL** — still a stub. Multi-yield balanced parentheses matching.
+### 10.1  BAL (carried from Sprint 9)
+Balanced parentheses matcher. Multi-yield: succeeds at each position where
+the text from the start to that point has balanced `(` and `)`.
+- Needs a new engine node `BAL!` that iterates forward, tracking depth.
+- On `:recede`, advances to the next balanced position.
+- Reference: Snobol4.Net `Function/Pattern/Bal.cs`
 
----
+### 10.2  `~P` optional
+`INVOKE 'tilde` → `(ALT P ε)`. Wire in the INVOKE dispatch table.
 
-## Sprint 10 Plan — Operator Completeness
+### 10.3  `P & Q` conjunction
+Both P and Q must match the same span from the same position.
+Emit as `(CONJ P Q)` engine node.
 
-1. `~P` optional — `(ALT P ε)` in INVOKE table
-2. `P & Q` conjunction — both P and Q must match the same span
-3. `@N` cursor assignment — immediate position capture during match
-4. `*expr` deferred guard — fixes `(EQ N 2)` eager-evaluation bug in ALT
+### 10.4  `@N` cursor assignment (immediate)
+Capture the current cursor position into variable N during the match.
+Emit as `(CURSOR-IMM N)` engine node.
 
-**Known open issue**: `(EQ N 2)` inside an ALT branch is evaluated eagerly
-at pattern-construction time. Requires Sprint 10 `*expr` deferred guard.
+### 10.5  `*expr` deferred guard
+Wrap an expression in a pattern node that evaluates at match time, not
+construction time. Fixes the known **EQ guard pruning bug**:
+`(EQ N 2)` inside an ALT branch is currently evaluated eagerly at
+pattern-construction time instead of match time.
 
 ---
 
@@ -178,7 +151,13 @@ Port a reference SNOBOL4 program end-to-end and validate output.
 ### $ vs . capture operators
 - `P $ V` — CAPTURE-IMM: assigns V immediately when P matches, unconditionally.
 - `P . V` — CAPTURE-COND: assigns V only when the full MATCH succeeds.
-  (Not yet fully distinguished; deferred-assign infrastructure pending.)
+  (Currently both assign immediately — deferred-assign infra still pending.)
+
+### Ω discipline for wrapper nodes
+Any engine node that wraps a child and pushes itself onto Ω at `:proceed`
+must NOT pop Ω on `:succeed`. Popping on `:succeed` discards retry frames
+that the child may have pushed (e.g. BREAKX#). Only pop Ω on `:fail/:recede`
+to remove the wrapper's own frame. This is the lesson from the BREAKX#+CAPTURE bug.
 
 ### Engine frame structure
 Frame ζ is a 7-vector: `[Σ Δ σ δ Π φ Ψ]`
@@ -188,10 +167,12 @@ Frame ζ is a 7-vector: `[Σ Δ σ δ Π φ Ψ]`
 - δ = cursor position now
 - Π = pattern node (the list/symbol)
 - φ = child index (slot 5) — BREAKX# reuses this as retry-position
-- Ψ = parent backtrack stack
+- Ψ = parent node stack (for returning to parent via ζ↑)
 
-Accessors: `ζΣ ζΔ ζσ ζδ ζΠ ζφ`  
-`full-subject` = the complete original subject string (closed over by the engine loop).
+Ω = backtrack choice stack (separate from Ψ).
+
+Accessors: `ζΣ ζΔ ζσ ζδ ζΠ ζφ`
+`full-subject` = complete original subject string (closed over by engine loop).
 
 ### Namespace isolation
 `GLOBALS` must be called once in the user's namespace before any match or
