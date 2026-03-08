@@ -87,7 +87,7 @@ namespace the user handed it via `env/GLOBALS`, `env/active-ns`,
 | Sprint 10 | `5a89477` | 139/431 | ~P optional, @N cursor, CONJ P&Q, *expr deferred |
 | Sprint 11a | `506d66f` | 151/447 | TABLE: atom-backed, subscript read/write <>/[], ITEM, PROTOTYPE |
 | Sprint 11b | `d75986c` | 166/467 | ARRAY: SnobolArray, multi-dim, bounds-checked, default value, PROTOTYPE |
-| Sprint 13  | TBD        | 220/548 | RETURN/FRETURN/END signals, DEFINE locals, APPLY, num nil-guard, uppercase-only keyword rule |
+| Sprint 14  | `f98f779`  | 220/548 | SPITBOL harness, SEQ concat fix, divide guard, trace removal |
 
 **Current baseline**: 220 tests / 548 assertions / 0 failures
 
@@ -161,6 +161,8 @@ variable operations. Tests call it in a `:each` fixture:
 | 3 | File I/O — DETACH, REWIND, ENDFILE are stubs | functions.clj |
 | 4 | Charset range expansion — `ANY("A-Z")` treats `-` as literal | primitives.clj |
 | 6 | PDD field write when accessor name shadows Clojure fn (e.g. REAL) | operators.clj |
+| 7 | `1 / 0` — integer divide by zero hangs in harness (zero? on non-numeric) | operators.clj |
+| 8 | Pattern replace `S PAT = R` drops unmatched prefix of S | operators.clj / match.clj |
 
 ---
 
@@ -203,28 +205,36 @@ This was a deliberate simplification that removes an entire class of ambiguity.
 
 ---
 
-## Sprint 14 — SPITBOL Harness  ⬜ PLANNED
+## Sprint 14 — SPITBOL Harness  ✅ COMPLETE (220/548)
 
-### Goal
-A working diff harness: given any `.sbl` source file, run it under both
-SPITBOL and SNOBOL4clojure, capture output, diff, record pass/fail.
+### What was done
+- `harness.clj`: `run-spitbol` / `run-clojure` / `diff-run` / `save-corpus!` / `load-corpus`
+- `run-spitbol`: shells to `/usr/local/bin/spitbol -b -`; error output (exit≠0) goes to `:stderr`
+- `run-clojure`: `with-out-str` + `future`/`deref` wall-clock timeout (5s); `reset-runtime!` clears compiler state between runs
+- Status classification: `:pass` `:pass-class` `:fail` `:timeout` `:skip`
+- SEQ concat fixed: `(SEQ "foo" "bar")` → `"foobar"` in expression context
+- Removed spurious `(trace r)` from `?=` handler
+- `divide` guarded against zero → nil (statement failure, matches SPITBOL)
+- `num` guarded against nil → `##NaN`
 
-### Context
-- SPITBOL binary: `/usr/local/bin/spitbol` (installed from x64-main, v4.0f)
-- Run as: `echo "$src" | spitbol -b -` → stdout is the oracle
-- SNOBOL4clojure side: `(CODE src)` then `(RUN 1)`, capture `OUTPUT$`/`TERMINAL$`
+### Smoke test results (8 cases)
+| Program | Status |
+|---------|--------|
+| `OUTPUT = 'hello world'` | ✅ :pass |
+| `OUTPUT = 3 + 4` | ✅ :pass |
+| `OUTPUT = 'foo' 'bar'` | ✅ :pass |
+| `GT(1,5)` (silent fail) | ✅ :pass |
+| `OUTPUT = 'a' / OUTPUT = 'b'` | ✅ :pass |
+| `DEFINE SQ / OUTPUT = SQ(7)` | ✅ :pass |
+| Loop 1..5 | ✅ :pass |
+| `OUTPUT = 1 / 0` | ⚠️ :timeout (div-by-zero hangs — bug #7) |
+| `S 'world' = 'SNOBOL4'` | ❌ :fail (replace drops prefix — bug #8) |
 
-### Tasks
-- [ ] 14.1  Shell wrapper `tools/spitbol-run.sh` — takes `.sbl` file, returns
-      normalised stdout (trim trailing whitespace, normalise line endings)
-- [ ] 14.2  Clojure harness ns `SNOBOL4clojure.harness` —
-      `(run-spitbol src)` / `(run-clojure src)` / `(diff-run src)`
-- [ ] 14.3  OUTPUT capture — wire `OUTPUT$` writes to a StringBuilder so
-      `run-clojure` returns a string matching SPITBOL stdout
-- [ ] 14.4  Step limit — honour `&STLIMIT` (default 250 000) to kill
-      infinite loops in generated programs
-- [ ] 14.5  Smoke test harness against 5 hand-picked `.sbl` programs
-- [ ] 14.6  Commit + push
+### New bugs found by harness
+| # | Issue | File |
+|---|-------|------|
+| 7 | `1 / 0` — integer divide by zero hangs (zero? fails on non-numeric result) | operators.clj |
+| 8 | Pattern replace `S PAT = R` drops unmatched prefix of S | operators.clj / match.clj |
 
 ---
 
