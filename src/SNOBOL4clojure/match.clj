@@ -344,8 +344,63 @@
           (:fail :recede)
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
-        ;; Not yet implemented
-        BAL! nil))))
+        ;; -- BAL! ---------------------------------------------------------------
+        ;; Matches balanced-paren substrings, multi-yield.
+        ;; Scans from entry-Delta carrying running nest depth.
+        ;; Yields (succeeds) every time nest returns to 0.
+        ;; On retry (:recede), resumes scan from saved [pos nest].
+        ;; phi (slot 5) stores [resume-pos resume-nest].
+        BAL!
+        (let [sublen  (count full-subject)
+              pos0    (ζΔ ζ)
+              scan-bal (fn [pos nest]
+                         (loop [p pos n nest]
+                           (cond
+                             (clojure.core/>= p sublen) nil
+                             :else
+                             (let [ch (nth full-subject p)
+                                   n2 (case ch
+                                        \( (inc n)
+                                        \) (dec n)
+                                        n)]
+                               (cond
+                                 (clojure.core/< n2 0) nil
+                                 (clojure.core/= n2 0) [(inc p) (inc p) 0]
+                                 :else (recur (inc p) n2))))))]
+          (case action
+            :proceed
+            (if-let [[end np nn] (scan-bal pos0 0)]
+              (recur :succeed
+                     (ζ↑ ζ (drop end (seq full-subject)) end)
+                     (🡥 Ω (assoc ζ 5 [np nn])))
+              (recur :fail (ζ↑ ζ (ζΣ ζ) pos0) Ω))
+            :recede
+            (let [[rp rn] (ζφ ζ)]
+              (if-let [[end np nn] (scan-bal rp rn)]
+                (recur :succeed
+                       (ζ↑ ζ (drop end (seq full-subject)) end)
+                       (🡥 Ω (assoc ζ 5 [np nn])))
+                (recur :recede (🡡 Ω) (🡧 Ω))))
+            :succeed (recur :succeed (ζ↑ ζ) Ω)
+            :fail    (recur :recede  (🡡 Ω) (🡧 Ω))))
+
+        ;; -- COLLECT! ------------------------------------------------------------
+        ;; (COLLECT! bag-atom P): match P; on each :succeed append [entry-Δ δ] to
+        ;; bag then immediately recede — driving P through all its Ω retry frames.
+        ;; Mirrors the SNOBOL4 idiom  P $ X FAIL  for exhausting multi-yield nodes.
+        COLLECT!
+        (case action
+          :proceed
+          (let [[S D _ _ Pi _ Psi] ζ
+                P   (nth Pi 2)
+                chi [S D S D P 1 (🡥 Psi ζ)]]
+            (recur :proceed chi (🡥 Ω ζ)))
+          :succeed
+          (let [bag (nth (ζΠ ζ) 1)]
+            (swap! bag conj [(ζΔ ζ) (ζδ ζ)])
+            (recur :recede (🡡 Ω) (🡧 Ω)))
+          (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))))))
 
 ;; ── Public API ────────────────────────────────────────────────────────────────
 
@@ -384,3 +439,18 @@
   [S P R]
   (when-let [[start end] (SEARCH S P)]
     (str (subs S 0 start) R (subs S end))))
+
+(defn COLLECT!
+  "Exhaustively collect every match [start end] of pattern P across string S,
+   including all multi-yield backtrack alternatives (e.g. BAL, ARB, ARBNO).
+   Mirrors the SNOBOL4 idiom  P $ X FAIL  — each match is captured then the
+   engine is forced to recede, driving P through all its Omega retry frames.
+   Returns a vector of [start end] pairs in scan order."
+  [S P]
+  (let [chars (seq S)
+        n     (count S)
+        bag   (atom [])
+        node  (list 'COLLECT! bag P)]
+    (doseq [i (range (inc n))]
+      (engine (drop i chars) i node i S))
+    @bag))

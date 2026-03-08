@@ -84,6 +84,7 @@
 (def SEARCH     match/SEARCH)
 (def FULLMATCH  match/FULLMATCH)
 (def REPLACE    match/REPLACE)
+(def COLLECT!  match/COLLECT!)
 
 ;; ── Re-export operators / EVAL ────────────────────────────────────────────────
 (def =     ops/=)
