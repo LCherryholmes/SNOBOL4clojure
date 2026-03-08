@@ -137,9 +137,10 @@ Both are used by `harness.clj` for three-oracle triangulation.
 
 | Sprint 18B (catalog) | `(pending)` | 1488/3249/0 | Catalog migration complete — 13 files, 510 tests |
 | Session 11 | `555bd39` | 1749/3786/0 | Fix recursive DEFINE — `<FUNS>` registry. `fact(5)=120`. Issue #7 closed. |
+| Session 12 | `c416b30` | 1764/3816/0 | Fix #9 (RTAB/TAB missing from INVOKE). Confirm #8/#10 fixed. Fix #6 (lowercase goto). Close #4 as by-design. 15 new regression tests. Worm-first strategy documented in PLAN.md. |
 
-**Current baseline**: 1761 tests / 3810 assertions / 0 failures
-**Last confirmed**: 2026-03-08 (session 11)
+**Current baseline**: 1764 tests / 3816 assertions / 0 failures
+**Last confirmed**: 2026-03-08 (session 12)
 
 ### Sprint 18C (step-probe) complete
 
@@ -291,9 +292,9 @@ on values that came from args.
 | 1 | CAPTURE-COND deferred semantics — `.` assigns immediately like `$`; deferred-assign infra not yet built | match.clj |
 | 2 | ANY(multi-arg) inside EVAL string — ClassCastException | operators.clj |
 | 3 | File I/O — DETACH, REWIND, ENDFILE are stubs | functions.clj |
-| 4 | Charset range expansion — `ANY("A-Z")` treats `-` as literal | primitives.clj |
+| 4 | Charset range expansion — `ANY("A-Z")` treats `-` as literal — **BY DESIGN**: standard SNOBOL4 (CSNOBOL4/v311) has no range syntax; `-` is a literal member. Range expansion is a SPITBOL extension; not implementing for now. | primitives.clj |
 | 5 | PDD field write when accessor name shadows Clojure fn (e.g. REAL) | operators.clj |
-| 6 | Goto case folding — Snobol4.Net uses lowercase `:s(label)` which fails our parser | grammar.clj |
+| 6 | ~~Goto case folding~~ — **FIXED** commit `c416b30`: grammar now accepts `'S'\|'s'` and `'F'\|'f'` in sjmp/fjmp rules. Regression tests added to `t_goto.clj`. Cooper suite now unblocked. | grammar.clj |
 | 7 | ~~DEFINE return value wrong~~ — **FIXED** commit `555bd39`: `<FUNS>` registry decouples function closure from result-slot variable. Recursive calls (`fact(5)=120`) now work. | operators.clj / env.clj |
 | 8 | ~~`~` negation operator broken~~ — **FIXED** (was already working via `tilde` INVOKE handler; root cause was diagnostic confusion with unrelated label/OUTPUT bug). Regression tests added to `t_compare.clj`. | operators.clj |
 | 9 | ~~RTAB/RPOS return empty string~~ — **FIXED** commit `(next)`: `RTAB` and `TAB` were missing from the INVOKE case table. EVAL! fell through to namespace lookup, found nothing, returned ε. Added `TAB` and `RTAB` entries to INVOKE. `RTAB(0) . T` now correctly captures full subject. Regression tests added to `t_patterns_prim.clj`. | operators.clj |
@@ -673,13 +674,14 @@ worm bands are green.
 
 Fix in this sequence — each unblocks the next tier of worm programs:
 
-1. ~~**Issue 10**~~ — loop fallthrough — **CONFIRMED FIXED** (was already working)
-2. ~~**Issue 9**~~  — RTAB/TAB missing from INVOKE — **FIXED** commit `555bd39`+
-3. ~~**Issue 8**~~  — `~` negation — **CONFIRMED FIXED** (tilde INVOKE handler was correct)
-4. **Issue 4**  — `ANY("A-Z")` charset range not expanded
-5. **Issue 6**  — goto case folding (Cooper suite uses lowercase `:s(label)`)
-6. **Issue 1**  — `.` capture deferred semantics
-7. **Issue 2**  — ANY multi-arg ClassCastException
+1. ~~**Issue 10**~~ — loop fallthrough — **CONFIRMED FIXED**
+2. ~~**Issue 9**~~  — RTAB/TAB missing from INVOKE — **FIXED** commit `9436c33`
+3. ~~**Issue 8**~~  — `~` negation — **CONFIRMED FIXED**
+4. ~~**Issue 6**~~  — goto case folding — **FIXED** commit `c416b30`
+5. ~~**Issue 4**~~  — charset range — **BY DESIGN** (standard SNOBOL4 has no range syntax)
+6. **Issue 5**  — PDD field write with name-shadowing (low priority)
+7. **Issue 1**  — `.` capture deferred semantics
+8. **Issue 2**  — ANY multi-arg ClassCastException
 
 ---
 
