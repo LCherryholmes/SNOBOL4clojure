@@ -364,6 +364,26 @@
                     meta (get @<FDEFS> (clojure.string/upper-case (str fname)))]
                 (when meta (nth (:locals meta) (dec (long n)) nil)))
     local     (apply INVOKE 'LOCAL args)
+    ;; CODE(src) — compile and execute a SNOBOL4 source fragment in the current env.
+    ;; Returns nil on success; :F branch taken on compile/runtime error.
+    ;; Uses resolve to avoid circular dependency (runtime → operators → compiler).
+    ;; Sprint 25F.
+    CODE      (let [src     (str (first args))
+                    compile (ns-resolve 'SNOBOL4clojure.compiler 'CODE)
+                    run     (ns-resolve 'SNOBOL4clojure.runtime  'RUN)]
+                (when-not (and compile run)
+                  (throw (ex-info "CODE: compiler/runtime not loaded"
+                                  {:snobol/signal :error})))
+                (try
+                  (run (compile src))
+                  nil
+                  (catch clojure.lang.ExceptionInfo e
+                    (case (get (ex-data e) :snobol/signal)
+                      :end nil
+                      (throw e)))
+                  (catch Exception e
+                    (throw (ex-info (.getMessage e) {:snobol/signal :error})))))
+    code      (apply INVOKE 'CODE args)
     quote   ($$ (second op))
             (let [raw-f ($$ op)
                   ;; NAME indirect reference — dereference to actual array/table
