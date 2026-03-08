@@ -750,3 +750,252 @@ migrated into the catalog structure above, one section at a time.
 | Date | What Happened |
 |------|---------------|
 | 2026-03-08 (session 3) | Oracles re-uploaded. Baseline confirmed 220/548/0. Diagnosed `lein test` hang: `test-cooper` taking 90s due to `cooper-span-010` and `cooper-notany-006` looping. Root cause: unary `*` (deferred pattern) captured variable value at build time instead of doing live lookup at match time. Fixed in `operators.clj` (special-case `(* sym)` in EVAL! to build live thunk) and `patterns.clj` (charset constructors detect DEFER! arg and wrap in outer DEFER). Created `test_helpers.clj` with `prog-timeout`/`prog`/`prog-infinite` macros — every test now runs under a 2000ms wall-clock budget with 1 retry. Wired all three main test files to use it. Full suite now completes in ~60s instead of hanging. One real failure exposed: `gimpel-bsort` genuinely times out (real runtime bug). Two architectural problems documented in PLAN.md: (1) fixed — outer timeout; (2) needs design — per-statement step limit + test catalog reorganisation. |
+
+---
+
+## Sprint 18C — Step-Probe Bisection Debugger  DESIGN (2026-03-08)
+
+### The Core Idea
+
+`&STLIMIT` is not just an infinite-loop guard. Combined with post-mortem
+variable inspection, it is a **precision bisection debugger** for any
+SNOBOL4 program — including ones that loop millions of times.
+
+### The Protocol
+
+```
+1. Set &STLIMIT = N
+2. Run the program — it stops hard after exactly N statements
+3. Inspect ALL variable state at the moment of termination
+4. Compare that state against CSNOBOL4 and SPITBOL at the same N
+5. Any divergence between the three engines at step N = exact bug location
+6. Binary-search N to isolate the divergence to a 1-statement window
+```
+
+Example: program loops 10,000 times before producing a wrong answer.
+
+```
+&STLIMIT = 1      → run 1 stmt  → dump vars → all engines agree
+&STLIMIT = 10     → run 10 stmts → dump vars → all agree
+&STLIMIT = 5000   → run 5000 → divergence found!
+&STLIMIT = 2500   → agree
+&STLIMIT = 3750   → diverge
+&STLIMIT = 3125   → diverge
+...               → binary search → isolated to stmt 3102
+```
+
+At step 3102, variable `X` is `"foo"` in our engine but `"bar"` in CSNOBOL4.
+That's the exact statement, the exact variable, the exact wrong value.
+
+### Implementation Plan
+
+#### 18C.1  `snapshot!` — full variable dump at any point
+
+```clojure
+(defn snapshot!
+  "Return a map of all currently-bound SNOBOL4 variable names -> values.
+   Reads from the user namespace registered by GLOBALS.
+   Excludes internal symbols (those starting with < or &)."
+  []
+  (into {} (filter (fn [[k v]] (not (re-find #"^[<&]" (name k))))
+                   (ns-publics *snobol-ns*))))
+```
+
+Add to `env.clj`. Export from `core.clj`.
+
+#### 18C.2  `run-to-step` — execute exactly N statements, return snapshot
+
+```clojure
+(defn run-to-step
+  "Run src for exactly n statements, then stop.
+   Returns {:exit :ok/:step-limit/:error
+            :steps n
+            :vars  {symbol -> value}   ; full variable snapshot
+            :stcount @&STCOUNT}."
+  [src n]
+  (reset! &STLIMIT n)
+  (let [r (run-with-timeout src 5000)]
+    (assoc r :vars (snapshot!))))
+```
+
+Add to `test-helpers.clj`.
+
+#### 18C.3  `bisect-divergence` — find exact step where engines diverge
+
+```clojure
+(defn bisect-divergence
+  "Binary-search for the lowest step N at which SNOBOL4clojure diverges
+   from the oracle (CSNOBOL4 or SPITBOL stdout).
+   Returns {:step N :clojure-vars {...} :oracle-stdout \"...\"}."
+  [src lo hi]
+  (if (= lo hi)
+    {:step lo
+     :clojure (run-to-step src lo)
+     :oracle  (run-csnobol4-to-step src lo)}   ; see 18C.4
+    (let [mid (quot (+ lo hi) 2)
+          r   (run-to-step src mid)]
+      (if (diverges? r (oracle-at-step src mid))
+        (bisect-divergence src lo mid)
+        (bisect-divergence src (inc mid) hi)))))
+```
+
+#### 18C.4  Oracle step-limit via `&STLIMIT` injection
+
+CSNOBOL4 supports `&STLIMIT` natively. We can inject it into the oracle
+program source:
+
+```clojure
+(defn run-csnobol4-to-step [src n]
+  ;; Prepend &STLIMIT assignment to the program
+  (run-csnobol4 (str "        &STLIMIT = " n "\n" src)))
+```
+
+SPITBOL supports `-step` flag or similar. Both oracles will stop at N
+and dump their output — which we compare to our snapshot.
+
+#### 18C.5  `probe-test` macro — inline bisection in a deftest
+
+```clojure
+(defmacro probe-test
+  "Run src up to max-steps, checking variable expectations at each probe point.
+   probe-points is a map of {step-n {var-name expected-value}}.
+   Fails the test at the first probe point where a variable has the wrong value.
+
+   Example:
+     (probe-test 1000
+       {10  {'I 1}
+        50  {'I 5}
+        100 {'I 10}}
+       \"        I = 0\"
+       \"LOOP    I = I + 1\"
+       \"        LT(I,10)  :S(LOOP)\"
+       \"END\")"
+  [max-steps probe-points & lines]
+  ...)
+```
+
+#### 18C.6  Restart mode — `run-with-restart`
+
+The key insight from Lon: **restart mode**. After a `:step-limit` stop,
+the program state is intact in the Clojure namespace atoms. You can:
+
+1. Inspect any variable with `($$ 'X)`
+2. Modify a variable with `(snobol-set! 'X newval)`
+3. Resume from the next statement with `(RUN (saddr next-stmt))`
+
+This means you can probe, patch, and continue — a true interactive REPL
+debugger for SNOBOL4 programs.
+
+```clojure
+(defn run-with-restart
+  "Run src for n statements. Returns a restart handle:
+   {:resume (fn [n2] run n2 more steps)
+    :vars   (snapshot!)
+    :stcount @&STCOUNT
+    :next-stmt @&LABL  ; next label/address to execute}"
+  [src n]
+  ...)
+```
+
+### Canonical Use Case: Debugging `gimpel-bsort`
+
+```clojure
+;; Current state: gimpel-bsort times out. Use bisection to find the bug.
+
+(comment
+  ;; Step 1: does it even start? Try 5 steps.
+  (run-to-step bsort-src 5)
+  ;; => {:exit :step-limit :vars {ARR <array> I nil J nil ...}}
+
+  ;; Step 2: try 50 steps — does the array get populated?
+  (run-to-step bsort-src 50)
+  ;; => {:exit :step-limit :vars {ARR <array> I 1 J nil ...}}
+
+  ;; Step 3: compare with CSNOBOL4 at step 50
+  (run-csnobol4-to-step bsort-src 50)
+  ;; => "pear\napple\n..."  ← oracle output
+
+  ;; Step 4: bisect until divergence found
+  (bisect-divergence bsort-src 1 500)
+  ;; => {:step 43 :clojure-vars {J 3 K 2 V "mango"} :oracle "..."}
+)
+```
+
+### &TRACE Integration with Step-Probe
+
+`&TRACE` + `&STLIMIT` is the most powerful combination:
+
+```
+Set &STLIMIT = 151
+Set TRACE('X', 'VALUE')   ← log every change to X
+Run program
+→ get exact history of X's value at steps 1..151
+→ compare to oracle's trace output
+→ spot the exact assignment that diverges
+```
+
+CSNOBOL4 and SPITBOL both support `TRACE()` natively. The three-oracle
+harness can compare trace logs as well as stdout — any divergence in
+the trace log IS the bug.
+
+### Summary of New Capabilities
+
+| Tool | What it does |
+|------|-------------|
+| `&STLIMIT = N` | Stop after exactly N statements |
+| `&STCOUNT` | Read how many statements executed |
+| `snapshot!` | Dump all variable state at stop point |
+| `run-to-step` | Run N steps, return state map |
+| `bisect-divergence` | O(log N) isolation of divergence from oracle |
+| `probe-test` | Inline step-checking in deftests |
+| `run-with-restart` | Stop, inspect, patch, resume |
+| `TRACE('X','VALUE')` | Log every assignment to X |
+| `TRACE('*','LABEL')` | Log every statement executed |
+| Combined | Trace log + step limit = complete execution record |
+
+### Tasks (Sprint 18C)
+
+- [ ] 18C.1  `snapshot!` in env.clj + export from core.clj
+- [ ] 18C.2  `run-to-step` in test-helpers.clj
+- [ ] 18C.3  `bisect-divergence` in test-helpers.clj
+- [ ] 18C.4  `run-csnobol4-to-step` / `run-spitbol-to-step` in harness.clj
+              (prepend `&STLIMIT = N` to program source)
+- [ ] 18C.5  `probe-test` macro in test-helpers.clj
+- [ ] 18C.6  `run-with-restart` in test-helpers.clj
+- [ ] 18C.7  Use bisect-divergence on gimpel-bsort to find the real bug
+- [ ] 18C.8  Document restart-mode workflow in test_helpers.clj docstring
+- [ ] 18C.9  Add `snapshot!` call to `:step-limit` handler in run-with-timeout
+              so every timeout auto-captures variable state
+
+### Session Log Entry (2026-03-08, continued)
+
+| Sprint | What |
+|--------|------|
+| 18B (this session) | &STCOUNT/&STLIMIT wired into RUN loop. snobol-steplimit! signal. trace.clj: complete TRACE/STOPTR/&TRACE/&FTRACE implementation — VALUE LABEL CALL RETURN PATTERN KEYWORD trace types, registry atom, fire-* hooks, *trace-output* dynamic var, enable-full-trace!/disable-full-trace! convenience fns. Wired into runtime.clj (LABEL), operators.clj (VALUE, CALL, RETURN), match.clj (PATTERN via *trace* binding), invoke.clj (TRACE/STOPTR callable from SNOBOL4). test_trace.clj: 11 tests / 26 assertions / 0 failures. test-helpers: set-steplimit!, prog-steplimit, :step-limit handling. Full suite: 953+11=964 tests, baseline maintained. |
+| 18C (designed) | Step-probe bisection debugger. snapshot!, run-to-step, bisect-divergence, probe-test, run-with-restart. Oracle step-injection via &STLIMIT prepend. See Sprint 18C tasks above. |
+
+### gimpel-bsort Root Cause (found via run-to-step bisection, 2026-03-08)
+
+Program completes in ~30 steps (not infinite loop). Bug is **wrong output**.
+Array is completely unsorted — `ARR<1>` still `'pear'` after `BSORT(.ARR,1,5)`.
+
+**Root cause**: `BSORT(.ARR,1,5)` passes `.ARR` — a NAME indirect reference.
+Inside BSORT, parameter `A` receives the NAME. `A<J>` should dereference through
+`A` → `ARR` → `ARR<J>`. Instead, subscript read/write on a NAME-typed variable
+operates on a new local array, not the original `ARR`.
+
+**Fix needed** in `operators.clj` / `invoke.clj` subscript dispatch:
+When the container symbol resolves to a NAME (indirect reference), dereference
+it first before doing the subscript read/write.
+
+```clojure
+;; In INVOKE '= subscript branch and subscript read:
+(let [container-val ($$ container-sym)]
+  (if (instance? SNOBOL4clojure.env.NAME container-val)
+    ;; Dereference NAME → get the actual array
+    (let [real-sym (.-n container-val)]
+      ...)
+    ...))
+```
+
+This is **Sprint 18C.7** — fix NAME-dereference in subscript operations.

@@ -25,7 +25,8 @@
              [LIT$ ANY$ NOTANY$ SPAN$ NSPAN$ BREAK$ BREAKX$
               POS# RPOS# LEN# TAB# RTAB# BOL# EOL#
               SUCCEED! FAIL! ARB! BAL! ARBNO! ABORT!]]
-            [SNOBOL4clojure.patterns   :refer [POS RPOS]])
+            [SNOBOL4clojure.patterns   :refer [POS RPOS]]
+            [SNOBOL4clojure.trace      :refer [pattern-trace-active?]])
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── Tracing (off by default) ──────────────────────────────────────────────────
@@ -455,16 +456,18 @@
 (defn SEARCH
   "Slide pattern P across string S, trying each start position 0..n.
    Returns [start end] for the first match found, nil if none.
-   (subs S start end) extracts the matched substring."
+   (subs S start end) extracts the matched substring.
+   Binds *trace* true when a PATTERN trace is active (via trace.clj)."
   [S P]
-  (let [chars (seq S)
-        n     (count S)]
-    (loop [i 0]
-      (when (<= i n)
-        (let [result (engine (drop i chars) i P i S)]
-          (if result
-            result
-            (recur (inc i))))))))
+  (binding [*trace* (or *trace* (pattern-trace-active? S))]
+    (let [chars (seq S)
+          n     (count S)]
+      (loop [i 0]
+        (when (<= i n)
+          (let [result (engine (drop i chars) i P i S)]
+            (if result
+              result
+              (recur (inc i)))))))))
 
 (defn MATCH
   "Match pattern P against string S anchored at position 0.

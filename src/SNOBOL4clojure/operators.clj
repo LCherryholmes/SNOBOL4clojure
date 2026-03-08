@@ -17,7 +17,8 @@
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
               LEN POS RPOS RTAB TAB FAIL]]
             [SNOBOL4clojure.emitter   :refer [emitter]]
-            [SNOBOL4clojure.grammar   :refer [parse-expression]])
+            [SNOBOL4clojure.grammar   :refer [parse-expression]]
+            [SNOBOL4clojure.trace     :refer [fire-value! fire-call! fire-return! trace! stoptr!]])
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── Numeric conversion macros ─────────────────────────────────────────────────
@@ -196,7 +197,9 @@
                 (let [v (if (and (list? r) (clojure.core/= (first r) 'SEQ))
                           (apply str (map #(if (nil? %) "" (str %)) (rest r)))
                           r)]
-                  (snobol-set! N v) v)))
+                  (snobol-set! N v)
+                  (fire-value! N v)
+                  v)))
     ?=      (let [[n p R] args
                   subject (str (or ($$ n) ""))
                   pat     p                       ; already evaluated by EVAL! dispatch
@@ -244,6 +247,8 @@
                             (snobol-set! (symbol l) ε))
                           ;; Clear the result slot
                           (snobol-set! f-sym ε)
+                          ;; CALL trace
+                          (fire-call! fname call-args)
                           ;; Run from entry label; catch RETURN/FRETURN/NRETURN
                           (let [run-fn  (ns-resolve 'SNOBOL4clojure.runtime 'RUN)
                                 outcome (try
@@ -253,6 +258,8 @@
                                             (get (ex-data e) :snobol/signal :return)))]
                             ;; Collect result before restoring
                             (let [result ($$ f-sym)]
+                              ;; RETURN trace
+                              (fire-return! fname result outcome)
                               ;; Restore saved values
                               (doseq [[k v] saved]
                                 (snobol-set! (symbol k) v))

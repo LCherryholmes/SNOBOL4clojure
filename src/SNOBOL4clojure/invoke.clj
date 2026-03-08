@@ -15,7 +15,8 @@
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
               LEN POS RPOS RTAB TAB FAIL]]
             [SNOBOL4clojure.emitter   :refer [emitter]]
-            [SNOBOL4clojure.grammar   :refer [parse-expression]])
+            [SNOBOL4clojure.grammar   :refer [parse-expression]]
+            [SNOBOL4clojure.trace     :refer [trace! stoptr! clear-all-traces!]])
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── INVOKE ────────────────────────────────────────────────────────────────────
@@ -101,6 +102,15 @@
     LPAD    (LPAD    (first args) (second args))
     RPAD    (RPAD    (first args) (second args))
     quote   ($$ (second op))
+    ;; ── Trace functions ───────────────────────────────────────────────────────
+    TRACE   (let [[name type label user-fn] args]
+              (trace! (str name) (str type) label user-fn))
+    trace   (let [[name type label user-fn] args]
+              (trace! (str name) (str type) label user-fn))
+    STOPTR  (let [[name type] args]
+              (stoptr! (str name) (str type)))
+    stoptr  (let [[name type] args]
+              (stoptr! (str name) (str type)))
             (let [f ($$ op)]
               (if (fn? f) (apply f args) ε))))
 

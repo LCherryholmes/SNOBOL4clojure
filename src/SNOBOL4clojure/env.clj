@@ -100,6 +100,22 @@
       (if (nil? line) ε (str line)))
     (if-let [V (reference N)] (var-get V) ε)))
 
+;; ── Variable snapshot ────────────────────────────────────────────────────────
+(defn snapshot!
+  "Return a map of all currently-bound user SNOBOL4 variables -> values.
+   Excludes internal symbols (those starting with < & or containing /).
+   Call after a :step-limit stop to inspect full program state.
+   Also useful for post-mortem debugging: (snapshot!) after any RUN."
+  []
+  (into (sorted-map)
+        (keep (fn [[sym var]]
+                (let [n (name sym)]
+                  (when (and (not (re-find #"^[<&]" n))
+                             (not (re-find #"/" n))
+                             (not (re-find #"^__" n)))
+                    [sym (var-get var)])))
+              (ns-interns (active-ns)))))
+
 ;; ── Arrays and Tables ─────────────────────────────────────────────────────────
 
 ;; SnobolArray: multi-dimensional, integer-subscripted, bounds-checked.
@@ -189,6 +205,9 @@
 (defn snobol-freturn! [] (throw (ex-info "FRETURN" {:snobol/signal :freturn})))
 (defn snobol-nreturn! [] (throw (ex-info "NRETURN" {:snobol/signal :nreturn})))
 (defn snobol-end!     [] (throw (ex-info "END"     {:snobol/signal :end})))
+(defn snobol-steplimit! [n]
+  (throw (ex-info (str "Step limit exceeded at step " n)
+                  {:snobol/signal :step-limit :steps n})))
 ;; Maps JVM class names to SNOBOL4 type names.
 (defmulti  DATATYPE (fn [X] (str (class X))))
 (defmethod DATATYPE "class java.lang.Character"                   [_] "STRING")

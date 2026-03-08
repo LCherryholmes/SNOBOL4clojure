@@ -64,8 +64,11 @@
                            {:exit :ok
                             :stdout (with-out-str (RUN (CODE src)))}
                            (catch clojure.lang.ExceptionInfo e
-                             (if (= (get (ex-data e) :snobol/signal) :end)
-                               {:exit :ok :stdout ""}
+                             (case (get (ex-data e) :snobol/signal)
+                               :end       {:exit :ok :stdout ""}
+                               :step-limit {:exit :step-limit
+                                            :steps (get (ex-data e) :steps)
+                                            :thrown (.getMessage e)}
                                {:exit :error :thrown (.getMessage e)}))
                            (catch Exception e
                              {:exit :error :thrown (.getMessage e)}))))]
@@ -91,8 +94,10 @@
   [budget-ms & lines]
   `(let [src# ~(clojure.string/join "\n" (map str lines))
          r#   (run-with-timeout src# ~budget-ms)]
-     (is (not= :timeout (:exit r#))
-         (str "TIMEOUT after " ~budget-ms "ms (x2 retries): "
+     (is (not (#{:timeout :step-limit} (:exit r#)))
+         (str (if (= :step-limit (:exit r#))
+                (str "STEP-LIMIT after " (:steps r#) " steps: ")
+                (str "TIMEOUT after " ~budget-ms "ms (x2 retries): "))
               (pr-str (first (clojure.string/split-lines src#)))))
      r#))
 
@@ -112,3 +117,115 @@
      (is (= :timeout (:exit r#))
          (str "Expected TIMEOUT but program returned: " (:exit r#)))
      r#))
+
+;; ── Step-limit helpers ────────────────────────────────────────────────────────
+
+(defn set-steplimit!
+  "Set &STLIMIT to n. Use before prog-timeout to bound a potentially looping
+   program in the engine itself (not just wall clock).
+   Smaller n = faster failure detection for genuinely infinite programs.
+   Reset to 2147483647 to restore default (unlimited)."
+  [n]
+  (reset! SNOBOL4clojure.env/&STLIMIT n))
+
+(defmacro prog-steplimit
+  "Run program with both a wall-clock budget AND an in-engine step limit.
+   Fails the test if either the step limit or the timeout is exceeded.
+   Use for loop tests where you know an upper bound on iterations."
+  [budget-ms max-steps & lines]
+  `(do
+     (reset! SNOBOL4clojure.env/&STLIMIT ~max-steps)
+     (let [r# (prog-timeout ~budget-ms ~@lines)]
+       (reset! SNOBOL4clojure.env/&STLIMIT 2147483647)
+       r#)))
+
+;; ── Step-probe / bisection debugger (Sprint 18C) ─────────────────────────────
+
+(defn run-to-step
+  "Run SNOBOL4 program `src` for exactly `n` statements then stop.
+   Returns a map:
+     :exit    — :ok (finished naturally) | :step-limit | :error | :timeout
+     :steps   — &STCOUNT at termination
+     :vars    — snapshot of all user variable bindings at termination
+     :stdout  — any OUTPUT produced up to step n
+     :thrown  — exception message if :error
+
+   This is the core probe primitive. Use it to inspect program state
+   at any point during execution — the foundation of bisection debugging.
+
+   Example:
+     (run-to-step \"        I = 0\\nLOOP    I = I + 1\\n        LT(I,10) :S(LOOP)\\nEND\" 5)
+     ;=> {:exit :step-limit :steps 5 :vars {I 5} :stdout \"\"}"
+  [src n]
+  (reset! SNOBOL4clojure.env/&STLIMIT n)
+  (let [r (run-with-timeout src 5000)]
+    (reset! SNOBOL4clojure.env/&STLIMIT 2147483647)
+    (assoc r
+           :steps @SNOBOL4clojure.env/&STCOUNT
+           :vars  (SNOBOL4clojure.env/snapshot!))))
+
+(defn probe-at
+  "Run src to step n and return the value of variable `var-sym` at that point.
+   Convenience wrapper around run-to-step.
+
+   Example:
+     (probe-at loop-src 50 'I)  ;=> 5"
+  [src n var-sym]
+  (let [r (run-to-step src n)]
+    (get (:vars r) var-sym)))
+
+(defn bisect-divergence
+  "Binary-search for the lowest step N (in [lo..hi]) at which the value of
+   `var-sym` in our engine diverges from `expected-fn` — a 1-arg predicate
+   that returns true when the value is correct.
+
+   Returns {:step N :value <wrong-value> :vars <full-snapshot>}
+   or nil if no divergence found in [lo..hi].
+
+   Example: find when I stops being (= step-count / 2):
+     (bisect-divergence src 1 1000 'I #(= % (/ (run-to-step src N) 2)))
+
+   Practical use:
+     Find the exact step where our engine diverges from oracle output.
+     Run CSNOBOL4/SPITBOL with &STLIMIT=N prepended to get oracle state at N,
+     then compare with (run-to-step src N)."
+  [src lo hi var-sym expected-fn]
+  (if (> lo hi)
+    nil
+    (let [mid  (quot (+ lo hi) 2)
+          r    (run-to-step src mid)
+          val  (get (:vars r) var-sym)]
+      (if (expected-fn val)
+        ;; Still correct at mid — divergence must be later
+        (bisect-divergence src (inc mid) hi var-sym expected-fn)
+        ;; Wrong at mid — divergence is at mid or earlier
+        (if (= lo mid)
+          {:step mid :value val :vars (:vars r)}
+          (bisect-divergence src lo (dec mid) var-sym expected-fn))))))
+
+(defmacro probe-test
+  "Assert variable values at specific step counts during program execution.
+   probe-points is a map of {step-count {var-sym expected-value}}.
+   Fails at the first step/variable pair that doesn't match.
+
+   Use this for loop correctness tests: verify invariants at N, 2N, 3N steps.
+
+   Example:
+     (probe-test
+       {1  {'I 1}
+        5  {'I 5}
+        10 {'I 10}}
+       \"        I = 0\"
+       \"LOOP    I = I + 1\"
+       \"        LT(I,10)  :S(LOOP)\"
+       \"END\")"
+  [probe-points & lines]
+  (let [src (clojure.string/join "\n" (map str lines))]
+    `(doseq [[step# expectations#] (sort-by key ~probe-points)]
+       (let [r#    (run-to-step ~src step#)
+             vars# (:vars r#)]
+         (doseq [[var# expected#] expectations#]
+           (clojure.test/is (= expected# (get vars# var#))
+                            (str "At step " step# ", expected " var#
+                                 " = " (pr-str expected#)
+                                 " but got " (pr-str (get vars# var#)))))))))

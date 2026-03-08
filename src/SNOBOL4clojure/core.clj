@@ -13,7 +13,8 @@
             [SNOBOL4clojure.grammar    :as gram]
             [SNOBOL4clojure.emitter    :as emit]
             [SNOBOL4clojure.compiler   :as comp]
-            [SNOBOL4clojure.runtime    :as rt])
+            [SNOBOL4clojure.runtime    :as rt]
+            [SNOBOL4clojure.trace      :as trace])
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── Re-export env ─────────────────────────────────────────────────────────────
@@ -156,3 +157,15 @@
   (def BED (EVAL '[(POS 0) (| "B" "R") (| "E" "EA") (| "D" "DS") (RPOS 0)]))
   (pp/pprint BED)
   (? "READS" BED))
+
+;; ── Re-export trace API ───────────────────────────────────────────────────────
+;; These are available to SNOBOL4 programs via INVOKE and to Clojure tests.
+(def trace-register!     trace/trace!)
+(def trace-stop!         trace/stoptr!)
+(def trace-clear!        trace/clear-all-traces!)
+(def trace-enable-full!  trace/enable-full-trace!)
+(def trace-disable-full! trace/disable-full-trace!)
+(def trace-output        trace/*trace-output*)
+
+;; ── Re-export debug/probe API ─────────────────────────────────────────────────
+(def snapshot!  env/snapshot!)
