@@ -87,8 +87,9 @@ namespace the user handed it via `env/GLOBALS`, `env/active-ns`,
 | Sprint 10 | `5a89477` | 139/431 | ~P optional, @N cursor, CONJ P&Q, *expr deferred |
 | Sprint 11a | `506d66f` | 151/447 | TABLE: atom-backed, subscript read/write <>/[], ITEM, PROTOTYPE |
 | Sprint 11b | `d75986c` | 166/467 | ARRAY: SnobolArray, multi-dim, bounds-checked, default value, PROTOTYPE |
+| Sprint 12  | `3af1ffb` | 206/529 | CONVERT full matrix, DATA/FIELD (map-based PDD), SORT/RSORT, COPY, DATATYPE via INVOKE |
 
-**Current baseline**: 166 tests / 467 assertions / 0 failures
+**Current baseline**: 206 tests / 529 assertions / 0 failures
 
 ---
 
@@ -160,24 +161,27 @@ variable operations. Tests call it in a `:each` fixture:
 | 3 | File I/O -- DETACH, REWIND, ENDFILE are stubs | functions.clj |
 | 4 | charset range expansion -- (charset "A-Za-z") treats - as literal | primitives.clj |
 | 5 | goto case-insensitive -- :s(x) / :f(x) lowercase not parsed | grammar.clj |
+| 6 | PDD field write when accessor name shadows Clojure fn (e.g. REAL) — works via INVOKE but raw `(REAL x)` eval would shadow | operators.clj |
 
 ---
 
-## Sprint 12 Plan -- Data Types & Conversion
+## Sprint 12 — Data Types & Conversion  ✅ COMPLETE (206/529)
 
-### 12.1  CONVERT
-`CONVERT(x, type)` -- coerce a value to a named SNOBOL4 type.
-Currently a stub returning x. Needs dispatch on type string:
-"STRING", "INTEGER", "REAL", "ARRAY", "TABLE", "PATTERN".
+### 12.1  CONVERT  ✅
+Full coercion matrix: STRING/INTEGER/REAL/NAME → STRING/INTEGER/REAL/PATTERN/NAME,
+ARRAY(Nx2) ↔ TABLE, same-type identity, all others return nil (failure).
+Overflow/parse failures → nil → :F branch.
 
-### 12.2  DATA / FIELD (program-defined data types)
-`DATA('POINT(X,Y)')` defines a constructor POINT and accessors X, Y.
-DATA! already emits the deftype -- needs FIELD to wire accessors and
-DATATYPE to recognise instances.
-Reference: TestSnobol4/Function/ProgramDefinedDataType/
+### 12.2  DATA / FIELD  ✅
+PDD instances are maps `{:__type__ "TYPE", "F1" v1, ...}` — no defrecord needed.
+DATA registers type in `data-type-registry`, installs constructor+accessor fns
+via `snobol-set!` into the active SNOBOL namespace.
+FIELD(type, n) returns nth field name. Accessor write `F(X) = val` handled via
+INVOKE `=` branch detecting fn container and rebinding the instance variable.
+DATATYPE :default updated to recognise `:__type__` maps.
 
-### 12.3  SORT / RSORT
-Sort a TABLE by value (or key). Currently stubs returning nil.
+### 12.3  SORT / RSORT  ✅
+TABLE → sorted Nx2 ARRAY (ascending/descending by value string representation).
 
 ---
 
