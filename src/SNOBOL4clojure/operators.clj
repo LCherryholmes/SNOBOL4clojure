@@ -6,7 +6,8 @@
             [SNOBOL4clojure.env       :refer
              [ε η equal not-equal Σ+ subtract multiply divide
               ncvt scvt num $$ out reference snobol-set!
-              table? table-get table-set]]
+              table? table-get table-set
+              array? array-get array-set array-prototype]]
             [SNOBOL4clojure.functions :refer
              [ASCII REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE
               ITEM PROTOTYPE]]
@@ -157,13 +158,17 @@
     ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args]
               (cond
-                ;; subscript assignment: (= (A key) val) — mutate TABLE or ARRAY
-                (and (list? N) (clojure.core/= 2 (count N)))
-                (let [[container-sym k] N
+                ;; subscript assignment: (= (A k...) val) — mutate TABLE or ARRAY
+                (and (list? N) (>= (count N) 2))
+                (let [[container-sym & ks] N
                       container ($$ container-sym)]
-                  (when (table? container)
-                    (table-set container k r))
-                  r)
+                  (cond
+                    (table? container)
+                    (table-set container (first ks) r)
+                    (array? container)
+                    (or (array-set container (vec ks) r)
+                        (throw (ex-info "ARRAY: subscript out of bounds" {:keys ks})))
+                    :else nil))
                 ;; normal variable assignment
                 (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
                 (do (when (clojure.core/= N 'OUTPUT)   (println r))
@@ -221,7 +226,8 @@
     quote   ($$ (second op))
             (let [f ($$ op)]
               (cond
-                (table? f) (table-get f (first args))  ; TABLE subscript read
+                (table? f) (table-get f (first args))   ; TABLE subscript read
+                (array? f) (array-get f (vec args))     ; ARRAY subscript read
                 (fn? f)    (apply f args)
                 :else      ε))))
 
@@ -242,10 +248,10 @@
           (equal op '.)     (let [[P N]   parms] (INVOKE '. (EVAL! P) N))
           (equal op '$)     (let [[P N]   parms] (INVOKE '$ (EVAL! P) N))
           (equal op '=)     (let [[N R]   parms
-                                  ;; If N is a subscript call (container key),
-                                  ;; evaluate the key but not the container symbol
-                                  N' (if (and (list? N) (clojure.core/= 2 (count N)))
-                                       (list (first N) (EVAL! (second N)))
+                                  ;; If N is a subscript call (container key...),
+                                  ;; evaluate all keys but not the container symbol
+                                  N' (if (and (list? N) (>= (count N) 2))
+                                       (apply list (first N) (map EVAL! (rest N)))
                                        N)]
                               (INVOKE '= N' (EVAL! R)))
           (equal op '?=)    (let [[N P R] parms] (INVOKE '?= N (EVAL! P) R))

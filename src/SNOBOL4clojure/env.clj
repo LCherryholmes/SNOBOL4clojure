@@ -100,7 +100,45 @@
     (if-let [V (reference N)] (var-get V) ε)))
 
 ;; ── Arrays and Tables ─────────────────────────────────────────────────────────
-(defn ARRAY     [_proto] (object-array 10))
+
+;; SnobolArray: multi-dimensional, integer-subscripted, bounds-checked.
+;; dims  = vector of [lo hi] pairs, one per dimension
+;; dflt  = default value for unset slots
+;; data  = atom wrapping a map from index-tuple (vector of ints) → value
+(defrecord SnobolArray [dims dflt data])
+
+(defn- parse-array-proto
+  "Parse a SNOBOL4 array prototype string into a vector of [lo hi] pairs.
+   Accepts integer N (meaning [1,N]) or string '[-]m:n,...'.
+   Returns nil on any parse error."
+  [proto]
+  (let [s (str proto)]
+    (try
+      (let [parts (clojure.string/split s #",")]
+        (mapv (fn [part]
+                (let [part (clojure.string/trim part)]
+                  (if (re-find #":" part)
+                    (let [[lo hi] (clojure.string/split part #":" 2)
+                          lo (Long/parseLong (clojure.string/trim lo))
+                          hi (Long/parseLong (clojure.string/trim hi))]
+                      (when (> lo hi) (throw (ex-info "lo>hi" {})))
+                      [lo hi])
+                    (let [n (Long/parseLong part)]
+                      (when (<= n 0) (throw (ex-info "size<=0" {})))
+                      [1 n]))))
+              parts))
+      (catch Exception _ nil))))
+
+(defn ARRAY
+  "ARRAY(proto) or ARRAY(proto, default).
+   proto is an integer N → dimension [1..N], or a string like '-5:10,3:5,20'.
+   Returns a SnobolArray, or throws on invalid proto."
+  ([proto] (ARRAY proto ε))
+  ([proto dflt]
+   (let [dims (parse-array-proto proto)]
+     (when (nil? dims) (throw (ex-info "ARRAY: invalid prototype" {:proto proto})))
+     (->SnobolArray dims dflt (atom {})))))
+
 (defn TABLE     ([]      (atom {}))
                 ([_n]    (atom {}))
                 ([_n _d] (atom {})))
@@ -111,6 +149,38 @@
 (defn table-get [t k]        (get @t k ε))
 (defn table-set [t k v]      (swap! t assoc k v) v)
 
+(defn array?    [x] (instance? SnobolArray x))
+
+(defn- array-check-bounds
+  "Returns nil (failure) if idx-vec is out of bounds, else the normalised key."
+  [^SnobolArray arr idx-vec]
+  (let [dims (:dims arr)]
+    (when (clojure.core/= (count idx-vec) (count dims))
+      (when (every? true?
+                    (map (fn [[lo hi] i]
+                           (and (integer? i) (>= i lo) (<= i hi)))
+                         dims idx-vec))
+        idx-vec))))
+
+(defn array-get
+  "Read arr at idx-vec (vector of ints). Returns nil on bounds failure."
+  [^SnobolArray arr idx-vec]
+  (when-let [k (array-check-bounds arr idx-vec)]
+    (get @(:data arr) k (:dflt arr))))
+
+(defn array-set
+  "Write arr at idx-vec. Returns nil on bounds failure, value on success."
+  [^SnobolArray arr idx-vec v]
+  (when-let [k (array-check-bounds arr idx-vec)]
+    (swap! (:data arr) assoc k v)
+    v))
+
+(defn array-prototype
+  "Return the PROTOTYPE string for a SnobolArray."
+  [^SnobolArray arr]
+  (clojure.string/join "," (map (fn [[lo hi]] (str lo ":" hi)) (:dims arr))))
+
+
 ;; ── DATATYPE dispatch ─────────────────────────────────────────────────────────
 ;; Maps JVM class names to SNOBOL4 type names.
 (defmulti  DATATYPE (fn [X] (str (class X))))
@@ -120,6 +190,7 @@
 (defmethod DATATYPE "class java.lang.Double"                      [_] "REAL")
 (defmethod DATATYPE "class [Ljava.lang.Object;"                   [_] "ARRAY")
 (defmethod DATATYPE "class [LLjava.lang.Object;"                  [_] "ARRAY")
+(defmethod DATATYPE "class SNOBOL4clojure.env.SnobolArray"        [_] "ARRAY")
 (defmethod DATATYPE "class clojure.lang.Atom"                     [_] "TABLE")
 (defmethod DATATYPE "class clojure.lang.PersistentArrayMap"       [_] "TABLE")
 (defmethod DATATYPE "class clojure.lang.PersistentHashMap"        [_] "TABLE")

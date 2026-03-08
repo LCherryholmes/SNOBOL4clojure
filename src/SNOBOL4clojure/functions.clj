@@ -120,11 +120,12 @@
 
 (defn PROTOTYPE
   "PROTOTYPE(array-or-table) — return the dimension spec string.
-   For TABLE returns ε.  For ARRAY returns the prototype string."
+   For TABLE returns ε.  For ARRAY returns normalized 'lo:hi,...' string."
   [x]
   (cond
     (SNOBOL4clojure.env/table? x) ""
-    :else ""))    ; ARRAY prototype — stub pending full ARRAY impl
+    (SNOBOL4clojure.env/array? x) (SNOBOL4clojure.env/array-prototype x)
+    :else ""))
 
 (defn SORT      [_A] nil)
 (defn RSORT     [_A] nil)
