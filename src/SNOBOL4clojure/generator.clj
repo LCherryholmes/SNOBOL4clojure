@@ -382,3 +382,471 @@
     (gen-concat)
     (gen-cmp)
     (gen-pat-match)))
+
+;; ── Sprint 18: gen-by-length — length-band grammar worm ──────────────────────
+;;
+;; Design: generate all syntactically valid programs at each character-length
+;; band (or up to N samples for larger bands).  The canonical variable pools
+;; and fixture initialisation are always prepended so every program is
+;; self-contained and runnable by the harness.
+
+(def ^:private canonical-fixtures
+  "Standard fixture preamble — initialises all typed pools."
+  (str/join "\n"
+    ["        I = 0"
+     "        J = 1"
+     "        K = 2"
+     "        L = 3"
+     "        M = 4"
+     "        N = 5"
+     "        S = 'hello'"
+     "        T = 'world'"
+     "        X = 'foo'"
+     "        Y = 'bar'"
+     "        Z = 'baz'"]))
+
+(defn- with-fixtures
+  "Wrap body lines with canonical fixtures + END."
+  [& body-lines]
+  (str canonical-fixtures "\n"
+       (str/join "\n" body-lines) "\n"
+       "END"))
+
+;; ── Length-band building blocks ───────────────────────────────────────────────
+;; Each builder returns a seq of (body-line ...) vectors; caller wraps fixtures.
+
+(defn- band-assign-int []
+  (for [v int-vars lit int-lits]
+    [(indent (str v " = " lit))
+     (indent (str "OUTPUT = " v))]))
+
+(defn- band-assign-str []
+  (for [v str-vars lit str-lits]
+    [(indent (str v " = " lit))
+     (indent (str "OUTPUT = " v))]))
+
+(defn- band-arith []
+  (for [v int-vars op arith-ops lhs int-lits rhs (filter pos? int-lits)]
+    [(indent (str v " = " lhs " " op " " rhs))
+     (indent (str "OUTPUT = " v))]))
+
+(defn- band-cmp []
+  (for [op cmp-ops-int lhs int-lits rhs int-lits :when (not= lhs rhs)]
+    [(indent (str op "(" lhs "," rhs ") :S(YES)F(NO)"))
+     "YES     OUTPUT = 'yes'"
+     "        :(DONE)"
+     "NO      OUTPUT = 'no'"
+     "DONE"]))
+
+(defn- band-concat []
+  (for [v str-vars s1 str-lits s2 str-lits :when (not= s1 s2)]
+    [(indent (str v " = " s1 " " s2))
+     (indent (str "OUTPUT = " v))]))
+
+(defn- band-size []
+  (for [v str-vars]
+    [(indent (str "OUTPUT = SIZE(" v ")"))]))
+
+(defn- band-pat-match []
+  (for [s str-vars p pat-lits]
+    [(indent (str s " " p " :S(HIT)F(MISS)"))
+     "HIT     OUTPUT = 'matched'"
+     "        :(DONE)"
+     "MISS    OUTPUT = 'no match'"
+     "DONE"]))
+
+(defn- band-pat-replace []
+  (for [v str-vars p pat-lits repl str-lits]
+    [(indent (str v " " p " = " repl))
+     (indent (str "OUTPUT = " v))]))
+
+(defn- band-loop []
+  ;; Bounded loops I=1..N, N in {3,4,5}
+  (for [limit [3 4 5]]
+    ["        I = 1"
+     (str "LOOP    OUTPUT = I")
+     "        I = I + 1"
+     (str "        LE(I," limit ") :S(LOOP)")]))
+
+(defn- band-ident []
+  (for [s1 str-lits s2 str-lits :when (not= s1 s2)]
+    [(indent (str "IDENT(" s1 "," s2 ") :S(YES)F(NO)"))
+     "YES     OUTPUT = 'same'"
+     "        :(DONE)"
+     "NO      OUTPUT = 'different'"
+     "DONE"]))
+
+(defn- band-len-match []
+  (for [n [1 2 3 4 5] v str-vars]
+    [(indent (str v " LEN(" n ") :S(HIT)F(MISS)"))
+     "HIT     OUTPUT = 'matched'"
+     "        :(DONE)"
+     "MISS    OUTPUT = 'no match'"
+     "DONE"]))
+
+(defn- band-any-match []
+  (for [cs ["'aeiou'" "'bcdfg'" "'0123456789'"] v str-vars]
+    [(indent (str v " ANY(" cs ") :S(HIT)F(MISS)"))
+     "HIT     OUTPUT = 'matched'"
+     "        :(DONE)"
+     "MISS    OUTPUT = 'no match'"
+     "DONE"]))
+
+(defn- band-span-match []
+  (for [cs ["'abcdefghijklmnopqrstuvwxyz'" "'0123456789'" "'helo'"] v str-vars]
+    [(indent (str v " SPAN(" cs ") :S(HIT)F(MISS)"))
+     "HIT     OUTPUT = 'matched'"
+     "        :(DONE)"
+     "MISS    OUTPUT = 'no match'"
+     "DONE"]))
+
+(defn- band-break-match []
+  (for [cs ["'o'" "'l'" "'d'"] v str-vars]
+    [(indent (str v " BREAK(" cs ") . T :S(HIT)F(MISS)"))
+     "HIT     OUTPUT = T"
+     "        :(DONE)"
+     "MISS    OUTPUT = 'no match'"
+     "DONE"]))
+
+(defn- band-capture []
+  (for [v str-vars p ["LEN(3)" "LEN(2)" "SPAN('abcdefghijklmnopqrstuvwxyz')" "ANY('aeiou')"]]
+    [(indent (str v " " p " . T :S(HIT)F(MISS)"))
+     "HIT     OUTPUT = T"
+     "        :(DONE)"
+     "MISS    OUTPUT = 'no match'"
+     "DONE"]))
+
+(defn- band-trim []
+  (for [v str-vars]
+    [(indent (str "OUTPUT = TRIM(" v ")"))]))
+
+(defn- band-substr-cap []
+  ;; Capture a substring then output it
+  (for [v str-vars]
+    [(indent (str v " LEN(3) $ T :S(HIT)F(MISS)"))
+     "HIT     OUTPUT = T"
+     "        :(DONE)"
+     "MISS    OUTPUT = 'no match'"
+     "DONE"]))
+
+(defn- band-define-simple []
+  ;; Simple DEFINE / call — factorial via iteration
+  [["        DEFINE('DOUBLE(X)')"
+    "        I = DOUBLE(5)"
+    "        OUTPUT = I"
+    "        :(END)"
+    "DOUBLE  DOUBLE = X * 2 :S(RETURN)F(FRETURN)"
+    "END"]])   ; NOTE: these are full programs, not body-lines
+
+;; ── Assemble band programs ────────────────────────────────────────────────────
+
+(defn- bodies->programs
+  "Convert a seq of body-line vectors to full programs (with fixtures)."
+  [bodies]
+  (map (fn [lines] (apply with-fixtures lines)) bodies))
+
+(defn gen-by-length
+  "Lazy seq of [length program-src] pairs sorted by source length.
+   Covers every grammatical construct at its simplest.
+   Suitable for systematic coverage testing.
+
+   Each program is self-contained and uses canonical fixture variables.
+   Programs are emitted in order of increasing source length.
+
+   Usage:
+     (take 10 (gen-by-length))   ; first 10 shortest programs
+     (filter #(= 1 (:band %)) (gen-by-length-annotated))  ; just T1"
+  []
+  (let [all-bodies (concat
+                     (band-assign-int)
+                     (band-assign-str)
+                     (band-cmp)
+                     (band-ident)
+                     (band-arith)
+                     (band-concat)
+                     (band-size)
+                     (band-trim)
+                     (band-len-match)
+                     (band-any-match)
+                     (band-span-match)
+                     (band-break-match)
+                     (band-capture)
+                     (band-substr-cap)
+                     (band-pat-match)
+                     (band-pat-replace)
+                     (band-loop))
+        programs (bodies->programs all-bodies)
+        ;; Also splice in the standalone define programs (already full programs)
+        standalone (map first (band-define-simple))]
+    (->> (concat programs standalone)
+         (sort-by count)
+         (dedupe))))
+
+(defn gen-by-length-annotated
+  "Like gen-by-length but returns maps {:src s :length n :band k}
+   where band is 0..5 based on source length:
+     0  = trivial  (<= 80 chars)
+     1  = simple   (<= 140 chars)
+     2  = medium   (<= 200 chars)
+     3  = complex  (<= 300 chars)
+     4  = large    (<= 500 chars)
+     5  = very large (> 500 chars)"
+  []
+  (map (fn [src]
+         {:src    src
+          :length (count src)
+          :band   (cond (<= (count src)  80) 0
+                        (<= (count src) 140) 1
+                        (<= (count src) 200) 2
+                        (<= (count src) 300) 3
+                        (<= (count src) 500) 4
+                        :else                5)})
+       (gen-by-length)))
+
+;; ── rand-statement — random single-statement generator ───────────────────────
+;;
+;; Generates a complete 1-statement program using the canonical variable pools.
+;; The statement body is chosen uniformly at random from all grammatical forms.
+
+(defn rand-statement
+  "Generate a random complete SNOBOL4 program consisting of exactly one
+   meaningful statement (plus fixture setup and END).
+   The statement is chosen uniformly from all grammatical shapes at random.
+   Returns source string."
+  []
+  (let [forms
+        [;; T0 — atomic assignments
+         (fn [] (indent (str (rand-nth int-vars) " = " (rand-nth int-lits))))
+         (fn [] (indent (str (rand-nth str-vars) " = " (rand-nth str-lits))))
+         ;; T1 — arithmetic
+         (fn [] (let [op (rand-nth arith-ops)
+                      lhs (rand-nth int-lits)
+                      rhs (rand-nth (filter pos? int-lits))]
+                  (indent (str (rand-nth int-vars) " = " lhs " " op " " rhs))))
+         ;; T1 — concat
+         (fn [] (indent (str (rand-nth str-vars) " = "
+                             (rand-nth str-lits) " " (rand-nth str-lits))))
+         ;; T1 — output
+         (fn [] (indent (str "OUTPUT = " (rand-nth str-vars))))
+         (fn [] (indent (str "OUTPUT = " (rand-nth int-vars))))
+         ;; T2 — comparisons (self-contained with goto)
+         (fn [] (let [op (rand-nth cmp-ops-int)
+                      a (rand-nth int-lits) b (rand-nth int-lits)]
+                  (str (indent (str op "(" a "," b ") :S(YES)F(NO)")) "\n"
+                       "YES     OUTPUT = 'yes'\n"
+                       "        :(DONE)\n"
+                       "NO      OUTPUT = 'no'\n"
+                       "DONE")))
+         ;; T2 — string identity
+         (fn [] (let [a (rand-nth str-lits) b (rand-nth str-lits)]
+                  (str (indent (str "IDENT(" a "," b ") :S(YES)F(NO)")) "\n"
+                       "YES     OUTPUT = 'same'\n"
+                       "        :(DONE)\n"
+                       "NO      OUTPUT = 'different'\n"
+                       "DONE")))
+         ;; T2 — SIZE
+         (fn [] (indent (str "OUTPUT = SIZE(" (rand-nth str-vars) ")")))
+         ;; T2 — pattern match
+         (fn [] (let [v (rand-nth str-vars) p (rand-nth pat-lits)]
+                  (str (indent (str v " " p " :S(HIT)F(MISS)")) "\n"
+                       "HIT     OUTPUT = 'matched'\n"
+                       "        :(DONE)\n"
+                       "MISS    OUTPUT = 'no match'\n"
+                       "DONE")))
+         ;; T2 — capture
+         (fn [] (let [v (rand-nth str-vars)
+                      p (rand-nth ["LEN(2)" "LEN(3)" "ANY('aeiou')"])]
+                  (str (indent (str v " " p " . T :S(HIT)F(MISS)")) "\n"
+                       "HIT     OUTPUT = T\n"
+                       "        :(DONE)\n"
+                       "MISS    OUTPUT = 'no match'\n"
+                       "DONE")))
+         ;; T2 — replace
+         (fn [] (let [v (rand-nth str-vars) p (rand-nth pat-lits)
+                      r (rand-nth str-lits)]
+                  (str (indent (str v " " p " = " r)) "\n"
+                       (indent (str "OUTPUT = " v)))))
+         ;; T2 — TRIM
+         (fn [] (indent (str "OUTPUT = TRIM(" (rand-nth str-vars) ")")))
+         ;; T3 — bounded loop
+         (fn [] (let [n (rand-nth [3 4 5])]
+                  (str "        I = 1\n"
+                       "LOOP    OUTPUT = I\n"
+                       "        I = I + 1\n"
+                       (indent (str "LE(I," n ") :S(LOOP)")))))]
+        body ((rand-nth forms))]
+    (str canonical-fixtures "\n" body "\n" "END")))
+
+;; ── Error-class programs ──────────────────────────────────────────────────────
+;;
+;; Generates programs that exercise each of the four error classes at each
+;; length band.  The oracle determines whether these are :pass, :skip, etc.
+
+(defn gen-error-class-programs
+  "Return a seq of programs designed to exercise the four error classes:
+     :normal   — runs fine
+     :div-zero — integer division by zero
+     :bad-goto — goto undefined label
+     :syntax   — malformed statement (grammar error)
+   
+   Oracle determines expected behaviour — these are passed through diff-run."
+  []
+  (concat
+   ;; :normal — clean programs
+   (take 20 (gen-by-length))
+
+   ;; :div-zero — division by zero
+   [(str canonical-fixtures "\n"
+         "        I = 5 / 0\n"
+         "        OUTPUT = I\n"
+         "END")
+    (str canonical-fixtures "\n"
+         "        I = 10\n"
+         "        J = 0\n"
+         "        K = I / J\n"
+         "        OUTPUT = K\n"
+         "END")]
+
+   ;; :bad-goto — goto undefined label (runtime error)
+   [(str canonical-fixtures "\n"
+         "        I = 1\n"
+         "        I EQ(I,1) :S(NOWHERE)\n"
+         "END")
+    (str canonical-fixtures "\n"
+         "        :(UNDEFINED_LABEL)\n"
+         "END")]
+
+   ;; :syntax errors — malformed programs
+   ["        = bad syntax\nEND"
+    "NOLABEL\nEND"]))
+
+;; ── Automated batch runner ────────────────────────────────────────────────────
+;;
+;; Run N programs through the three-oracle harness; save corpus records;
+;; return summary statistics.  This is the main entry point for Sprint 18.4.
+
+(defn run-worm-batch
+  "Run `n` programs through the three-oracle diff harness.
+   source-fn is a 0-arg function that returns a program source string.
+   Returns a map:
+     :records  — vector of corpus records
+     :summary  — {:pass N :fail N :skip N :timeout N :pass-class N}
+     :failures — vector of corpus records with :status :fail
+
+   Example:
+     (run-worm-batch 100 rand-program)
+     (run-worm-batch 500 #(first (drop (rand-int 200) (gen-by-length))))
+
+   Internally calls harness/diff-run — requires SPITBOL + CSNOBOL4 installed.
+   Saves all records to resources/golden-corpus.edn."
+  [n source-fn]
+  (require '[SNOBOL4clojure.harness :as harness])
+  (let [programs  (repeatedly n source-fn)
+        records   (mapv (fn [src]
+                          (try
+                            ((resolve 'SNOBOL4clojure.harness/diff-run) src)
+                            (catch Exception e
+                              {:src src :status :error
+                               :thrown (.getMessage e)})))
+                        programs)
+        summary   (reduce (fn [acc r]
+                            (update acc (get r :status :error) (fnil inc 0)))
+                          {} records)
+        failures  (filterv #(= :fail (:status %)) records)]
+    ((resolve 'SNOBOL4clojure.harness/save-corpus!) records)
+    {:records  records
+     :summary  summary
+     :failures failures}))
+
+(defn run-systematic-batch
+  "Run the full systematic (gen-by-length) corpus through the harness.
+   Returns the same map as run-worm-batch.
+   This exhaustively covers every construct in the grammar."
+  []
+  (require '[SNOBOL4clojure.harness :as harness])
+  (let [programs  (vec (gen-by-length))
+        _         (println (str "Running " (count programs) " systematic programs..."))
+        records   (vec
+                    (map-indexed
+                      (fn [i src]
+                        (when (zero? (mod i 50))
+                          (println (str "  " i "/" (count programs) "...")))
+                        (try
+                          ((resolve 'SNOBOL4clojure.harness/diff-run) src)
+                          (catch Exception e
+                            {:src src :status :error :thrown (.getMessage e)})))
+                      programs))
+        summary   (reduce (fn [acc r]
+                            (update acc (get r :status :error) (fnil inc 0)))
+                          {} records)
+        failures  (filterv #(= :fail (:status %)) records)]
+    ((resolve 'SNOBOL4clojure.harness/save-corpus!) records)
+    {:records  records
+     :summary  summary
+     :failures failures
+     :total    (count programs)}))
+
+;; ── Corpus record → deftest emitter ──────────────────────────────────────────
+;;
+;; Convert a :fail corpus record into a pinned regression deftest.
+
+(defn- safe-name
+  "Make a string into a valid Clojure identifier."
+  [s]
+  (-> s
+      (str/replace #"[^a-zA-Z0-9_]" "_")
+      (str/replace #"^[0-9]" "x")))
+
+(defn- quote-lines
+  "Turn a multi-line SNOBOL4 source string into a seq of quoted line strings."
+  [src]
+  (map (fn [line] (str "    " (pr-str line)))
+       (str/split-lines src)))
+
+(defn corpus-record->deftest
+  "Convert a corpus record to a Clojure deftest string.
+   For :pass records: pins the expected output.
+   For :fail records: pins the oracle output as expected (regression guard).
+   For :skip/:timeout/:pass-class: emits a commented-out skeleton.
+
+   oracle-stdout is extracted from :spitbol or :csnobol4 based on :oracle tag."
+  [record index]
+  (let [{:keys [src status oracle spitbol csnobol4]} record
+        oracle-out (case oracle
+                     :both     (:stdout spitbol)
+                     :spitbol  (:stdout spitbol)
+                     :csnobol4 (:stdout csnobol4)
+                     :disagree (:stdout spitbol)
+                     :both-error nil
+                     nil)
+        test-name  (symbol (str "worm_auto_" (format "%04d" index)))
+        lines      (quote-lines src)]
+    (case status
+      (:pass :fail)
+      (str "(deftest " test-name "\n"
+           "  (let [r (run-with-timeout\n"
+           "           (str/join \"\\n\"\n"
+           "             [" (str/join "\n              " lines) "]))\n"
+           "              2000)]\n"
+           "    (is (= " (pr-str (or oracle-out "")) "\n"
+           "           (str/trim-newline (or (:stdout r) \"\"))))))\n")
+
+      ;; skip/timeout/pass-class — emit as comment
+      (str ";; " (name status) " — skipped (oracle: " oracle ")\n"
+           ";; (deftest " test-name " ...)\n"))))
+
+(defn emit-regression-tests
+  "Given a collection of corpus records, emit a complete Clojure test namespace
+   string suitable for writing to a .clj test file.
+   Only :pass and :fail records are emitted as live deftests; others commented."
+  [records ns-name]
+  (str "(ns " ns-name "\n"
+       "  \"Auto-generated regression tests from worm corpus.\n"
+       "   DO NOT EDIT — regenerate with (emit-regression-tests ...)\"\n"
+       "  (:require [clojure.test :refer :all]\n"
+       "            [clojure.string :as str]\n"
+       "            [SNOBOL4clojure.core :refer :all]\n"
+       "            [SNOBOL4clojure.test-helpers :refer [run-with-timeout]]))\n\n"
+       "(GLOBALS *ns*)\n"
+       "(use-fixtures :each (fn [f] (GLOBALS (find-ns (quote " ns-name "))) (f)))\n\n"
+       (str/join "\n" (map-indexed corpus-record->deftest records))))
