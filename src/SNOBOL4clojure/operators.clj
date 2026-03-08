@@ -186,17 +186,20 @@
                     :else nil))
                 ;; normal variable assignment
                 (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
-                (let [out-val (if (and (list? r) (= (first r) 'SEQ))
+                (let [out-val (if (and (list? r) (clojure.core/= (first r) 'SEQ))
                                 (apply str (map #(if (nil? %) "" (str %)) (rest r)))
                                 r)]
                   (when (clojure.core/= N 'OUTPUT)   (println out-val))
                   (when (clojure.core/= N 'TERMINAL) (println out-val))
                   out-val)
                 :else
-                (do (snobol-set! N r) r)))
+                (let [v (if (and (list? r) (clojure.core/= (first r) 'SEQ))
+                          (apply str (map #(if (nil? %) "" (str %)) (rest r)))
+                          r)]
+                  (snobol-set! N v) v)))
     ?=      (let [[n p R] args
                   subject (str (or ($$ n) ""))
-                  pat     (EVAL! p)
+                  pat     p                       ; already evaluated by EVAL! dispatch
                   repl    (str (or (EVAL! R) ""))]
               (when-let [[start end] (SEARCH subject pat)]
                 (let [result (str (subs subject 0 start)
