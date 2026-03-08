@@ -51,7 +51,7 @@
 ;; ── num conversion ────────────────────────────────────────────────────────────
 (deftest test-num
   (is (= 3.14  (num 3.14)))
-  (is (= 42.0  (num 42)))
+  (is (= 42    (num 42)))
   (is (= 1.5   (num "1.5")))
   (is (Double/isNaN (num "abc"))))
 

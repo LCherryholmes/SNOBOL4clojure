@@ -7,14 +7,14 @@
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── String functions ──────────────────────────────────────────────────────────
-(defn SIZE    [s]         (count s))
+(defn SIZE    [s]         (count (str s)))
 (defn REPLACE [s1 s2 s3]
   ;; Replace chars in s1: each char of s2 mapped to corresponding char of s3
   (apply str (map #(let [i (.indexOf ^String s2 (str %))]
                      (if (>= i 0) (.charAt ^String s3 i) %))
                   s1)))
 (defn DUPL    [x i]   (apply str (repeat i x)))  ; string only for now
-(defn TRIM    [s]     (clojure.string/trim s))
+(defn TRIM    [s]     (clojure.string/trimr (str s)))
 (defn REVERSE [s]     (apply str (clojure.string/reverse s)))
 (defn LPAD    [s n]   (clojure.string/join (concat (repeat (subtract n (count s)) \space) [s])))
 (defn RPAD    [s n]   (clojure.string/join (concat [s] (repeat (subtract n (count s)) \space))))

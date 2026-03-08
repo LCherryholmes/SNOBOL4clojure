@@ -60,8 +60,8 @@
 (eval (primitive 'LLT    ε nil scvt     #(list '<    (list 'compare %1 %2) 0)))
 (eval (primitive 'LGE    ε   ε scvt     #(list '>=   (list 'compare %1 %2) 0)))
 (eval (primitive 'LGT    ε nil scvt     #(list '>    (list 'compare %1 %2) 0)))
-(eval (primitive 'IDENT  ε   ε identity #(list 'identical? %1 %2)))
-(eval (primitive 'DIFFER ε nil identity #(list 'not (list 'identical? %1 %2))))
+(eval (primitive 'IDENT  ε   ε identity #(list 'equal %1 %2)))
+(eval (primitive 'DIFFER ε nil identity #(list 'not= %1 %2)))
 
 ;; ── SNOBOL4 operators ─────────────────────────────────────────────────────────
 (defn =     ([_x]       η)                         ; unary  — programmable
@@ -148,25 +148,26 @@
     FAIL    FAIL
     ;; Arithmetic — coerce to SNOBOL numeric type (integer if both integer, else real)
     +       (let [ns (map num args)]
-              (if (every? #(== (Math/floor %) %) ns)
+              (if (every? integer? ns)
                 (long (apply clojure.core/+' ns))
                 (apply clojure.core/+ ns)))
     -       (let [ns (map num args)]
-              (if (every? #(== (Math/floor %) %) ns)
+              (if (every? integer? ns)
                 (long (apply clojure.core/-' ns))
                 (apply clojure.core/- ns)))
     *       (let [ns (map num args)]
-              (if (every? #(== (Math/floor %) %) ns)
+              (if (every? integer? ns)
                 (long (apply clojure.core/*' ns))
                 (apply clojure.core/* ns)))
-    /       (let [ns  (map num args)
-                  d   (last ns)]
+    tilde   (let [v (first args)]       ; ~ negates success/failure
+              (if (nil? v) ε nil))
+    /       (let [ns (map num args)
+                  d  (last ns)]
               (if (zero? d)
                 (throw (ex-info "Division by zero" {:snobol/error 14}))
-                (let [result (apply clojure.core// ns)]
-                  (if (== (Math/floor result) result)
-                    (long result)
-                    result))))
+                (if (every? integer? ns)
+                  (apply quot ns)
+                  (apply clojure.core// ns))))
     ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args]
               ;; nil replacement = sub-expression failure → statement fails

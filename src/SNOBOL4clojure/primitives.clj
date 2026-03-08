@@ -75,8 +75,11 @@
 
 (defn RTAB# [Σ Δ Π]
   (loop [σ Σ δ Δ]
-    (if (>= (count σ) Π) [σ δ]
-      (if (not (seq σ)) (err σ δ) (recur (rest σ) (inc δ))))))
+    (let [rem (count σ)]
+      (cond
+        (== rem Π)  [σ δ]                ; exactly at target — succeed
+        (< rem Π)   (err Σ Δ)            ; overshot — fail
+        :else       (recur (rest σ) (inc δ))))))
 
 ;; ── Zero-width anchors ────────────────────────────────────────────────────────
 (defn BOL# [Σ Δ _Π] (if (clojure.core/= Δ 0) [Σ Δ] (err Σ Δ)))

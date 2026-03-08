@@ -52,11 +52,11 @@
     (is      (IDENT  x "hello"))    ; interned — same object
     (is (not (DIFFER x x)))
     (is (not (DIFFER x "hello"))))  ; interned — same object
-  ;; Non-interned string (built at runtime) is NOT identical
-  (let [x (str "hel" "lo")         ; still interned by javac actually
-        y (String. "hello")]        ; force new object
-    (is (not (IDENT x y)))
-    (is      (DIFFER x y))))
+  ;; IDENT uses value equality — (String. "hello") equals "hello"
+  (let [x (str "hel" "lo")
+        y (String. "hello")]
+    (is      (IDENT x y))           ; same value → IDENT succeeds
+    (is (not (DIFFER x y)))))       ; same value → DIFFER fails
 
 ;; ── EVAL with quoted expressions ──────────────────────────────────────────────
 (deftest test-eval-quoted

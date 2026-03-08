@@ -56,11 +56,10 @@
               (if (every? #(== (Math/floor %) %) ns)
                 (long (apply clojure.core/*' ns))
                 (apply clojure.core/* ns)))
-    /       (let [ns (map num args)
-                  result (apply clojure.core// ns)]
-              (if (== (Math/floor result) result)
-                (long result)
-                result))
+    /       (let [ns (map num args)]
+              (if (every? integer? ns)
+                (apply quot ns)
+                (apply clojure.core// ns)))
     ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args]
               (when-not (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
@@ -98,7 +97,8 @@
     SIZE    (SIZE    (first args))
     TRIM    (TRIM    (first args))
     DUPL    (DUPL    (first args) (second args))
-    REVERSE (REVERSE (first args))
+    tilde   (let [v (first args)]       ; ~ negates success/failure
+              (if (nil? v) ε nil))
     LPAD    (LPAD    (first args) (second args))
     RPAD    (RPAD    (first args) (second args))
     quote   ($$ (second op))

@@ -9,7 +9,10 @@
 (defn Σ+       ([x y] (clojure.core/+' x y)) ([x] (clojure.core/+' x)))
 (defn subtract ([x y] (clojure.core/-' x y)) ([x] (clojure.core/-' x)))
 (defn multiply ([x y] (clojure.core/*' x y)) ([x] (clojure.core/*' x)))
-(defn divide    [x y] (clojure.core// x y))
+(defn divide    [x y]
+  (if (and (integer? x) (integer? y))
+    (quot x y)                        ; integer / integer → truncate toward zero
+    (clojure.core// x y)))            ; real arithmetic otherwise
 (defn equal     [x y] (clojure.core/= x y))
 (defn not-equal [x y] (clojure.core/not= x y))
 (defn out      [item] (binding [pp/*print-right-margin* 2048, pp/*print-miser-width* 2000]
@@ -59,11 +62,14 @@
 ;; ── Numeric conversion ────────────────────────────────────────────────────────
 (defn num [x]
   (cond
-    (nil? x)   ##NaN
+    (nil? x)     ##NaN
     (double? x)  x
-    (integer? x) (.doubleValue x)
-    true (try (Double/parseDouble (str x))
-           (catch NumberFormatException _ ##NaN))))
+    (integer? x) x                       ; preserve integer type
+    true (let [s (str x)]
+           (or (try (Long/parseLong s)    ; try integer parse first
+                 (catch NumberFormatException _ nil))
+               (try (Double/parseDouble s)
+                 (catch NumberFormatException _ ##NaN))))))
 
 (defn  ncvt [x] (list 'num x))
 (defn  scvt [x] (list 'str x))
