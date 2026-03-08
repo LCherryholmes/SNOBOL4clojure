@@ -5,12 +5,18 @@
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── Character-class patterns ──────────────────────────────────────────────────
-(defn ANY    [S] (list 'ANY$    (charset S)))
-(defn BREAK  [S] (list 'BREAK$  (charset S)))
-(defn BREAKX [S] (list 'BREAKX# (charset S)))   ; backtracking form
-(defn NOTANY [S] (list 'NOTANY$ (charset S)))
-(defn NSPAN  [S] (list 'NSPAN$  (charset S)))    ; 0-or-more span
-(defn SPAN   [S] (list 'SPAN$   (charset S)))
+;; If the argument is a DEFER! thunk (produced by unary * on a variable),
+;; we must NOT call charset now — the variable may change between uses.
+;; Instead wrap the whole constructor in a DEFER so the engine re-evaluates
+;; the pattern (and re-builds the charset) at match time from the live value.
+(defn- deferred? [S] (and (list? S) (clojure.core/= (first S) 'DEFER!)))
+
+(defn ANY    [S] (if (deferred? S) (list 'DEFER! (fn [] (ANY    (str ((second S))))))  (list 'ANY$    (charset S))))
+(defn BREAK  [S] (if (deferred? S) (list 'DEFER! (fn [] (BREAK  (str ((second S))))))  (list 'BREAK$  (charset S))))
+(defn BREAKX [S] (if (deferred? S) (list 'DEFER! (fn [] (BREAKX (str ((second S))))))  (list 'BREAKX# (charset S))))  ; backtracking form
+(defn NOTANY [S] (if (deferred? S) (list 'DEFER! (fn [] (NOTANY (str ((second S))))))  (list 'NOTANY$ (charset S))))
+(defn NSPAN  [S] (if (deferred? S) (list 'DEFER! (fn [] (NSPAN  (str ((second S))))))  (list 'NSPAN$  (charset S))))   ; 0-or-more span
+(defn SPAN   [S] (if (deferred? S) (list 'DEFER! (fn [] (SPAN   (str ((second S))))))  (list 'SPAN$   (charset S))))
 
 ;; ── Length / position patterns ────────────────────────────────────────────────
 (defn LEN  [I] (list 'LEN#  I))

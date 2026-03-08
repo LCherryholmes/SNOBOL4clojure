@@ -20,21 +20,22 @@
      A failing test means our impl is wrong.
   "
   (:require [clojure.test :refer :all]
-            [SNOBOL4clojure.core :refer :all]))
+            [SNOBOL4clojure.core :refer :all]
+            [SNOBOL4clojure.test-helpers :refer [prog prog-timeout prog-infinite]]))
 
 ;; ── Macro ──────────────────────────────────────────────────────────────────────
-(defmacro prog [& lines]
-  `(RUN (CODE ~(clojure.string/join "\n" (map str lines)))))
+;; prog, prog-timeout, prog-infinite are imported from test-helpers.
+;; Do NOT redefine prog here — all tests run under a timeout (Halting Problem).
 
 ;; ── Band 0: Bare programs ──────────────────────────────────────────────────────
 
 (deftest band0-bare-end
   "Smallest valid program: just END.  Should complete without error."
-  (is (nil? (prog "end"))))
+  (is (= :ok (:exit (prog "end")))))
 
 (deftest band0-end-uppercase
   "END is uppercase in our dialect — also valid."
-  (is (nil? (prog "END"))))
+  (is (= :ok (:exit (prog "END")))))
 
 (deftest band0-bare-label
   "A label with no body: statement is a no-op, falls through to END."
@@ -45,7 +46,7 @@
 
 (deftest band0-comment-only
   "A comment line (starts with *) followed by END."
-  (is (nil? (prog "* this is a comment" "end"))))
+  (is (= :ok (:exit (prog "* this is a comment" "end")))))
 
 (deftest band0-output-empty-string
   "OUTPUT = '' emits a blank line — variable holds ''"

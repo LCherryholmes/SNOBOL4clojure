@@ -124,7 +124,7 @@
 ;; Δ       — start position (integer)
 ;; Π       — pattern node
 ;; start-Δ — the anchor position for the returned span start
-(defn- engine [Σ Δ Π start-Δ full-subject]
+(defn engine [Σ Δ Π start-Δ full-subject]
   (loop [action :proceed, ζ [Σ Δ ε ε Π 1 []], Ω []]
     (let [λ (ζλ ζ)]
       (animate action full-subject ζ)

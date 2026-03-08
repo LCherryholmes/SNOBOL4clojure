@@ -40,10 +40,13 @@
     35  Edge cases
   "
   (:require [clojure.test :refer :all]
-            [SNOBOL4clojure.core :refer :all]))
+            [SNOBOL4clojure.core :refer :all]
+            [SNOBOL4clojure.test-helpers :refer [prog prog-timeout prog-infinite]]))
 
-(defmacro prog [& lines]
-  `(RUN (CODE ~(clojure.string/join "\n" (map str lines)))))
+(GLOBALS *ns*)
+(use-fixtures :each (fn [f] (GLOBALS (find-ns 'SNOBOL4clojure.test-worm1000)) (f)))
+
+;; prog, prog-timeout, prog-infinite imported from test-helpers (Halting Problem defence).
 
 (deftest worm_int_lit_0
   "I = 0"
@@ -3070,7 +3073,7 @@
 )
 
 (deftest worm_concat_ab
-  "S = 'a' 'b' => "ab""
+  "S = 'a' 'b' => 'ab'"
   (prog
     "        S = 'a' 'b'"
     "end"
@@ -3079,7 +3082,7 @@
 )
 
 (deftest worm_concat_abc
-  "S = 'a' 'b' 'c' => "abc""
+  "S = 'a' 'b' 'c' => 'abc'"
   (prog
     "        S = 'a' 'b' 'c'"
     "end"
@@ -3088,7 +3091,7 @@
 )
 
 (deftest worm_concat_empty_left
-  "S = '' 'hello' => "hello""
+  "S = '' 'hello' => 'hello'"
   (prog
     "        S = '' 'hello'"
     "end"
@@ -3097,7 +3100,7 @@
 )
 
 (deftest worm_concat_empty_right
-  "S = 'hello' '' => "hello""
+  "S = 'hello' '' => 'hello'"
   (prog
     "        S = 'hello' ''"
     "end"
@@ -3106,7 +3109,7 @@
 )
 
 (deftest worm_concat_both_empty
-  "S = '' '' => """
+  "S = '' '' => ''"
   (prog
     "        S = '' ''"
     "end"
@@ -3115,7 +3118,7 @@
 )
 
 (deftest worm_concat_int_str
-  "S = 42 'x' => "42x""
+  "S = 42 'x' => '42x'"
   (prog
     "        S = 42 'x'"
     "end"
@@ -3124,7 +3127,7 @@
 )
 
 (deftest worm_concat_str_int
-  "S = 'x' 42 => "x42""
+  "S = 'x' 42 => 'x42'"
   (prog
     "        S = 'x' 42"
     "end"
@@ -3133,7 +3136,7 @@
 )
 
 (deftest worm_concat_int_int
-  "S = 1 2 => "12""
+  "S = 1 2 => '12'"
   (prog
     "        S = 1 2"
     "end"
@@ -3142,7 +3145,7 @@
 )
 
 (deftest worm_concat_spaces
-  "S = 'hello' ' ' 'world' => "hello world""
+  "S = 'hello' ' ' 'world' => 'hello world'"
   (prog
     "        S = 'hello' ' ' 'world'"
     "end"
@@ -3151,7 +3154,7 @@
 )
 
 (deftest worm_concat_long_concat
-  "S = 'foo' 'bar' 'baz' 'qux' => "foobarbazqux""
+  "S = 'foo' 'bar' 'baz' 'qux' => 'foobarbazqux'"
   (prog
     "        S = 'foo' 'bar' 'baz' 'qux'"
     "end"
@@ -4807,7 +4810,7 @@
 )
 
 (deftest worm_datatype_string
-  "DATATYPE('hello') = "string""
+  "DATATYPE('hello') = 'string'"
   (prog
     "        R = DATATYPE('hello')"
     "end"
@@ -4816,7 +4819,7 @@
 )
 
 (deftest worm_datatype_integer
-  "DATATYPE(42) = "integer""
+  "DATATYPE(42) = 'integer'"
   (prog
     "        R = DATATYPE(42)"
     "end"
@@ -4825,7 +4828,7 @@
 )
 
 (deftest worm_datatype_real
-  "DATATYPE(3.14) = "real""
+  "DATATYPE(3.14) = 'real'"
   (prog
     "        R = DATATYPE(3.14)"
     "end"
@@ -4834,7 +4837,7 @@
 )
 
 (deftest worm_datatype_pattern
-  "DATATYPE(ANY('a')) = "pattern""
+  "DATATYPE(ANY('a')) = 'pattern'"
   (prog
     "        R = DATATYPE(ANY('a'))"
     "end"
@@ -4843,7 +4846,7 @@
 )
 
 (deftest worm_datatype_array
-  "DATATYPE(ARRAY(3)) = "array""
+  "DATATYPE(ARRAY(3)) = 'array'"
   (prog
     "        R = DATATYPE(ARRAY(3))"
     "end"
@@ -4852,7 +4855,7 @@
 )
 
 (deftest worm_datatype_table
-  "DATATYPE(TABLE()) = "table""
+  "DATATYPE(TABLE()) = 'table'"
   (prog
     "        R = DATATYPE(TABLE())"
     "end"

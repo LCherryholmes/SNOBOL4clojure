@@ -54,10 +54,10 @@
 (eval (primitive 'GT     0 nil ncvt     #(list '>     %1 %2)))
 (eval (primitive 'LEQ    ε   ε scvt     #(list 'equal %1 %2)))
 (eval (primitive 'LNE    ε nil scvt     #(list 'not=  %1 %2)))
-(eval (primitive 'LLE    ε   ε scvt     #(list '<=    %1 %2)))
-(eval (primitive 'LLT    ε nil scvt     #(list '<     %1 %2)))
-(eval (primitive 'LGE    ε   ε scvt     #(list '>=    %1 %2)))
-(eval (primitive 'LGT    ε nil scvt     #(list '>     %1 %2)))
+(eval (primitive 'LLE    ε   ε scvt     #(list '<=   (list 'compare %1 %2) 0)))
+(eval (primitive 'LLT    ε nil scvt     #(list '<    (list 'compare %1 %2) 0)))
+(eval (primitive 'LGE    ε   ε scvt     #(list '>=   (list 'compare %1 %2) 0)))
+(eval (primitive 'LGT    ε nil scvt     #(list '>    (list 'compare %1 %2) 0)))
 (eval (primitive 'IDENT  ε   ε identity #(list 'identical? %1 %2)))
 (eval (primitive 'DIFFER ε nil identity #(list 'not (list 'identical? %1 %2))))
 
@@ -360,6 +360,13 @@
                               (if (instance? clojure.lang.IDeref v) @v v))
           (equal op 'SEQ)   (apply str (map #(let [v (EVAL! %)] (if (nil? v) "" (str v))) parms))
           (equal op 'quote) (first parms)
+          ;; Unary * = deferred pattern: do NOT pre-evaluate the arg.
+          ;; The thunk must re-read the variable at match time so that
+          ;; SPAN(*B) / ANY(*B) / NOTANY(*B) see the current value of B,
+          ;; not the value B held when the pattern was first assigned.
+          (and (equal op '*) (clojure.core/= (count parms) 1))
+          (let [sym (first parms)]
+            (list 'DEFER! (fn [] (EVAL! sym))))
           true (let [args (apply vector (map EVAL! parms))]
                  (apply INVOKE op args))))
       true "Yikes! What is E?")))

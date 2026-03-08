@@ -600,3 +600,153 @@ Keep both tiers. Use `rand-*` for smoke tests; `gen-*` for regression suites.
 **10. Typed pools are canonical fixtures.**
 `I J K L M N` integers, `S T X Y Z` strings, `P Q R` patterns, `L1 L2` labels.
 Pre-initialize fixtures at program start. Do not generate total randomness.
+
+---
+
+## Sprint 18B — Per-Statement Timeout Architecture  DESIGN (2026-03-08)
+
+### The Two Problems Identified This Session
+
+#### Problem 1: `lein test` hangs forever on infinite-looping programs  ✅ FIXED
+**Root cause**: The bare `prog` macro called `(RUN (CODE ...))` with no timeout.
+Any SNOBOL4 program containing an infinite loop (`:S(SELF)`, unbounded GOTO,
+broken exit condition) would block the entire `lein test` process forever.
+It is **mathematically impossible** (Rice's theorem / Halting Problem) to
+statically determine whether a SNOBOL4 program terminates.
+
+**Fix implemented**: `test_helpers.clj` — `prog-timeout`, `prog`, `prog-infinite`
+macros wrap `RUN` in a `future`+`deref` with a configurable ms budget and
+1 retry. Timeout is reported as a `clojure.test/is` failure, not a hang.
+All test files now import `prog` from `test-helpers`.
+
+#### Problem 2: Timeout granularity is at the wrong level  ⚠️ DESIGN NEEDED
+**Root cause**: Even with per-`deftest` timeouts, a `deftest` that runs a
+10-statement SNOBOL4 program still has only ONE timeout for the whole program.
+If statement 7 loops infinitely, the test times out — but statements 1-6
+gave no signal about what passed or failed.
+
+Worse: in the SNOBOL4 runtime, `RUN` is a `loop/recur` — a tight, single-
+threaded Clojure loop. **There is no hook point between statement executions**
+where a timer can be checked without modifying the core engine. The future/
+deref kill-from-outside approach can only fire once per future, not per
+statement.
+
+### The Correct Architecture
+
+**Principle**: Each `deftest` should cover exactly ONE semantic fact.
+That semantic fact may require a few setup statements (assign fixtures,
+define a function) but must have exactly ONE statement that is the subject
+of the test — and that is the statement that can loop.
+
+**Three test shapes**:
+
+```
+Shape A — Atomic (no risk of infinite loop):
+  Single assignment or single match. Budget: 100ms.
+  (deftest assign-int-literal
+    (prog-timeout 100 "        I = 42" "END")
+    (is (= 42 ($$ 'I))))
+
+Shape B — Bounded loop (terminates by construction):
+  Loop with a provably finite bound (e.g. LT(I,10)).
+  Budget: 500ms. Document the bound in the test docstring.
+  (deftest loop-count-10
+    \"Loop I=1..10, bounded by LT(I,10). Max 10 iters.\"
+    (prog-timeout 500 ...))
+
+Shape C — Algorithm (multi-statement, risk of infinite loop):
+  These MUST be split. Each sub-algorithm step gets its own deftest.
+  Never bundle a 15-statement algorithm into one deftest.
+  The gimpel-bsort test is the canonical example of what NOT to do.
+```
+
+**The statement-level timeout problem (runtime architecture)**:
+
+The `RUN` loop is `loop/recur` — uninterruptible from inside. Options:
+
+| Option | Mechanism | Cost | Granularity |
+|--------|-----------|------|-------------|
+| A. Future-per-deftest | `future`+`deref` wraps whole `prog` | Already done | Per-test |
+| B. Step counter in RUN | Add `(when (> steps MAX) (throw :step-limit))` | ~5% overhead | Per-statement (approx) |
+| C. Future-per-statement | Wrap each statement dispatch in its own future | High overhead | True per-statement |
+| D. Thread interrupt | Set interrupt flag; check in RUN loop | Medium | Per-statement |
+
+**Recommendation: Option B + A combined.**
+
+- Keep Option A (future-per-deftest) as the outer safety net.
+- Add Option B (step counter) inside `RUN` as the inner per-statement guard.
+  A `&STEPLIMIT` keyword (default 100,000 steps) kills runaway programs fast
+  and tells you exactly how many statements executed before the kill.
+  This is cheap — one integer increment and comparison per loop iteration.
+  It also gives the automated worm generator a way to classify programs:
+  `:ok`, `:step-limit`, `:timeout`, `:error`.
+
+**Step counter design (runtime.clj)**:
+```clojure
+;; In RUN, add step counter to loop:
+(loop [current (saddr at) steps 0]
+  (when (> steps @<STEPLIMIT>)   ; &STEPLIMIT default 100_000
+    (throw (ex-info "Step limit exceeded"
+                    {:snobol/signal :step-limit :steps steps})))
+  ...
+  (recur (saddr next) (inc steps)))
+```
+
+**`&STEPLIMIT` keyword** (add to env.clj):
+- Default: `100000` (fast programs finish in microseconds; 100k is generous)
+- Tests can set it low for infinite-loop detection: `(snobol-set! '&STEPLIMIT 50)`
+- Harness uses it: classify `:step-limit` same as `:timeout` (both = divergence)
+
+### Test Catalog Redesign
+
+**Current state**: tests bundled by sprint/feature into large files.
+Files grow unbounded. A single hang in a large test file blocks the whole file.
+
+**Target state**: a test catalog organized as:
+```
+test/
+  SNOBOL4clojure/
+    catalog/
+      t_assign.clj        ; Shape A only — atomic assignments
+      t_arith.clj         ; Shape A — arithmetic, all operators  
+      t_compare.clj       ; Shape A — EQ/LT/GT/etc
+      t_string.clj        ; Shape A — concat, SIZE, TRIM, etc
+      t_patterns_prim.clj ; Shape A — LEN/ANY/SPAN/BREAK/etc, single match
+      t_patterns_cap.clj  ; Shape A — $ and . capture
+      t_patterns_adv.clj  ; Shape B — ARB, ARBNO, FENCE, CONJ, BAL
+      t_goto.clj          ; Shape A+B — unconditional/conditional goto
+      t_loops.clj         ; Shape B — bounded loops, documented bound
+      t_define.clj        ; Shape B — DEFINE/RETURN/FRETURN
+      t_table.clj         ; Shape A — TABLE read/write
+      t_array.clj         ; Shape A — ARRAY read/write
+      t_convert.clj       ; Shape A — CONVERT/DATATYPE
+      t_algorithms.clj    ; Shape C — split algorithms, one step per deftest
+```
+
+**Naming convention**: `t_<feature>_<nnn>` where nnn is zero-padded.
+Each test file stays under 200 `deftest`s. Files are independent — one
+hanging file does not block another.
+
+**worm1000 migration**: existing `test_worm1000.clj` (521 tests) is already
+at the right granularity (one semantic fact per deftest) but should be
+migrated into the catalog structure above, one section at a time.
+
+### Tasks (Sprint 18B)
+
+- [ ] 18B.1  Add `&STEPLIMIT` to `env.clj` (default 100,000)
+- [ ] 18B.2  Add step counter + `:step-limit` signal to `runtime.clj`
+- [ ] 18B.3  Handle `:step-limit` in `test-helpers/run-with-timeout` —
+             report as `:timeout` in test output with step count
+- [ ] 18B.4  Handle `:step-limit` in `harness.clj` — classify same as `:timeout`
+- [ ] 18B.5  Split `gimpel-bsort` (and any other Shape C tests) into per-step Shape B tests
+- [ ] 18B.6  Create `test/SNOBOL4clojure/catalog/` directory structure
+- [ ] 18B.7  Migrate `test_worm1000.clj` sections into catalog files, one file per section
+- [ ] 18B.8  Document budget conventions in each catalog file header
+- [ ] 18B.9  Update `project.clj` test paths to include `catalog/`
+- [ ] 18B.10 Confirm full suite runs in < 60s wall clock with 0 hangs
+
+### Session Log Entry (2026-03-08, this session)
+
+| Date | What Happened |
+|------|---------------|
+| 2026-03-08 (session 3) | Oracles re-uploaded. Baseline confirmed 220/548/0. Diagnosed `lein test` hang: `test-cooper` taking 90s due to `cooper-span-010` and `cooper-notany-006` looping. Root cause: unary `*` (deferred pattern) captured variable value at build time instead of doing live lookup at match time. Fixed in `operators.clj` (special-case `(* sym)` in EVAL! to build live thunk) and `patterns.clj` (charset constructors detect DEFER! arg and wrap in outer DEFER). Created `test_helpers.clj` with `prog-timeout`/`prog`/`prog-infinite` macros — every test now runs under a 2000ms wall-clock budget with 1 retry. Wired all three main test files to use it. Full suite now completes in ~60s instead of hanging. One real failure exposed: `gimpel-bsort` genuinely times out (real runtime bug). Two architectural problems documented in PLAN.md: (1) fixed — outer timeout; (2) needs design — per-statement step limit + test catalog reorganisation. |
