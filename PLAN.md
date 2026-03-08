@@ -1465,3 +1465,120 @@ This is **Sprint 18C.7** — fix NAME-dereference in subscript operations.
 - `micro_t4_freturn_on_failure`, `micro_t4_freturn_on_zero_div`
 - `micro_t5_recursive_factorial`
 - Plus issues 8 (~ negation), 9 (RTAB/RPOS), 10 (loop fallthrough) still open
+
+---
+
+## Sprint 25 — Corpus & Flagship Plan (Session 13e, planning)
+
+### The three tiers of work
+
+#### Tier 1 — Gimpel corpus (4 stdin-only programs, runnable now)
+
+These four programs need only `-INCLUDE` preprocessing — no named file I/O:
+
+| Program | What it does | Key libraries |
+|---------|-------------|---------------|
+| `BCD_EBCD.SNO` | One-liner: BCD→EBCDIC via REPLACE | none |
+| `INFINIP.SNO` | Infinite-precision integer arithmetic | `infinip.inc` |
+| `L_ONE.SNO` | Compiler for language L1 → machine M assembly | `pol.inc`, `push.inc`, etc. |
+| `L_TWO.SNO` | Compiler for L2 with register optimisation | same + more |
+
+The remaining 6 Gimpel programs (`POKER`, `RPOEM`, `RSEASON`, `RSTORY`, `STONE`, `ASM`) need named file I/O via `INPUT(.VAR, unit,, 'filename')` — blocked until Sprint 26.
+
+**Blocker: `-INCLUDE` preprocessing.**  
+Our `CODE!` currently receives raw source with `-INCLUDE 'foo.inc'` lines verbatim — the compiler never sees them.  
+Fix: add a pre-pass that resolves `-INCLUDE` directives by reading the file and splicing its content inline before parsing.
+
+#### Tier 2 — AI-SNOBOL corpus (8 programs)
+
+The AI-SNOBOL programs use `SNOCORE.INC` which introduces several SNOBOL4+ extensions:
+
+| Feature | What it is | Status |
+|---------|-----------|--------|
+| `-PLUSOPS 1` | Enable `+`/`-`/`~` as continuation chars | Partially handled |
+| `-CASE 0` | Case-insensitive matching mode | Stub |
+| `OPSYN(op, fn, n)` | Redefine operator to call function | Error messages exist, not implemented |
+| `CODE(src)` | Compile and execute a string as SNOBOL4 | Stub — most critical |
+| `DATA('CONS(CAR,CDR)')` | User-defined datatype | ✅ implemented |
+| `INPUT(.VAR, unit)` | Named I/O channel (no filename = stdin) | Partial |
+| `TERMINAL` variable | Write to stderr/console bypassing OUTPUT | Stub |
+| `LGT(s1,s2)` | String greater-than | Defined via primitive but **missing from INVOKE** |
+
+`TEST.SNO` is the AI-SNOBOL test harness — it exercises CONS/CAR/CDR list processing, `OPSYN`, `CODE`, `EVAL`, `APPLY`, and essentially the full SNOLISPIST library. Very demanding.
+`HSORT.SNO`, `ENDING.SNO`, `WANG.SNO` are simpler — no OPSYN/CODE needed.
+
+#### Tier 3 — beauty.sno (the flagship)
+
+`beauty.sno` is a self-contained SNOBOL4 program by Lon Cherryholmes (2002-2005).
+It reads SNOBOL4 source line by line from `INPUT` (stdin), builds a full parse tree, and pretty-prints it back to `OUTPUT` (stdout). The showcase: pipe `beauty.sno` through itself — it reads its own source.
+
+**What beauty.sno needs:**
+
+1. **`-INCLUDE` resolution** — it has 19 include directives. The include files are NOT in the zip; they must be supplied. This is Tier 1's blocker too.
+2. **`$'op' = pattern` — indirect pattern assignment to operator names** (e.g. `$'=' = *snoWhite '=' *snoWhite`). This is advanced indirect assignment where the LHS is a string naming an operator symbol. Likely works via `$` indirect already.
+3. **`*varname` — deferred evaluation patterns** — already implemented.
+4. **`ARBNO`, `FENCE`, `BAL`, `CONJ` (`&`)** — all implemented.
+5. **`INPUT`/`OUTPUT` as plain variables** (stdin/stdout) — already works.
+6. **No named file I/O** — beauty.sno reads from stdin only. ✅
+
+Beauty.sno itself is complete and self-contained *except* for its 19 `-INCLUDE` files. Since those are yours, Lon, you'll need to supply them. Once `-INCLUDE` is implemented, beauty.sno can be tested.
+
+### Sprint 25 task list
+
+#### 25A — `-INCLUDE` preprocessor
+- [ ] 25A.1 Add `preprocess-includes` fn to `compiler.clj`: scans source for lines matching `^-INCLUDE\s+'([^']+)'` or `^-INCLUDE\s+"([^"]+)"`, reads the named file relative to a configurable search path, splices content inline. Recursive (includes can include).
+- [ ] 25A.2 Add search-path parameter to `CODE!`, `CODE`, `compile-to-file`; default `["."]`.
+- [ ] 25A.3 Wire into `prog` in test-helpers: accept optional `:include-path` key.
+- [ ] 25A.4 Catalog test: `BCD_EBCD.SNO` (trivial one-liner, no includes needed — just verifies REPLACE still works).
+- [ ] 25A.5 Catalog test: simple two-file include smoke test.
+
+#### 25B — `LGT` INVOKE wiring (5-minute fix)
+- [ ] 25B.1 `LGT` is defined via `primitive` macro (line 63 of operators.clj) but absent from the `INVOKE` case table — same bug we just fixed for LEQ/LNE/etc. Add `LGT`, `lgt` arms.
+- [ ] 25B.2 3 catalog tests in `t_missing.clj`.
+
+#### 25C — `TERMINAL` variable
+- [ ] 25C.1 `TERMINAL` assignment should write to `*err*` (or a separate captured stream) rather than `OUTPUT`. In test mode, capture to `:terminal` key in result map.
+- [ ] 25C.2 2 catalog tests.
+
+#### 25D — Named I/O channels: `INPUT(.VAR, unit)` / `INPUT(.VAR, unit,, 'file')`
+- [ ] 25D.1 Add I/O channel registry (atom map of unit# → reader/writer) to `env.clj`.
+- [ ] 25D.2 Implement `INPUT(.VAR, unit)` — assigns VAR as a readable that draws from unit. When unit not opened, defaults to stdin.
+- [ ] 25D.3 Implement `INPUT(.VAR, unit,, 'filename')` — opens file for reading, registers on unit.
+- [ ] 25D.4 `OUTPUT(.VAR, unit)` / `OUTPUT(.VAR, unit,, 'filename')` — output channels.
+- [ ] 25D.5 Reading `$VAR` then reads a line from the associated channel.
+- [ ] 25D.6 `ENDFILE(unit)` / `REWIND(unit)` / `BACKSPACE(unit)` implement properly.
+- [ ] 25D.7 Tests: Gimpel file-I/O programs (`RPOEM`, `RSEASON`, `RSTORY`) with their `.IN` data files.
+
+#### 25E — `OPSYN(new, old, n)`
+- [ ] 25E.1 `OPSYN('PRINT', 'PRT.VIA.OUTPUT')` — alias one function name to another. Store in `<FUNS>` map.
+- [ ] 25E.2 `OPSYN('|', .PRT.VIA.OUTPUT, 1)` — redefine a unary/binary operator to call a user function. Store in operator override table in env.clj; check in INVOKE before default dispatch.
+- [ ] 25E.3 Tests: basic alias and operator redefinition.
+
+#### 25F — `CODE(src)` 
+- [ ] 25F.1 `CODE(src)` compiles and executes a string of SNOBOL4 source as a program fragment. This is essentially `(RUN (CODE! src))` — we already have all the pieces.
+- [ ] 25F.2 The fragment runs in the current environment (same globals).
+- [ ] 25F.3 Returns nil on success, signals error on compile failure.
+- [ ] 25F.4 Tests: `CODE('X = 42')`, `CODE('DEFINE(...)')`, etc.
+
+### Priority order
+
+1. **25B** (LGT, 5 min) — do first, it's embarrassingly simple
+2. **25A** (INCLUDE) — unlocks Gimpel stdin programs and beauty.sno
+3. **25C** (TERMINAL) — needed for Gimpel error messages
+4. **25F** (CODE) — needed for AI-SNOBOL TEST.SNO
+5. **25D** (named I/O) — unlocks remaining 6 Gimpel programs
+6. **25E** (OPSYN) — needed for full AI-SNOBOL SNOLISPIST library
+
+### README flagship sequence (once beauty.sno runs)
+
+```
+cat beauty.sno | snobol4clojure beauty.sno    # beautify itself from stdin
+```
+
+Three copies in memory simultaneously:
+1. The source being **read** (INPUT = stdin, which is beauty.sno)
+2. The program being **executed** (beauty.sno loaded as the running program)
+3. The **parse tree** of the input (AST of beauty.sno being processed in heap)
+
+Caption: *"A SNOBOL4 beautifier reading, processing, and reprinting its own source — all three copies in memory simultaneously. Running on SNOBOL4clojure, a complete SNOBOL4 implementation in Clojure."*
+
