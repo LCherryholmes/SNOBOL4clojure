@@ -352,6 +352,8 @@
     llt       (LLT    (first args) (second args))
     LGE       (LGE    (first args) (second args))
     lge       (LGE    (first args) (second args))
+    LGT       (LGT    (first args) (second args))
+    lgt       (LGT    (first args) (second args))
     ;; ARG(fname, n) — nth parameter name of function fname (1-based)
     ARG       (let [[fname n] args
                     meta (get @<FDEFS> (clojure.string/upper-case (str fname)))]

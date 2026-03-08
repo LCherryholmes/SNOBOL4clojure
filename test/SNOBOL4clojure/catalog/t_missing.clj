@@ -361,3 +361,32 @@ NO      OUTPUT = 'no'
         :(RETURN)
         F('a')
 END")))))
+
+;; ── LGT (string greater-than) ─────────────────────────────────────────────────
+
+(deftest lgt_succeeds
+  "LGT('b','a') succeeds — 'b' > 'a' lexicographically"
+  (is (= "yes\n" (:stdout (prog "
+        LGT('b','a') :S(YES)F(NO)
+YES     OUTPUT = 'yes'
+        :(END)
+NO      OUTPUT = 'no'
+END")))))
+
+(deftest lgt_fails_equal
+  "LGT('a','a') fails — equal strings are not strictly greater"
+  (is (= "no\n" (:stdout (prog "
+        LGT('a','a') :S(YES)F(NO)
+YES     OUTPUT = 'yes'
+        :(END)
+NO      OUTPUT = 'no'
+END")))))
+
+(deftest lgt_fails_less
+  "LGT('a','b') fails — 'a' < 'b' lexicographically"
+  (is (= "no\n" (:stdout (prog "
+        LGT('a','b') :S(YES)F(NO)
+YES     OUTPUT = 'yes'
+        :(END)
+NO      OUTPUT = 'no'
+END")))))
