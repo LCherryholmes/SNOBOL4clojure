@@ -1,0 +1,3 @@
+[submodule "corpus/lon"]
+	path = corpus/lon
+	url = https://github.com/LCherryholmes/SNOBOL4.git

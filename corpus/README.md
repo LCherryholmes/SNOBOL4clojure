@@ -70,3 +70,29 @@ cat corpus/beauty/beauty.sno | snobol4clojure corpus/beauty/beauty.sno
 The 19 `-INCLUDE` files (`global.inc`, `is.inc`, `FENCE.inc`, etc.) are part of
 Lon's private SNOBOL4 library and are not redistributed here. Place them in
 `corpus/beauty/` alongside `beauty.sno` to run.
+
+## `lon/` ← git submodule → [LCherryholmes/SNOBOL4](https://github.com/LCherryholmes/SNOBOL4)
+
+Lon Cherryholmes's personal SNOBOL4 library, maintained as a separate repository
+and included here as a git submodule. Clone with:
+
+```bash
+git clone --recurse-submodules https://github.com/LCherryholmes/SNOBOL4clojure.git
+# or after a plain clone:
+git submodule update --init --recursive
+```
+
+Key contents:
+
+| Path | Description |
+|------|-------------|
+| `inc/` | ~90 library `.inc` files |
+| `inc/global.inc` … `inc/trace.inc` | The 19 includes required by `beauty.sno` |
+| `inc/TZ/` | 66-file timezone/transpiler system |
+| `sno/` | ~60 programs: beauty, bootstrap, data tools, SQL, web |
+| `rinky/` | 33 social-media listener programs (Twitter/Facebook/etc., ~2010) |
+| `ebnf/` | SNOBOL4 EBNF grammar definitions |
+
+The `beauty/` directory above depends on `lon/inc/` for its 19 `-INCLUDE` files.
+Once `-INCLUDE` preprocessing is implemented (Sprint 25A), the include path for
+beauty.sno is `corpus/lon/inc/`.
