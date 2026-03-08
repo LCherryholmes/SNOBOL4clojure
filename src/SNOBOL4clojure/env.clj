@@ -9,7 +9,7 @@
 (defn Σ+       ([x y] (clojure.core/+' x y)) ([x] (clojure.core/+' x)))
 (defn subtract ([x y] (clojure.core/-' x y)) ([x] (clojure.core/-' x)))
 (defn multiply ([x y] (clojure.core/*' x y)) ([x] (clojure.core/*' x)))
-(defn divide    [x y] (clojure.core// x y))
+(defn divide    [x y] (when-not (zero? y) (clojure.core// x y)))
 (defn equal     [x y] (clojure.core/= x y))
 (defn not-equal [x y] (clojure.core/not= x y))
 (defn out      [item] (binding [pp/*print-right-margin* 2048, pp/*print-miser-width* 2000]

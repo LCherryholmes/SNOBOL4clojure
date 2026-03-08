@@ -49,53 +49,59 @@
     (let [result (sh/sh *spitbol-bin* "-b" "-"
                         :in src
                         :env {"PATH" "/usr/local/bin:/usr/bin:/bin"})]
-      {:stdout (normalise (:out result))
-       :stderr (normalise (:err result))
-       :exit   (:exit result)})
+      ;; SPITBOL puts error messages in stdout when exit != 0
+      (if (zero? (:exit result))
+        {:stdout (normalise (:out result))
+         :stderr (normalise (:err result))
+         :exit   0}
+        {:stdout ""
+         :stderr (normalise (:out result))
+         :exit   (:exit result)}))
     (catch Exception e
       {:stdout "" :stderr (.getMessage e) :exit :crashed})))
 
 ;; ── SNOBOL4clojure side ───────────────────────────────────────────────────────
+;; Fixed namespace for harness runs — created once
+(defonce ^:private harness-ns
+  (create-ns 'SNOBOL4clojure.harness-run))
+
+(defn- reset-runtime!
+  "Clear all compiler + runtime state for a fresh run."
+  []
+  (env/GLOBALS harness-ns)
+  (reset! env/STNO  0)
+  (reset! env/<STNO> {})
+  (reset! env/<LABL> {})
+  (reset! env/<CODE> {}))
+
 (defn run-clojure
   "Run src through SNOBOL4clojure. Returns {:stdout :stderr :exit :thrown}."
   [src]
-  (let [out-buf  (StringBuilder.)
-        err-buf  (StringBuilder.)
-        test-ns  (create-ns (gensym "sno-harness-"))]
-    (try
-      ;; Each run gets a clean isolated namespace
-      (env/GLOBALS test-ns)
-      ;; Capture OUTPUT writes — patch OUTPUT$ write-watcher
-      (binding [env/OUTPUT$ (atom "")]
-        ;; Override the OUTPUT$ atom's watcher to accumulate lines
-        (add-watch env/OUTPUT$ :capture
-                   (fn [_ _ _ v]
-                     (when (and v (not= v ""))
-                       (.append out-buf v)
-                       (.append out-buf "\n"))))
-        (try
-          (let [stlimit-prefix (str "&STLIMIT = " *stlimit* "\n")]
-            (sno/RUN (sno/CODE (str stlimit-prefix src))))
-          (finally
-            (remove-watch env/OUTPUT$ :capture))))
-      {:stdout (normalise (str out-buf))
-       :stderr (normalise (str err-buf))
-       :exit   :ok}
-      (catch clojure.lang.ExceptionInfo e
-        (let [sig (get (ex-data e) :snobol/signal)]
-          (if (= sig :end)
-            {:stdout (normalise (str out-buf)) :stderr "" :exit :ok}
-            {:stdout (normalise (str out-buf))
-             :stderr (.getMessage e)
-             :exit   :error
-             :thrown (str (class e) ": " (.getMessage e))})))
-      (catch Exception e
-        {:stdout (normalise (str out-buf))
-         :stderr (.getMessage e)
-         :exit   :error
-         :thrown (str (class e) ": " (.getMessage e))})
-      (finally
-        (remove-ns (ns-name test-ns))))))
+  (try
+    (reset-runtime!)
+    (let [stdout-p (promise)
+          f (future
+              (deliver stdout-p
+                (with-out-str
+                  (try
+                    (sno/RUN (sno/CODE src))
+                    (catch clojure.lang.ExceptionInfo e
+                      (when-not (= (get (ex-data e) :snobol/signal) :end)
+                        (throw e)))))))]
+      (if-let [stdout (deref stdout-p *timeout-ms* nil)]
+        {:stdout (normalise stdout) :stderr "" :exit :ok}
+        (do (future-cancel f)
+            {:stdout "" :stderr "timeout" :exit :timeout})))
+    (catch clojure.lang.ExceptionInfo e
+      {:stdout ""
+       :stderr (.getMessage e)
+       :exit   :error
+       :thrown (str (class e) ": " (.getMessage e))})
+    (catch Exception e
+      {:stdout ""
+       :stderr (.getMessage e)
+       :exit   :error
+       :thrown (str (class e) ": " (.getMessage e))})))
 
 ;; ── Status classification ─────────────────────────────────────────────────────
 (defn- classify

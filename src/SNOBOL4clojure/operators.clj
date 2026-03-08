@@ -183,13 +183,16 @@
                     :else nil))
                 ;; normal variable assignment
                 (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
-                (do (when (clojure.core/= N 'OUTPUT)   (println r))
-                    (when (clojure.core/= N 'TERMINAL) (println r))
-                    r)
+                (let [out-val (if (and (list? r) (= (first r) 'SEQ))
+                                (apply str (map #(if (nil? %) "" (str %)) (rest r)))
+                                r)]
+                  (when (clojure.core/= N 'OUTPUT)   (println out-val))
+                  (when (clojure.core/= N 'TERMINAL) (println out-val))
+                  out-val)
                 :else
                 (do (snobol-set! N r) r)))
     ?=      (let [[n _p R] args, r (EVAL! R)]
-              (snobol-set! n (trace r)) r)
+              (snobol-set! n r) r)
     DEFINE  (let [[proto entry-arg] args
                   ;; Parse: 'fname(p1,p2,...)l1,l2,...'  or  'fname(p1,...)'
                   lp        (.indexOf ^String proto "(")
@@ -333,6 +336,7 @@
                                                 (var-get vr))
                                               ($$ kw-sym))]
                               (if (instance? clojure.lang.IDeref v) @v v))
+          (equal op 'SEQ)   (apply str (map #(let [v (EVAL! %)] (if (nil? v) "" (str v))) parms))
           (equal op 'quote) (first parms)
           true (let [args (apply vector (map EVAL! parms))]
                  (apply INVOKE op args))))
