@@ -126,6 +126,12 @@
 (def REVERSE fns/REVERSE)
 (def DATA    fns/DATA)
 (def DATA!   fns/DATA!)
+(def ASCII   fns/ASCII)
+(def CHAR    fns/CHAR)
+(def REMDR   fns/REMDR)
+(def INTEGER fns/INTEGER)
+(def REAL    fns/REAL)
+(def STRING  fns/STRING)
 
 ;; ── Re-export compiler / runtime ─────────────────────────────────────────────
 (def CODE!   comp/CODE!)

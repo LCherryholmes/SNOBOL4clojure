@@ -94,7 +94,10 @@
   (ns-resolve (active-ns) (symbol (name N))))
 
 (defn $$ [N]
-  (if-let [V (reference N)] (var-get V) ε))
+  (if (clojure.core/= (symbol (name N)) 'INPUT)
+    (let [line (try (read-line) (catch Exception _ nil))]
+      (if (nil? line) ε (str line)))
+    (if-let [V (reference N)] (var-get V) ε)))
 
 ;; ── Arrays and Tables ─────────────────────────────────────────────────────────
 (defn ARRAY     [_proto] (object-array 10))

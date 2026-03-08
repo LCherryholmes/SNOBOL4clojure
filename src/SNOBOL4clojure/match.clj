@@ -197,32 +197,31 @@
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
         ;; ── FENCE! ───────────────────────────────────────────────────────────
-        ;; FENCE(P) — match P, but if P succeeds, cut: prevent retry of P on backtrack.
-        ;; Π = (FENCE! child-pattern)  or  (FENCE!)  (bare FENCE = cut-and-abort)
-        ;; On :proceed  — descend into child; push self onto Ω as cut marker
-        ;; On :succeed  — pop cut marker from Ω, propagate success
-        ;; On :recede   — FENCE was backtracked into: refuse to retry (fail upward)
-        ;;                For bare FENCE this aborts the match entirely.
+        ;; Two forms per SNOBOL4/SPITBOL spec (C backend docstring):
+        ;;   FENCE(P)  — fence_function: P matches; backtracking *into* P blocked;
+        ;;               backtracking *past* this node to outer ALT still allowed.
+        ;;   FENCE()   — fence_simple: matches empty string; any backtrack past
+        ;;               this point aborts the entire match (returns nil).
         FENCE!
-        ;; FENCE(P): match P; if P succeeds, commit (no retry of P on backtrack).
-        ;; If P fails, FENCE itself fails (outer ALT can still try next branch).
-        ;; Bare FENCE(): succeed once, then abort on any backtrack.
         (case action
           :proceed
           (let [[Σ Δ _ _ _ _ Ψ] ζ
-                child            (second (ζΠ ζ))]   ; nil for bare (FENCE!)
+                child            (second (ζΠ ζ))]
             (if child
-              ;; Build child frame: set Π=child, push FENCE onto Ψ so :succeed
-              ;; returns here.  Also push FENCE onto Ω as a cut barrier.
+              ;; FENCE(P): descend into child; push cut barrier onto Ω
               (recur :proceed [Σ Δ Σ Δ child 1 (🡥 Ψ ζ)] (🡥 Ω ζ))
-              ;; Bare FENCE — succeed once; push cut barrier so :recede aborts
-              (recur :succeed (ζ↑ ζ) (🡥 Ω ζ))))
+              ;; Bare FENCE(): succeed once; push :ABORT sentinel onto Ω
+              (recur :succeed (ζ↑ ζ) (🡥 Ω :ABORT))))
           :succeed
-          ;; Child succeeded — consume the cut barrier, propagate success upward
+          ;; Child (or bare FENCE) succeeded — pop cut barrier, propagate up
           (recur :succeed (ζ↑ ζ) (🡧 Ω))
           (:recede :fail)
-          ;; Backtracked into FENCE — refuse to retry child; fail upward
-          (recur :recede (🡡 Ω) (🡧 Ω)))
+          ;; Backtracked into FENCE.
+          ;; FENCE(P): refuse retry, let outer context try next alternative.
+          ;; Bare FENCE(): :ABORT sentinel on Ω — terminate entire match.
+          (if (clojure.core/= (🡡 Ω) :ABORT)
+            nil
+            (recur :recede (🡡 Ω) (🡧 Ω))))
 
         ;; ── ARB! ─────────────────────────────────────────────────────────────
         ;; ARB — matches any string, shortest first (0 chars, then 1, 2, …).
@@ -259,8 +258,24 @@
           (:recede :fail)
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
+        ;; ── ABORT! ───────────────────────────────────────────────────────────
+        ;; ABORT — immediately terminate the entire match, regardless of context.
+        ;; Returns nil from the engine loop unconditionally.
+        ABORT!
+        nil
+
+        ;; ── REM! ─────────────────────────────────────────────────────────────
+        ;; REM — matches all remaining characters from the current cursor.
+        ;; Always succeeds (including empty remainder). No backtrack alternative.
+        REM!
+        (case action
+          :proceed
+          (recur :succeed (ζ↑ ζ [] (count full-subject)) Ω)
+          (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
         ;; Not yet implemented
-        (BAL! ABORT!) nil))))
+        BAL! nil))))
 
 ;; ── Public API ────────────────────────────────────────────────────────────────
 

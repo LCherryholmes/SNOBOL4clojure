@@ -20,6 +20,31 @@
 (defn CONVERT [x _t]  x)   ; stub
 (defn COPY    [x]     x)   ; stub
 
+;; ── Type conversion & char functions ─────────────────────────────────────────
+(defn ASCII   [s]  (int (first (str s))))
+(defn CHAR    [n]  (str (char n)))
+(defn REMDR   [x y] (clojure.core/rem (long x) (long y)))
+
+(defn INTEGER [x]
+  "Convert x to integer, or return ε (fail) if not convertible."
+  (cond
+    (integer? x) x
+    (number?  x) (long x)
+    :else (try (Long/parseLong (clojure.string/trim (str x)))
+               (catch Exception _ ε))))
+
+(defn REAL    [x]
+  "Convert x to real (double), or return ε (fail) if not convertible."
+  (cond
+    (float? x)   x
+    (number? x)  (double x)
+    :else (try (Double/parseDouble (clojure.string/trim (str x)))
+               (catch Exception _ ε))))
+
+(defn STRING  [x]
+  "Convert any value to its string representation."
+  (str x))
+
 ;; ── Program-defined datatype ──────────────────────────────────────────────────
 (def proto-data-name  #"^([A-Za-z][0-9-.A-Z_a-z]+)\((.*)$")
 (def proto-data-field #"^([0-9-.A-Z_a-z]+)[,)](.*)$")
@@ -46,17 +71,22 @@
 (defn DATA  [S] (let [data (DATA! S)] (binding [*print-meta* true] (out data)) (eval data) ε))
 (defn FIELD [])
 
-;; ── Numeric functions ─────────────────────────────────────────────────────────
-(defn CHAR   [n]   (str (char n)))
+;; ── Date / time ───────────────────────────────────────────────────────────────
 (defn DATE   []    (.toString (java.util.Date.)))
 (defn TIME   []    (System/currentTimeMillis))
 
-;; ── I/O stubs ─────────────────────────────────────────────────────────────────
+;; ── I/O ───────────────────────────────────────────────────────────────────────
+;; INPUT variable: reading it calls read-line on *in*.
+;; Returns the next line (without newline), or ε at EOF.
+(defn READ-LINE! []
+  (let [line (try (read-line) (catch Exception _ nil))]
+    (if (nil? line) ε (str line))))
+
 (defn BACKSPACE [] ε)
 (defn DETACH    [] ε)
 (defn EJECT     [] ε)
 (defn ENDFILE   [] ε)
-(defn INPUT     [] ε)
+(defn INPUT     [] (READ-LINE!))   ; bare INPUT() call reads one line
 (defn OUTPUT    [] ε)
 (defn REWIND    [] ε)
 

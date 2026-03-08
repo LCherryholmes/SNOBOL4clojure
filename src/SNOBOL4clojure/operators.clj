@@ -6,7 +6,9 @@
             [SNOBOL4clojure.env       :refer
              [ε η equal not-equal Σ+ subtract multiply divide
               ncvt scvt num $$ out reference snobol-set!]]
-            [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH REPLACE]]
+            [SNOBOL4clojure.functions :refer
+             [ASCII REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE]]
+            [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH]]
             [SNOBOL4clojure.patterns  :refer
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
               LEN POS RPOS RTAB TAB FAIL]]
@@ -94,8 +96,7 @@
             ([x y]      (x-2 'ALT x y))          ; binary — alternation
             ([x y & zs] (x-n 'ALT x y zs)))
 
-;; ── Numeric math macros ───────────────────────────────────────────────────────
-(defmacro INTEGER [_x])
+;; ── Numeric math macros (generate optional math fns on demand) ───────────────
 (defmacro SIN    [] `(defn SIN   [x] (Math/sin  ~(numcvt 'x))))
 (defmacro COS    [] `(defn COS   [x] (Math/cos  ~(numcvt 'x))))
 (defmacro TAN    [] `(defn TAN   [x] (Math/tan  ~(numcvt 'x))))
@@ -105,7 +106,6 @@
 (defmacro EXP    [] `(defn EXP   [x] (Math/exp  ~(numcvt 'x))))
 (defmacro LN     [] `(defn LN    [x] (Math/log  ~(numcvt 'x))))
 (defmacro SQRT   [] `(defn SQRT  [x] (Math/sqrt ~(numcvt 'x))))
-(defmacro REMDR  [] `(defn REMDR [x y] (clojure.core/rem ~(numcvt 'x) ~(numcvt 'y))))
 (defmacro CHOP   [] `(defn CHOP  [x]
                        (let [_x ~(numcvt 'x)]
                          (if (< _x 0.0) (Math/ceil _x) (Math/floor _x)))))
@@ -154,12 +154,9 @@
                 result))
     ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args
-                  ;; r is already evaluated by EVAL! — it's a value, not IR.
-                  ;; Convert numeric strings to numbers for consistency.
                   val  r]
               (when-not (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
                 (snobol-set! N val))
-              ;; Special I/O variables — println on assignment
               (when (clojure.core/= N 'OUTPUT)   (println val))
               (when (clojure.core/= N 'TERMINAL) (println val))
               val)
@@ -191,6 +188,17 @@
                 (snobol-set! f-sym the-fn)
                 ε))
     REPLACE (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))
+    ASCII   (ASCII  (first args))
+    REMDR   (REMDR  (first args) (second args))
+    INTEGER (INTEGER (first args))
+    REAL    (REAL    (first args))
+    STRING  (STRING  (first args))
+    SIZE    (SIZE   (first args))
+    TRIM    (TRIM   (first args))
+    DUPL    (DUPL   (first args) (second args))
+    REVERSE (REVERSE (first args))
+    LPAD    (LPAD   (first args) (second args))
+    RPAD    (RPAD   (first args) (second args))
     quote   ($$ (second op))
             (let [f ($$ op)]
               (if (fn? f) (apply f args) ε))))
