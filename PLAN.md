@@ -132,8 +132,11 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Sprint 14.5 | `(pending)` | 220/548 | PLAN.md rewrite; source archives extracted; no code changes |
 
 | Sprint 18D | `fbcde8e` | 967/2161/0 | SEQ nil-propagation fix; NAME indirect subscript fix; gimpel-bsort passing |
+| Sprint 18B (catalog) | `(pending)` | 1488/3249/0 | Catalog directory created. test_worm1000.clj split into 13 catalog files under `test/SNOBOL4clojure/catalog/`: t_assign (43), t_arith (194), t_compare (72), t_string (24), t_patterns_prim (78), t_patterns_cap (10), t_patterns_adv (11), t_goto (8), t_loops (8), t_define (16), t_table (7), t_array (7), t_convert (28), t_algorithms (11). Auto-discovered by lein (no project.clj change needed). Full suite: 1488 tests / 3249 assertions / 0 failures / 45s wall clock. Sprint 18B tasks 18B.6–18B.10 complete. |
 
-**Current baseline**: 967 tests / 2161 assertions / 0 failures
+| Sprint 18B (catalog) | `(pending)` | 1488/3249/0 | Catalog migration complete — 13 files, 510 tests |
+
+**Current baseline**: 1488 tests / 3249 assertions / 0 failures / 45s wall clock
 **Last confirmed**: 2026-03-08
 
 ---
@@ -740,11 +743,11 @@ migrated into the catalog structure above, one section at a time.
              report as `:timeout` in test output with step count
 - [ ] 18B.4  Handle `:step-limit` in `harness.clj` — classify same as `:timeout`
 - [ ] 18B.5  Split `gimpel-bsort` (and any other Shape C tests) into per-step Shape B tests
-- [ ] 18B.6  Create `test/SNOBOL4clojure/catalog/` directory structure
-- [ ] 18B.7  Migrate `test_worm1000.clj` sections into catalog files, one file per section
-- [ ] 18B.8  Document budget conventions in each catalog file header
-- [ ] 18B.9  Update `project.clj` test paths to include `catalog/`
-- [ ] 18B.10 Confirm full suite runs in < 60s wall clock with 0 hangs
+- [x] 18B.6  Create `test/SNOBOL4clojure/catalog/` directory structure
+- [x] 18B.7  Migrate `test_worm1000.clj` sections into catalog files, one file per section
+- [x] 18B.8  Document budget conventions in each catalog file header
+- [x] 18B.9  Update `project.clj` test paths to include `catalog/` (auto-discovered — no change needed)
+- [x] 18B.10 Confirm full suite runs in < 60s wall clock with 0 hangs (45s, 1488 tests, 0 failures)
 
 ### Session Log Entry (2026-03-08, this session)
 
