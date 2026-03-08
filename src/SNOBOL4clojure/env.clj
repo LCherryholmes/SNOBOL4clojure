@@ -214,7 +214,9 @@
 (defmethod DATATYPE :default [X]
   (let [cn (str (class X))]
     (or
-      ;; Custom SNOBOL4 data types defined via DATA
+      ;; Program-defined data types (map with :__type__ key)
+      (when (and (map? X) (:__type__ X)) (:__type__ X))
+      ;; Custom SNOBOL4 data types defined via DATA (legacy deftype path)
       (when-let [m (re-find #"class SNOBOL4clojure\.core\.(.*)" cn)]  (m 1))
       (when-let [m (re-find #"class SNOBOL4clojure\.env\.(.*)"  cn)]  (m 1))
       ;; NAME type specifically

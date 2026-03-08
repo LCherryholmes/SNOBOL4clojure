@@ -10,7 +10,7 @@
               array? array-get array-set array-prototype]]
             [SNOBOL4clojure.functions :refer
              [ASCII REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE
-              ITEM PROTOTYPE]]
+              ITEM PROTOTYPE CONVERT COPY FIELD SORT RSORT DATA]]
             [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH]]
             [SNOBOL4clojure.patterns  :refer
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
@@ -158,7 +158,7 @@
     ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args]
               (cond
-                ;; subscript assignment: (= (A k...) val) — mutate TABLE or ARRAY
+                ;; subscript assignment: (= (A k...) val) — mutate TABLE, ARRAY, or PDD
                 (and (list? N) (>= (count N) 2))
                 (let [[container-sym & ks] N
                       container ($$ container-sym)]
@@ -168,6 +168,15 @@
                     (array? container)
                     (or (array-set container (vec ks) r)
                         (throw (ex-info "ARRAY: subscript out of bounds" {:keys ks})))
+                    ;; PDD field setter: accessor-fn(instance-sym) = val
+                    ;; The accessor fn called with 2 args returns the updated map;
+                    ;; we then rebind the instance variable.
+                    (fn? container)
+                    (let [inst-sym (first ks)
+                          inst     ($$ inst-sym)
+                          updated  (container inst r)]
+                      (snobol-set! inst-sym updated)
+                      r)
                     :else nil))
                 ;; normal variable assignment
                 (clojure.core/contains? #{'OUTPUT 'TERMINAL 'INPUT} N)
@@ -223,6 +232,20 @@
     item      (ITEM      (first args) (second args))
     PROTOTYPE (PROTOTYPE (first args))
     prototype (PROTOTYPE (first args))
+    CONVERT   (CONVERT   (first args) (second args))
+    convert   (CONVERT   (first args) (second args))
+    COPY      (COPY      (first args))
+    copy      (COPY      (first args))
+    FIELD     (FIELD     (first args) (second args))
+    field     (FIELD     (first args) (second args))
+    SORT      (SORT      (first args))
+    sort      (SORT      (first args))
+    RSORT     (RSORT     (first args))
+    rsort     (RSORT     (first args))
+    DATA      (DATA      (first args))
+    data      (DATA      (first args))
+    DATATYPE  (SNOBOL4clojure.env/DATATYPE (first args))
+    datatype  (SNOBOL4clojure.env/DATATYPE (first args))
     quote   ($$ (second op))
             (let [f ($$ op)]
               (cond
