@@ -148,7 +148,7 @@
   "Compare oracle stdout against clojure outcome; return status keyword."
   [oracle-out cl]
   (cond
-    (= (:exit cl) :timeout)    :timeout
+    (#{:timeout :step-limit} (:exit cl))  :timeout
     (= :both-error (:oracle oracle-out)) ; both oracles errored — skip
     (if (= (:exit cl) :error) :pass-class :skip)
 
@@ -209,3 +209,45 @@
           (let [form (try (read r false ::eof) (catch Exception _ ::eof))]
             (if (= form ::eof) acc
               (recur (conj acc form)))))))))
+
+;; ── Step-probe oracle runners (18C.4) ────────────────────────────────────────
+
+(defn run-csnobol4-to-step
+  "Run src through CSNOBOL4 for exactly n statements by prepending
+   &STLIMIT = n to the program source.  CSNOBOL4 natively honours &STLIMIT.
+   Returns the same {:stdout :stderr :exit} map as run-csnobol4.
+   Used by bisect-divergence for three-oracle step comparison."
+  [src n]
+  (run-csnobol4 (str "        &STLIMIT = " n "\n" src)))
+
+(defn run-spitbol-to-step
+  "Run src through SPITBOL for exactly n statements by prepending
+   &STLIMIT = n to the program source.  SPITBOL honours &STLIMIT.
+   Returns the same {:stdout :stderr :exit} map as run-spitbol."
+  [src n]
+  (run-spitbol (str "        &STLIMIT = " n "\n" src)))
+
+(defn run-clojure-to-step
+  "Run src through SNOBOL4clojure for exactly n statements.
+   Returns the run-to-step map: {:exit :steps :vars :stdout}.
+   Requires test-helpers/run-to-step — call from test context only."
+  [src n]
+  ;; Delegate to test-helpers/run-to-step when available; otherwise
+  ;; inline the logic using the harness-private reset-runtime!.
+  (reset-runtime!)
+  (reset! env/&STLIMIT n)
+  (try
+    (let [stdout (with-out-str
+                   (try (sno/RUN (sno/CODE src))
+                     (catch clojure.lang.ExceptionInfo e
+                       (when-not (#{:end :step-limit}
+                                  (get (ex-data e) :snobol/signal))
+                         (throw e)))))]
+      {:exit    (if (> @env/&STCOUNT n) :step-limit :ok)
+       :steps   @env/&STCOUNT
+       :stdout  (normalise stdout)
+       :vars    (env/snapshot!)})
+    (catch Exception e
+      {:exit :error :thrown (.getMessage e) :vars (env/snapshot!)})
+    (finally
+      (reset! env/&STLIMIT 2147483647))))

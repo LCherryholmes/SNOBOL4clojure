@@ -43,6 +43,42 @@
   On first timeout the test retries ONCE (JVM warmup / GC jitter can cause
   spurious timeouts). If it times out twice it is reported as a test failure
   via `clojure.test/is`, not a hang.
+
+  ## Sprint 18C — Step-probe bisection debugger
+
+  ### `run-to-step` / `probe-at`
+  Run a program for exactly N statements then inspect variable state:
+      (run-to-step src 50)    ; => {:exit :step-limit :steps 50 :vars {I 5} ...}
+      (probe-at src 50 'I)    ; => 5
+
+  ### `bisect-divergence`
+  Binary-search for the first step at which a variable deviates from a
+  predicate.  Useful for isolating bugs in long-running programs:
+      (bisect-divergence src 1 1000 'I #(<= % 100))
+  Returns {:step N :value <wrong-value> :vars <snapshot>} or nil.
+
+  ### `probe-test` macro
+  Assert variable values at specific step counts:
+      (probe-test {10 {'I 10} 50 {'I 50}} \"        I=0\" \"LOOP...\" \"END\")
+
+  ### `run-with-restart`
+  Stop at N steps, inspect/patch state, then resume:
+      (def h (run-with-restart src 50))
+      (get (:vars h) 'I)         ; inspect
+      (snobol-set! 'I 99)        ; patch
+      ((:resume h) 20)           ; run 20 more steps
+
+  ### CRITICAL: `=` shadowing hazard
+  Test namespaces using `[SNOBOL4clojure.core :refer :all]` have `=` replaced
+  by SNOBOL4's IR-building `=` operator.  In predicate lambdas defined in such
+  a namespace, `(= v 0)` builds the IR list `(= v 0)` — always truthy!
+
+  Always use `clojure.core/=` in predicates passed to bisect-divergence when
+  the predicate is defined in a test namespace:
+      ;; WRONG (= is SNOBOL4's operator, returns a truthy list):
+      (bisect-divergence src 1 100 'I #(= % 5))
+      ;; CORRECT:
+      (bisect-divergence src 1 100 'I #(clojure.core/= % 5))
   "
   (:require [clojure.test :refer [is]]
             [SNOBOL4clojure.core :refer [RUN CODE]]))
@@ -66,9 +102,11 @@
                            (catch clojure.lang.ExceptionInfo e
                              (case (get (ex-data e) :snobol/signal)
                                :end       {:exit :ok :stdout ""}
-                               :step-limit {:exit :step-limit
-                                            :steps (get (ex-data e) :steps)
-                                            :thrown (.getMessage e)}
+                               :step-limit {:exit   :step-limit
+                                            :steps  (get (ex-data e) :steps)
+                                            :thrown (.getMessage e)
+                                            ;; 18C.9: auto-snapshot at step-limit stop
+                                            :vars   (SNOBOL4clojure.env/snapshot!)}
                                {:exit :error :thrown (.getMessage e)}))
                            (catch Exception e
                              {:exit :error :thrown (.getMessage e)}))))]
@@ -157,6 +195,13 @@
      (run-to-step \"        I = 0\\nLOOP    I = I + 1\\n        LT(I,10) :S(LOOP)\\nEND\" 5)
      ;=> {:exit :step-limit :steps 5 :vars {I 5} :stdout \"\"}"
   [src n]
+  ;; Reset compiler state so each call starts from a clean slate.
+  ;; Without this, accumulated CODE entries from prior calls shift statement
+  ;; numbers and leave stale variable state that corrupts bisect-divergence.
+  (reset! SNOBOL4clojure.env/STNO  0)
+  (reset! SNOBOL4clojure.env/<STNO> {})
+  (reset! SNOBOL4clojure.env/<LABL> {})
+  (reset! SNOBOL4clojure.env/<CODE> {})
   (reset! SNOBOL4clojure.env/&STLIMIT n)
   (let [r (run-with-timeout src 5000)]
     (reset! SNOBOL4clojure.env/&STLIMIT 2147483647)
@@ -194,14 +239,17 @@
     nil
     (let [mid  (quot (+ lo hi) 2)
           r    (run-to-step src mid)
-          val  (get (:vars r) var-sym)]
-      (if (expected-fn val)
-        ;; Still correct at mid — divergence must be later
-        (bisect-divergence src (inc mid) hi var-sym expected-fn)
-        ;; Wrong at mid — divergence is at mid or earlier
-        (if (= lo mid)
-          {:step mid :value val :vars (:vars r)}
-          (bisect-divergence src lo (dec mid) var-sym expected-fn))))))
+          val  (get (:vars r) var-sym)
+          ok?  (expected-fn val)]
+      (if (= lo hi)
+        ;; Base case: single step — return if pred fails, nil if holds
+        (when-not ok? {:step mid :value val :vars (:vars r)})
+        (if ok?
+          ;; Correct at mid — first failure must be later
+          (bisect-divergence src (inc mid) hi var-sym expected-fn)
+          ;; Wrong at mid — first failure is at mid or earlier
+          (or (bisect-divergence src lo (dec mid) var-sym expected-fn)
+              {:step mid :value val :vars (:vars r)}))))))
 
 (defmacro probe-test
   "Assert variable values at specific step counts during program execution.
@@ -229,3 +277,54 @@
                             (str "At step " step# ", expected " var#
                                  " = " (pr-str expected#)
                                  " but got " (pr-str (get vars# var#)))))))))
+
+;; ── Restart mode (Sprint 18C.6) ───────────────────────────────────────────────
+
+(defn run-with-restart
+  "Run src for exactly n statements, then return a restart handle.
+
+   The restart handle is a map:
+     :resume  — (fn [n2]) — run n2 MORE statements from current position
+     :vars    — full variable snapshot at the stop point
+     :steps   — &STCOUNT at stop
+     :exit    — :step-limit | :ok | :error
+     :stdout  — output produced so far
+
+   Workflow:
+     1. (def h (run-with-restart src 50))   ; stop after 50 stmts
+     2. (get (:vars h) 'I)                  ; inspect variable I
+     3. (snobol-set! 'I 99)                 ; patch a variable
+     4. ((:resume h) 20)                    ; run 20 more statements
+     5. (snapshot!)                         ; inspect state again
+
+   This gives you an interactive REPL debugger for SNOBOL4 programs.
+   Variable state is intact in the Clojure namespace atoms between calls.
+
+   WARNING: run-with-restart does NOT call GLOBALS — it uses the current
+   namespace.  Always call GLOBALS before the first run-with-restart in
+   a test or REPL session."
+  [src n]
+  (let [r (run-to-step src n)]
+    (assoc r
+           :resume (fn [n2]
+                     ;; Don't re-CODE — use current statement pointer
+                     (reset! SNOBOL4clojure.env/&STLIMIT n2)
+                     (reset! SNOBOL4clojure.env/&STCOUNT 0)
+                     (let [next-stmt @SNOBOL4clojure.env/<STNO>
+                           resume-r  (try
+                                       {:exit   :ok
+                                        :stdout (with-out-str
+                                                  (SNOBOL4clojure.runtime/RUN
+                                                    ;; Resume from statement after stop
+                                                    (inc @SNOBOL4clojure.env/STNO)))}
+                                       (catch clojure.lang.ExceptionInfo e
+                                         (case (get (ex-data e) :snobol/signal)
+                                           :end        {:exit :ok  :stdout ""}
+                                           :step-limit {:exit :step-limit
+                                                        :steps (get (ex-data e) :steps)}
+                                           {:exit :error :thrown (.getMessage e)}))
+                                       (catch Exception e
+                                         {:exit :error :thrown (.getMessage e)})
+                                       (finally
+                                         (reset! SNOBOL4clojure.env/&STLIMIT 2147483647)))]
+                       (assoc resume-r :vars (SNOBOL4clojure.env/snapshot!)))))))

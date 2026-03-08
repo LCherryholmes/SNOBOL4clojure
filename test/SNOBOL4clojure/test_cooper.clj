@@ -1037,7 +1037,9 @@
 ;; ── Gimpel/BSORT.INC ─────────────────────────────────────────────────────────
 
 (deftest gimpel-bsort
-  "Bubble sort: BSORT(A,1,5) sorts array in place"
+  "Shape B — Bubble sort: BSORT(A,1,5) sorts array in place.
+   Bounded loop: O(N²) comparisons, N=5 → max ~25 inner iterations.
+   Budget: 2000ms."
   (prog
     "        DEFINE('BSORT(A,I,N)J,K,V')  :(BSORT_END)"
     "BSORT   J  =  I"
