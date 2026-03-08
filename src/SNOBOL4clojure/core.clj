@@ -15,7 +15,8 @@
             [SNOBOL4clojure.compiler   :as comp]
             [SNOBOL4clojure.runtime    :as rt]
             [SNOBOL4clojure.trace      :as trace]
-            [SNOBOL4clojure.transpiler :as xpile])
+            [SNOBOL4clojure.transpiler :as xpile]
+            [SNOBOL4clojure.vm         :as vm])
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── Re-export env ─────────────────────────────────────────────────────────────
@@ -176,6 +177,21 @@
 (def load-transpiled!   xpile/load-transpiled!)
 (def run-transpiled!    xpile/run-transpiled!)
 (def bench-compare      xpile/bench-compare)
+
+;; ── Re-export VM (Stage 23C) ──────────────────────────────────────────────────
+(def compile-ir         vm/compile-ir)
+(def compile-src        vm/compile-src)
+(def run-vm!            vm/run-vm!)
+(def run-program!       vm/run-program!)
+(def bench-compare-vm   vm/bench-compare-vm)
+;; Opcode constants
+(def OP-HALT            vm/OP-HALT)
+(def OP-EXEC            vm/OP-EXEC)
+(def OP-EXEC-S          vm/OP-EXEC-S)
+(def OP-EXEC-F          vm/OP-EXEC-F)
+(def OP-EXEC-SF         vm/OP-EXEC-SF)
+(def OP-JUMP            vm/OP-JUMP)
+(def OP-SIGNAL          vm/OP-SIGNAL)
 
 ;; ── Re-export trace API ───────────────────────────────────────────────────────
 ;; These are available to SNOBOL4 programs via INVOKE and to Clojure tests.
