@@ -87,9 +87,10 @@
 
 (defn run-with-timeout
   "Run (RUN (CODE src)) under a wall-clock budget.
-   Returns {:exit :ok :stdout <str>} or {:exit :timeout :stdout nil}.
+   Returns {:exit :ok :stdout <str> :stderr <str>} or {:exit :timeout :stdout nil :stderr nil}.
    Retries once on timeout (to absorb JVM warmup / GC jitter).
-   Budget-ms default is 2000."
+   Budget-ms default is 2000.
+   :stderr captures output from TERMINAL assignments (which write to *err*)."
   ([src] (run-with-timeout src 2000))
   ([src budget-ms]
    (letfn [(attempt []
@@ -97,11 +98,14 @@
                    f (future
                        (deliver result-p
                          (try
-                           {:exit :ok
-                            :stdout (with-out-str (RUN (CODE-memo src)))}
+                           (let [err-buf (java.io.StringWriter.)
+                                 stdout  (with-out-str
+                                           (binding [*err* (java.io.PrintWriter. err-buf true)]
+                                             (RUN (CODE-memo src))))]
+                             {:exit :ok :stdout stdout :stderr (str err-buf)})
                            (catch clojure.lang.ExceptionInfo e
                              (case (get (ex-data e) :snobol/signal)
-                               :end       {:exit :ok :stdout ""}
+                               :end       {:exit :ok :stdout "" :stderr ""}
                                :step-limit {:exit   :step-limit
                                             :steps  (get (ex-data e) :steps)
                                             :thrown (.getMessage e)
@@ -111,7 +115,7 @@
                            (catch Exception e
                              {:exit :error :thrown (.getMessage e)}))))]
                (or (deref result-p budget-ms nil)
-                   (do (future-cancel f) {:exit :timeout :stdout nil}))))]
+                   (do (future-cancel f) {:exit :timeout :stdout nil :stderr nil}))))]
      ;; Retry once on timeout
      (let [r (attempt)]
        (if (= (:exit r) :timeout)

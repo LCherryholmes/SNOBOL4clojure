@@ -206,7 +206,7 @@
                                 (apply str (map #(if (nil? %) "" (str %)) (rest r)))
                                 r)]
                   (when (clojure.core/= N 'OUTPUT)   (println out-val))
-                  (when (clojure.core/= N 'TERMINAL) (println out-val))
+                  (when (clojure.core/= N 'TERMINAL) (binding [*out* *err*] (println out-val)))
                   out-val)
                 :else
                 (let [v (if (and (list? r) (clojure.core/= (first r) 'SEQ))
