@@ -630,6 +630,59 @@ Golden corpus >= 5000, all green. README written. Tag v1.0.
 
 ---
 
+## Development Strategy  (agreed 2026-03-08)
+
+### Primary driver: token-budget worm generator
+
+The worm generator is the main engine of progress until the implementation is
+ready for integration tests.  The methodology:
+
+1. **Write programs of increasing semantic complexity** — T0 (atomic), T1
+   (single op), T2 (two ops), T3 (conditional + loop), T4 (define/call),
+   T5 (recursive / multi-function), TN (full algorithm).
+2. **Run each program against the engine.**  Any divergence from expected
+   output is a bug.  Pin it immediately as a `deftest` in the appropriate
+   catalog file.
+3. **Fix the bug.**  Read the reference source (CSNOBOL4 / SPITBOL) first —
+   never speculate.
+4. **Never delete a test.**  Every test ever written is a permanent regression
+   guard.  The catalog grows monotonically.  The only valid reason to touch an
+   existing test is to correct a wrong expected value after confirming against
+   both oracles.
+
+### Regression corpus is sacrosanct
+
+All 1749+ tests accumulated so far stay in the suite forever.  `lein test`
+must always exit 0 before any commit.  If a fix causes a regression, the fix
+is wrong.
+
+### Integration test tiers (not the primary driver — yet)
+
+These suites validate completeness once the worm has flushed the fundamental
+bugs.  Do not attempt them until issues 8 / 9 / 10 are fixed and the T3-T5
+worm bands are green.
+
+| Suite | File / location | Gate condition |
+|-------|----------------|----------------|
+| Jeffrey Cooper / Snobol4.Net | `test_cooper.clj` (partial) | Issue #6 (goto case) fixed |
+| Gimpel SPITBOL algorithms | Sprint 15 — upload `gimpel.zip` | Issues 8, 9, 10 fixed |
+| Shafto AI corpus | Sprint 17 — upload `aisnobol.zip` | Gimpel ≥ 80% passing |
+| SNOBOL4 formatter | Ultimate integration test | Full language coverage |
+
+### Bug fix priority order
+
+Fix in this sequence — each unblocks the next tier of worm programs:
+
+1. **Issue 10** — loop fallthrough (`LT(I,N)` guard loops instead of exits)
+2. **Issue 9**  — RTAB/RPOS capture empty string instead of matched span
+3. **Issue 8**  — `~` negation operator inverts S/F branches
+4. **Issue 4**  — `ANY("A-Z")` charset range not expanded
+5. **Issue 6**  — goto case folding (Cooper suite uses lowercase `:s(label)`)
+6. **Issue 1**  — `.` capture deferred semantics
+7. **Issue 2**  — ANY multi-arg ClassCastException
+
+---
+
 ## Corpus / Harness Ideas Backlog
 
 - Regression corpus — every `:fail` that gets fixed becomes a permanent `:pass`
