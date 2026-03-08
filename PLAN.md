@@ -26,7 +26,7 @@ compiler from SNOBOL4 source text to a labeled statement table.
 | Date | Baseline | What Happened |
 |------|----------|---------------|
 | 2026-03-08 | 220/548/0 | Repo cloned fresh; lein installed; baseline confirmed. PLAN.md rewritten. SPITBOL x64-main.zip and CSNOBOL4 snobol4-2.3.3.tar.gz uploaded and extracted to `/home/claude/spitbol-src/` and `/home/claude/csnobol4-src/`. Eureka grammar-worm harness design documented. |
-| 2026-03-08 (session 2) | 220/548/0 | Gimpel.zip + Cooper zip extracted. `test_cooper.clj` (82 tests) and `test_bootstrap.clj` (130 tests, 7 length bands) written by hand. **Bug fixed**: PDD field-setter crash — `VAL(N) = x` was evaluating the instance arg to a map, losing the symbol name; fixed in `operators.clj` EVAL! `=` branch to keep raw symbol for fn? containers. **Bug fixed**: REPLACE multi-line continuation. **Key strategy decision**: Claude acts as the worm generator first — hand-write 1000 exhaustive primitive-first tests before building automated generator. `test_worm1000.clj` generated (521 tests, not yet triaged). Oracle binaries not installed — harness runs Clojure side only. **Next session**: run test_worm1000, triage failures, fix bugs to 0, then build automated 100k generator. |
+| 2026-03-08 (session 4) | 967/2161/0 (after fixes) | Two operator bugs fixed to clear the last test failure. **Bug 1 — SEQ nil-propagation**: vector replacement like `[J+1, LT(J,N)]` was converting nil (LT failure) to `""` via SEQ, so the assignment always succeeded. Fixed in `EVAL!` vector case: `(some nil? evaled)` → return nil. Also guarded `INVOKE '='` with `when-not (nil? r)`. This fixes the canonical SNOBOL4 idiom `J = J + 1  LT(J,N) :F(RETURN)`. **Bug 2 — NAME indirect subscript dereference**: `BSORT(.ARR,1,5)` passes `.ARR` (a NAME); inside BSORT, `A<J>` was subscripting the NAME wrapper instead of `ARR`. Fixed in both subscript read and write dispatch: detect `NAME` instance, call `(.n raw-container)` to get real symbol, `$$` that. Both fixes in `operators.clj`. Commit `fbcde8e`. Full suite: **967 tests / 2161 assertions / 0 failures**. *(Note: test count dropped from 968→967 due to removal of a stale probe_test.clj artifact.)* |
 
 ---
 
@@ -131,8 +131,9 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Sprint 14 | `8b75205` | 220/548 | Harness, CSNOBOL4 oracle, worm generator, 4 operator bugs fixed |
 | Sprint 14.5 | `(pending)` | 220/548 | PLAN.md rewrite; source archives extracted; no code changes |
 
-**Current baseline**: 220 tests / 548 assertions / 0 failures
-**Harness baseline**: 80/80 generated programs passing
+| Sprint 18D | `fbcde8e` | 967/2161/0 | SEQ nil-propagation fix; NAME indirect subscript fix; gimpel-bsort passing |
+
+**Current baseline**: 967 tests / 2161 assertions / 0 failures
 **Last confirmed**: 2026-03-08
 
 ---
