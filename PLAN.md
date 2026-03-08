@@ -648,6 +648,281 @@ Golden corpus >= 5000, all green. README written. Tag v1.0.
 
 ---
 
+## Sprint 23+ — Architectural Acceleration  VISION (2026-03-08)
+
+> *"I'm just thinking out loud. The best way of course."* — Lon Cherryholmes
+
+This section documents the multi-stage acceleration architecture Lon identified.
+Each stage builds on the previous and is independently valuable.  They are not
+sprints in the worm-first sense; they are architectural milestones that unlock
+orders-of-magnitude speedups at each level.
+
+---
+
+### The Current Pipeline (for reference)
+
+```
+SNOBOL4 source text
+   ↓  split-source  (compiler.clj)
+raw statement strings
+   ↓  parse-statement / instaparse  (grammar.clj)
+instaparse AST (hiccup vectors)
+   ↓  emitter  (emitter.clj)
+Clojure IR  ← THIS IS ALREADY PURE EDN DATA
+   ↓  CODE  (compiler.clj)
+labeled statement table  {1 [body goto], :LOOP [body goto], ...}
+   ↓  RUN loop/recur  (runtime.clj)
+   ↓  EVAL! / INVOKE / MATCH  (operators.clj, match.clj)
+output + side-effects
+```
+
+**Key insight Lon identified**: the Clojure IR produced by `CODE!` is already
+pure, serialisable EDN.  Example:
+
+```clojure
+;; Source: "        I = I + 1\n        LE(I,5) :S(LOOP)"
+;; IR:
+{1        [(= I (+ I 1)) nil]
+ 2        [(LE I 5)       {:S :LOOP}]
+ :LOOP    [(= OUTPUT I)   nil]
+ :END     [nil nil]}
+```
+
+Every statement body is a Clojure list (prefix IR), every goto is a plain map.
+This is a **hierarchical, homoiconic assembly language** — immutable at the IR
+level, evaluated against mutable program state.
+
+---
+
+### Stage 23A — Pre-compiled EDN Cache  DESIGNED
+
+**The idea**: serialise the IR to EDN on first compile; reload it on subsequent
+runs without re-parsing.  This eliminates the instaparse + emitter overhead for
+every test run.
+
+**How**:
+```clojure
+;; Compile once, cache to disk:
+(defn compile-to-edn [src path]
+  (let [[codes nos labels] (CODE! src)]
+    (spit path (pr-str {:codes codes :nos nos :labels labels}))))
+
+;; Load cached IR, skip grammar entirely:
+(defn load-edn [path]
+  (clojure.edn/read-string (slurp path)))
+```
+
+**Where it pays off**:
+- The `lein test` suite compiles the same ~200 test programs on every run.
+  With EDN caching, the grammar + emitter runs once per source change; all
+  subsequent runs skip it entirely.
+- The worm corpus (4,705+ programs) can be compiled once to a single EDN file
+  (`resources/worm-corpus-ir.edn`) and replayed at full speed.
+- The golden corpus (`resources/golden-corpus.edn`) already stores source text;
+  extending it to also store pre-compiled IR is a one-line change.
+
+**Speedup**: instaparse + emitter is ~80% of per-program cost for short programs.
+Expected 3-5x speedup on the test suite; 10-20x on worm batch runs.
+
+**Implementation**: add `compile-to-edn` / `load-edn` to `compiler.clj`;
+extend `run-worm-batch` to accept pre-compiled IR; add a `lein compile-corpus`
+alias that pre-compiles all catalog test programs.
+
+---
+
+### Stage 23B — SNOBOL4 → Clojure Transpiler  DESIGNED
+
+**The idea**: instead of interpreting the IR through EVAL!/INVOKE at runtime,
+*emit actual Clojure source code* from the IR.  The transpiled program is
+a real Clojure namespace that the JVM compiles to bytecode and runs at full
+native speed.
+
+**What the transpiler emits** (for each statement in the IR):
+
+```clojure
+;; IR statement:  [(= I (+ I 1))  {:S :LOOP}]
+;; Transpiled Clojure:
+(let [r (set! I (+ I 1))]
+  (if r (recur :LOOP) (recur (inc stmt-no))))
+```
+
+The entire SNOBOL4 program becomes a single Clojure `loop/case` over statement
+numbers — exactly the same shape as `RUN`, but with the IR already inlined as
+Clojure code rather than interpreted at runtime.
+
+**Key mapping**:
+
+| SNOBOL4 IR | Transpiled Clojure |
+|------------|-------------------|
+| `(= V expr)` | `(reset! V (EVAL expr))` |
+| `(? S P)` | `(MATCH S P)` |
+| `(?= S P R)` | `(REPLACE! S P R)` |
+| `{:S L}` | `(if result (recur L) (recur next))` |
+| `{:F L}` | `(if result (recur next) (recur L))` |
+| `{:G L}` | `(recur L)` |
+| `(INVOKE f args)` | `(f @args...)` (direct fn call) |
+
+**The transpiled program is a Clojure namespace** — it can be loaded with
+`load-string` / `eval`, compiled to a `.class` file with AOT, or emitted as
+a `.clj` source file.
+
+**Speedup**: eliminates EVAL! dispatch overhead (~50% of runtime cost for
+arithmetic-heavy programs), enables JVM JIT to inline hot paths, unlocks
+Clojure's type-hinting for numeric loops.  Expected 5-20x speedup vs.
+current interpreter.
+
+**Implementation**: new file `transpiler.clj`.  Recursive IR → Clojure AST
+transform.  `(transpile src)` → Clojure source string.  `(transpile! src ns)`
+→ loads and evaluates in a fresh namespace.
+
+---
+
+### Stage 23C — Clojure Stack Machine (CSM)  DESIGNED
+
+**The idea**: define a minimal bytecode instruction set for SNOBOL4 semantics,
+implement a stack machine interpreter in pure Clojure, and compile the IR to
+that bytecode.  This is the level between the tree-walking interpreter (current)
+and full JVM bytecode generation (Stage 23D).
+
+**Why**: the current RUN loop dispatches on IR lists.  A stack machine
+dispatches on integers (opcodes) — much faster for the JVM JIT.  It also
+makes the execution model explicit and auditable.
+
+**Proposed CSM instruction set**:
+
+```
+;; Stack machine opcodes for SNOBOL4clojure
+OPCODE  OPERAND     MEANING
+──────  ───────     ───────
+PUSH    value       push literal onto value stack
+LOAD    sym         push value of variable sym
+STORE   sym         pop → store in sym
+INVOKE  n op        pop n args, call op, push result or nil
+MATCH   —           pop [subject pattern], push match-result / nil
+REPLACE —           pop [subject pattern replacement], mutate subject
+BJMP    addr        unconditional branch to addr
+BTRUE   addr        branch if top of stack truthy
+BFALSE  addr        branch if top of stack nil
+LABEL   sym         define label (no-op at runtime, used by linker)
+RETURN  —           signal RETURN
+END     —           signal END
+```
+
+**The CSM compiler**: `IR → bytecode[]` is a simple linear pass over the IR.
+Each IR statement compiles to 3-8 instructions.  The bytecode is a Clojure
+vector of `[opcode operand]` pairs — still pure EDN, still serialisable.
+
+**The CSM interpreter**: a `loop/case` over `[pc stack]` — faster than EVAL!
+because opcodes are keywords (or integers), not arbitrary list structures.
+
+**Speedup**: 2-5x over EVAL! for arithmetic loops; enables future JVM bytecode
+generation (Stage 23D) by providing a clean compilation target.
+
+---
+
+### Stage 23D — JVM Bytecode Generation (ASM / clojure.asm)  DESIGNED
+
+**The idea**: compile SNOBOL4 IR directly to JVM `.class` files using ASM
+(the bytecode manipulation library bundled with Clojure itself).  Each
+compiled SNOBOL4 program becomes a real Java class with a `run()` method.
+The JVM JIT compiles it to native machine code on first call.
+
+**Why this is achievable**:
+- Clojure's own compiler already uses `clojure.asm` internally.
+- The SNOBOL4 IR is simple enough that codegen for the core loop is ~500 lines
+  of bytecode emission.
+- SPITBOL itself is a native-code compiler (x64 assembly); this is the Clojure
+  equivalent.
+
+**Architecture**:
+```
+SNOBOL4 IR
+   ↓  codegen.clj  (new)
+JVM bytecode (.class)  ← loaded with ClassLoader, runs at JIT speed
+   ↓  invoked as (. compiled-class run env)
+output + side-effects at native speed
+```
+
+**Key JVM optimisations unlocked**:
+- Integer variables → Java `long` primitives (no boxing).
+- Pattern match loops → inlined JVM loops, JIT-compiled.
+- GOTO-driven control flow → JVM `tableswitch` (O(1) dispatch).
+- String operations → direct `java.lang.String` calls.
+
+**Speedup**: 10-100x over the current interpreter for arithmetic-heavy programs.
+Competitive with SPITBOL v4.0f on integer benchmarks.
+
+**Implementation**: new file `codegen.clj`.  Uses `clojure.asm.ClassWriter` /
+`MethodVisitor`.  First milestone: compile and run `I = I + 1 / LE(I,N) :S(LOOP)`.
+
+---
+
+### Stage 23E — SPITBOL-class JIT Compiler  VISION
+
+The full realisation: a SNOBOL4/SPITBOL compiler that:
+
+1. Parses SNOBOL4 source (existing grammar.clj — unchanged).
+2. Emits Clojure IR (existing emitter.clj — unchanged).
+3. Optionally caches IR as EDN (Stage 23A).
+4. Compiles IR to JVM bytecode (Stage 23D).
+5. Loads bytecode; JVM JIT compiles hot paths to native x64.
+6. Pattern library (primitives.clj, patterns.clj) runs as compiled Java methods.
+
+**This makes SNOBOL4clojure a genuine SPITBOL-class implementation**:
+- Parser: instaparse (existing).
+- Runtime: JVM JIT (Stage 23D).
+- Pattern engine: compiled (Stage 23D primitive codegen).
+- Everything else (TABLE, ARRAY, DEFINE, DATA): existing Clojure — no change.
+
+**What does NOT change**:
+- The grammar, emitter, env, operators, patterns, functions, runtime files.
+  They remain the reference interpreter — always correct, always tested.
+- The test suite. Every existing test still passes against both the interpreter
+  and the compiled backend.
+- The three-oracle harness. The compiled backend is just another "oracle".
+
+**The interpreter stays as the semantic reference**; the compiler is a
+performance optimisation that must produce identical output on every test.
+
+---
+
+### Implementation Order (recommended)
+
+| Stage | Effort | Payoff | Gate condition |
+|-------|--------|--------|----------------|
+| 23A — EDN cache | 1 session | 3-5x test speed | Worm corpus complete |
+| 23B — Transpiler | 2 sessions | 5-20x runtime | EDN cache working |
+| 23C — Stack machine | 2 sessions | 2-5x + clean IR | Transpiler working |
+| 23D — JVM codegen | 3-4 sessions | 10-100x | Stack machine working |
+| 23E — Full JIT | ongoing | SPITBOL-class | All prior stages |
+
+**Start with 23A** — it is pure mechanical work (add serialisation to existing
+IR), delivers immediate speedup to every test run, and exercises the full IR
+structure as a validation step before building the compiler.
+
+---
+
+### Why Lon's Insight Is Correct
+
+The IR produced by `CODE!` is already:
+- **Pure EDN** — every node is a Clojure list, map, keyword, or primitive.
+  `(pr-str ir)` → string; `(edn/read-string s)` → original IR. No special types.
+- **Homoiconic** — the IR IS Clojure code in prefix form.  `(eval body)` runs it.
+  The transpiler writes itself.
+- **Hierarchical assembly** — statements are flat (no nesting beyond expressions);
+  control flow is explicit GOTOs.  This is exactly the shape JVM bytecode expects.
+- **Immutable at the IR level** — the statement table never changes after `CODE`.
+  Only the variable environment (atoms) is mutable at runtime.  This maps
+  perfectly to the JVM model: code segment (immutable `.class`) + heap (mutable
+  state).
+
+The observation that "everything we are doing by exec'ing after processing
+SNOBOL4 text could also be done with the pre-compiled version" is exactly right.
+The text→IR pass is purely a compile-time cost.  Once you have the IR, you never
+need the source text again.  Every stage above exploits this.
+
+---
+
 ## Development Strategy  (agreed 2026-03-08)
 
 ### Primary driver: token-budget worm generator
