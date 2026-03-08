@@ -32,6 +32,13 @@
 ;; ── Tracing (off by default) ──────────────────────────────────────────────────
 (def ^:dynamic *trace* false)
 
+;; ── Pending conditional captures (for the . operator) ────────────────────────
+;; A volatile! list of [var-sym matched-text] pairs, populated during a match
+;; by CAPTURE-COND nodes and committed to variables only when the overall match
+;; succeeds.  Mirrors the NAMICL "name list" mechanism in CSNOBOL4/v311.sil.
+;; Bound fresh by SEARCH/MATCH/FULLMATCH around each engine call.
+(def ^:dynamic *pending-cond* nil)
+
 ;; ── Frame accessors ───────────────────────────────────────────────────────────
 (defn ζΣ [ζ] (if ζ (ζ 0)))  ; subject chars on entry to this frame
 (defn ζΔ [ζ] (if ζ (ζ 1)))  ; position on entry
@@ -47,9 +54,11 @@
 (defn ζλ [ζ]   ; current operation symbol
   (cond
     (nil?        ζ)  nil
+    (list?       ζ)  (first ζ)        ; raw list node on Ω (e.g. COND-UNDO!)
     (nil?    (ζΠ ζ)) nil
     (string? (ζΠ ζ)) 'LIT$
     (symbol? (ζΠ ζ)) (ζΠ ζ)
+    (vector? (ζΠ ζ)) 'SEQ    ; vector = inline SEQ (e.g. CAPTURE-COND expansion)
     (list?   (ζΠ ζ)) (first (ζΠ ζ))
     (seq?    (ζΠ ζ)) (first (ζΠ ζ))
     true     (out ["ζλ? " (type (ζΠ ζ)) (ζΠ ζ)])))
@@ -108,7 +117,7 @@
        true         (str " Yikes!!! " (type X))))))
 
 (defn- animate [action full-subject ζ]
-  (when (and *trace* full-subject ζ)
+  (when (and *trace* full-subject ζ (vector? ζ))
     (println
       (format "%2s %-8s %16s %3d %16s %-9s %s"
         (count (ζΨ ζ))
@@ -253,18 +262,82 @@
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
         ;; ── CAPTURE-COND (.) ─────────────────────────────────────────────────
-        ;; Conditional assignment: assign only when the full match succeeds.
-        ;; Same frame/Ω discipline as CAPTURE-IMM.
+        ;; Conditional assignment — mirrors CSNOBOL4/v311 NME + ENME + FNME nodes.
+        ;;
+        ;; Reference: v311.sil lines ~3885-3930 (NME/ENME/FNME procedures).
+        ;; Architecture: NME fires BEFORE P (saves start cursor onto history stack);
+        ;; ENME fires AFTER P (computes span, adds to NAMICL "name list");
+        ;; FNME is the backtrack/undo node (removes from name list).
+        ;; The name list is committed to variables only on overall match success.
+        ;;
+        ;; Our implementation: CAPTURE-COND is a wrapper around child P.
+        ;; On :proceed — descend into P, push self onto Ω (recording entry cursor ζΔ).
+        ;; On :succeed — P matched; span is [ζΔ, ζδ].  Conj [var-sym text] onto
+        ;;               *pending-cond* (the name list).  Also push an UNDO frame
+        ;;               onto Ω so backtracking past this point removes the entry.
+        ;; On :recede  — backtracking into us; pop our frame, pass recede upward.
+        ;; The UNDO frame (COND-UNDO!) cleans up *pending-cond* on further backtrack.
+        ;; SEARCH/MATCH/FULLMATCH commit *pending-cond* when engine returns success.
         CAPTURE-COND
+        ;; Expands into SEQ[COND-MARK!(start), child-P, COND-ASSIGN!(var)]
+        ;; mirroring CSNOBOL4/v311 NME+ENME architecture.
         (case action
           :proceed
-          (recur :proceed (ζ↓ ζ) (🡥 Ω ζ))
-          :succeed
-          (let [[_ _ var-sym] (ζΠ ζ)
-                matched-text  (subs full-subject (ζΔ ζ) (ζδ ζ))]
-            (snobol-set! var-sym matched-text)
-            (recur :succeed (ζ↑ ζ) Ω))           ; leave child retry frames on Ω
+          (let [[_ child-P var-sym] (ζΠ ζ)
+                start-pos           (ζΔ ζ)
+                expanded            (vector (list 'COND-MARK! start-pos)
+                                            child-P
+                                            (list 'COND-ASSIGN! var-sym start-pos))]
+            (recur :proceed (ζ↓ ζ expanded) (🡥 Ω ζ)))
+          :succeed (recur :succeed (ζ↑ ζ) Ω)
           (:fail :recede)
+          (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; ── COND-MARK! ────────────────────────────────────────────
+        ;; Zero-width NME node: records start cursor in COND-ASSIGN! (baked in).
+        ;; Always succeeds immediately.
+        COND-MARK!
+        (case action
+          :proceed        (recur :succeed (ζ↑ ζ) Ω)
+          :succeed        (recur :succeed (ζ↑ ζ) Ω)
+          (:fail :recede) (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; ── COND-ASSIGN! ─────────────────────────────────────────
+        ;; Post-P ENME node: fires after P matches.
+        ;; Computes span [start-pos baked-in, entry-cursor = end of P],
+        ;; adds [var-sym text] to *pending-cond*, pushes COND-UNDO! onto Ω.
+        COND-ASSIGN!
+        (case action
+          :proceed
+          (let [[_ var-sym start-pos] (ζΠ ζ)
+                end-pos              (ζΔ ζ)
+                matched-text         (subs full-subject start-pos end-pos)]
+            (when *pending-cond*
+              (vswap! *pending-cond* conj [var-sym matched-text]))
+            (recur :succeed (ζ↑ ζ) (🡥 Ω (list 'COND-UNDO! var-sym))))
+          :succeed        (recur :succeed (ζ↑ ζ) Ω)
+          (:fail :recede) (recur :recede (🡡 Ω) (🡧 Ω)))
+
+        ;; ── COND-UNDO! (internal) ────────────────────────────────────────────
+        ;; Backtrack undo node for CAPTURE-COND.  When the engine recedes past
+        ;; a completed CAPTURE-COND, this removes the most recent pending entry
+        ;; for var-sym from *pending-cond*, mirroring CSNOBOL4 DNME/FNME undo.
+        COND-UNDO!
+        ;; This node lives on Ω, not as a child frame.  It is reached only via
+        ;; :recede → (🡡 Ω).  The ζ here IS the COND-UNDO! list itself.
+        ;; On recede: pop the most-recently-added pending entry for this var,
+        ;; then continue receding.
+        (let [[_ var-sym] ζ]
+          (when *pending-cond*
+            (vswap! *pending-cond*
+                    (fn [lst]
+                      (let [[kept _]
+                            (reduce (fn [[acc done?] [vs _ :as e]]
+                                      (if (and (not done?) (clojure.core/= vs var-sym))
+                                        [acc true]
+                                        [(conj acc e) done?]))
+                                    [[] false] lst)]
+                        kept))))
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
         ;; ── FENCE! ───────────────────────────────────────────────────────────
@@ -415,11 +488,10 @@
           (recur :recede (🡡 Ω) (🡧 Ω)))
 
         ;; -- CONJ! ---------------------------------------------------------------
-        ;; (CONJ! P Q): both P and Q must match same start-to-end span.
+        ;; (CONJ! P Q): both P and Q must match the exact same span [start, end].
         ;; Uses two synchronous engine calls rather than Omega frames.
-        ;; :proceed — run P via engine; if matched, run Q from same start;
-        ;;            if Q's end matches P's end, recur :succeed; else :fail.
-        ;; No :succeed/:fail/:recede cases — node is self-contained in :proceed.
+        ;; Reference: test_sprint10 test-conj-fail-length-mismatch confirms
+        ;; that CONJ(LEN(3), LEN(2)) on "abc" must fail (different end positions).
         CONJ!
         (case action
           :proceed
@@ -453,20 +525,30 @@
 
 ;; ── Public API ────────────────────────────────────────────────────────────────
 
+(defn- commit-pending!
+  "Commit all pending conditional (.) assignments to their variables.
+   Called by SEARCH/MATCH/FULLMATCH when the engine returns success.
+   Mirrors CSNOBOL4/v311 NMD procedure that walks the NAMICL name list."
+  []
+  (doseq [[var-sym text] (reverse @*pending-cond*)]
+    (snobol-set! var-sym text)))
+
 (defn SEARCH
   "Slide pattern P across string S, trying each start position 0..n.
    Returns [start end] for the first match found, nil if none.
    (subs S start end) extracts the matched substring.
    Binds *trace* true when a PATTERN trace is active (via trace.clj)."
   [S P]
-  (binding [*trace* (or *trace* (pattern-trace-active? S))]
+  (binding [*trace*        (or *trace* (pattern-trace-active? S))
+            *pending-cond* (volatile! [])]
     (let [chars (seq S)
           n     (count S)]
       (loop [i 0]
         (when (<= i n)
+          (vswap! *pending-cond* (constantly []))          ; reset for each start pos
           (let [result (engine (drop i chars) i P i S)]
             (if result
-              result
+              (do (commit-pending!) result)
               (recur (inc i)))))))))
 
 (defn MATCH
@@ -474,14 +556,20 @@
    Returns [start end] on success, nil on failure.
    Equivalent to SEARCH with POS(0) prepended."
   [S P]
-  (engine (seq S) 0 (list 'SEQ (POS 0) P) 0 S))
+  (binding [*pending-cond* (volatile! [])]
+    (let [result (engine (seq S) 0 (list 'SEQ (POS 0) P) 0 S)]
+      (when result (commit-pending!))
+      result)))
 
 (defn FULLMATCH
   "Match pattern P against the entirety of string S (anchored both ends).
    Returns [0 (count S)] on success, nil on failure.
    Equivalent to SEARCH with POS(0) prepended and RPOS(0) appended."
   [S P]
-  (engine (seq S) 0 (list 'SEQ (POS 0) P (RPOS 0)) 0 S))
+  (binding [*pending-cond* (volatile! [])]
+    (let [result (engine (seq S) 0 (list 'SEQ (POS 0) P (RPOS 0)) 0 S)]
+      (when result (commit-pending!))
+      result)))
 
 (defn REPLACE
   "Match pattern P against S; if matched, replace the matched span with R.

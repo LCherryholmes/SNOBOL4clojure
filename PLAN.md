@@ -42,6 +42,7 @@ compiler from SNOBOL4 source text to a labeled statement table.
 8. **INVOKE args are pre-evaluated.** EVAL! calls `(map EVAL! parms)` before INVOKE. Args in INVOKE are already evaluated. Never call EVAL! on them again.
 9. **Two-tier generator discipline.** `rand-*` = probabilistic, fast, random coverage. `gen-*` = exhaustive lazy sequences, deterministic, complete. Keep both tiers.
 10. **Typed pools are canonical fixtures.** Use `I J K L M N` for integers, `S T X Y Z` for strings, `P Q R` for patterns, `L1 L2` for labels. Pre-initialize fixtures at program start. Idiomatic naming makes failures readable.
+11. **Two-strategy debugging discipline.** When a test fails or behaviour is unclear: (a) run a targeted probe to see what the engine *does*, AND (b) read the CSNOBOL4/SPITBOL source to see what it *should* do. Never write a speculative fix for a pattern engine node without first reading how that node is implemented in `csnobol4-src/.../snobol4.c` or `spitbol-src/.../bootstrap/sbl.asm`. See the "Debugging & Investigation Strategies" section for the verified file map.
 
 ---
 
@@ -144,6 +145,56 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Sprint | Commit | Tests | What |
 |--------|--------|-------|------|
 | Sprint 18C | `(pending)` | 1498/3276/0 | Step-probe bisection debugger complete. 18B.1–18B.5 also confirmed done. New: `snapshot!` (env.clj), `run-to-step`, `probe-at`, `bisect-divergence` (fixed algorithm), `probe-test` macro, `run-with-restart`, `run-csnobol4-to-step`, `run-spitbol-to-step`, `run-clojure-to-step` (harness.clj). `run-with-timeout` auto-captures `:vars` on `:step-limit`. `test_helpers.clj` docstring documents `=` shadowing hazard. 10 new tests in `test_probe18c.clj`. |
+
+---
+
+## Debugging & Investigation Strategies
+
+**Two complementary strategies -- always use BOTH; never guess.**
+
+### Strategy 1 -- Empirical: run the test, read the output
+The test suite shows what our engine *currently does*.
+- Write a targeted `deftest` probe; run `lein test`.
+- Print IR: `(SNOBOL4clojure.grammar/parse-statement "...")` + `emitter` to
+  see exactly what code is generated.
+- Use `run-to-step`, `probe-at`, `snapshot!` for step-level inspection.
+- Use `($$ 'VAR)` to read variable state after a `prog` run.
+- Use this first when the question is "what does our engine do?"
+
+### Strategy 2 -- Authoritative: read the reference source
+The reference archives are the **specification**.  For any question about
+what SNOBOL4 *should* do -- especially pattern engine backtrack discipline --
+reading the source is faster and more reliable than trial and error.
+
+**Verified file map:**
+
+| Question | File |
+|----------|------|
+| ARBNO/ARB backtrack node structure | `csnobol4-src/.../test/v311.sil` lines ~8254-8310 (ARBAK/ARHED/ARTAL) |
+| ARBNO build logic | `csnobol4-src/.../snobol4.c` function `ARBNO()` ~line 3602 |
+| Dot (.) capture in match engine | `spitbol-src/.../bootstrap/sbl.asm` `p_cas` ~line 4950 |
+| ARBNO node execution in SPITBOL | `spitbol-src/.../bootstrap/sbl.asm` `p_aba`/`p_abc`/`p_abd` ~line 4694 |
+| FENCE/ABORT/BAL nodes | `csnobol4-src/.../test/v311.sil` lines ~8250+ |
+| Pattern match dispatcher | `csnobol4-src/.../snobol4.c` `PATNOD()` ~line 3529 |
+| Any operator (CONJ, ARBNO, etc.) | `csnobol4-src/.../snobol4.c` -- search ALL-CAPS function name |
+
+**When to lead with each:**
+
+| Situation | Lead strategy |
+|-----------|---------------|
+| "Does our engine give the right answer?" | Strategy 1 |
+| "What IS the right answer for this edge case?" | Strategy 2 |
+| "Why is this pattern node misbehaving?" | Strategy 2 first, confirm with 1 |
+| "Is this a grammar/emitter bug or engine bug?" | Strategy 1 (print IR) |
+| "How does ARBNO/FENCE/BAL backtracking work?" | Strategy 2 (sbl.asm / v311.sil) |
+
+**Hard rule**: Never write a speculative fix for a pattern engine node
+without first reading how CSNOBOL4 or SPITBOL implements that node.
+Wrong mental models waste sessions.  The source is always available.
+
+> **In a new session**, archives at `/mnt/user-data/uploads/`.  Extract:
+> `tar xzf snobol4-2_3_3_tar.gz -C /home/claude/csnobol4-src/ --strip-components=1`
+> `unzip x64-main.zip -d /home/claude/spitbol-src/`
 
 ---
 

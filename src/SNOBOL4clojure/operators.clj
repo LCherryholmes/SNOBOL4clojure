@@ -15,6 +15,7 @@
             [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH]]
             [SNOBOL4clojure.patterns  :refer
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
+              ABORT BAL CONJ
               LEN POS RPOS RTAB TAB FAIL]]
             [SNOBOL4clojure.emitter   :refer [emitter]]
             [SNOBOL4clojure.grammar   :refer [parse-expression]]
@@ -134,6 +135,10 @@
     NOTANY  (NOTANY (first args))
     SPAN    (SPAN   (first args))
     FENCE   (if (seq args) (FENCE (first args)) (FENCE))
+    ARBNO   (ARBNO  (first args))
+    ABORT   ABORT
+    BAL     BAL
+    CONJ    (CONJ   (first args) (second args))
     EQ      (EQ     (first args) (second args))
     NE      (NE     (first args) (second args))
     LE      (LE     (first args) (second args))
