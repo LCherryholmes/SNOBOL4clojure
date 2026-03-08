@@ -29,7 +29,17 @@ SNOBOL4 source text to a labeled statement table.
 | `/home/claude/SNOBOL4python` | Python reference implementation (primary algorithmic reference) |
 | `/home/claude/Snobol4.Net/Snobol4.Net-feature-msil-trace/` | .NET implementation + test suite |
 | `/home/claude/x64ref/x64-main/` | C SPITBOL x64 reference |
-| `/home/claude/snobol4ref/snobol4-2.3.3/` | C SNOBOL4 reference |
+| `/tmp/gimpel/SPITBOL/` | ~100 Gimpel SPITBOL algorithm programs (`.INC`/`.SPT`) |
+| `/tmp/aisnobol/` | Shafto AI corpus: SNOLISPIST, Wang, ATN, Kalah |
+
+### Installed oracles
+
+| Binary | Version | Notes |
+|--------|---------|-------|
+| `/usr/local/bin/spitbol` | SPITBOL v4.0f | Run as `spitbol -b -` (batch, read from stdin) |
+| `/usr/local/bin/snobol4` | CSNOBOL4 2.3.3 | Run as `snobol4 -` (read from stdin) |
+
+Both are used by `harness.clj` for three-oracle triangulation.
 
 ### GitHub repositories
 
@@ -37,8 +47,6 @@ SNOBOL4 source text to a labeled statement table.
 |------|-----|-------|
 | SNOBOL4clojure | https://github.com/LCherryholmes/SNOBOL4clojure.git | **This project** |
 | SNOBOL4python | https://github.com/LCherryholmes/SNOBOL4python.git | Python port — best source for algorithmic detail |
-| SNOBOL4csharp | *(URL unknown — ask user to confirm)* | C# port — confirm URL with user |
-| Snobol4.Net | *(local only — no git remote found on disk)* | .NET impl + exhaustive test suite in `TestSnobol4/` |
 
 > **Ground truth for edge cases**: The Snobol4.Net test suite at
 > `TestSnobol4/Function/` — one `.cs` file per primitive/function.
@@ -67,9 +75,11 @@ namespace the user handed it via `env/GLOBALS`, `env/active-ns`,
 | `grammar.clj` | instaparse grammar + parse-statement/parse-expression |
 | `emitter.clj` | AST to Clojure IR transform |
 | `compiler.clj` | CODE!/CODE: source text to labeled statement table |
-| `operators.clj` | operators (?, =, |, $, ., +...), EVAL/EVAL!/INVOKE, comparison primitives |
+| `operators.clj` | operators (?, =, \|, $, ., +...), EVAL/EVAL!/INVOKE, comparison primitives |
 | `runtime.clj` | RUN: GOTO-driven statement interpreter |
 | `core.clj` | thin facade with explicit def re-exports of full public API |
+| `harness.clj` | Three-oracle diff harness: SPITBOL / CSNOBOL4 / SNOBOL4clojure |
+| `generator.clj` | Worm test generator: typed variable pools, rand-* and gen-* tiers |
 
 ---
 
@@ -87,9 +97,12 @@ namespace the user handed it via `env/GLOBALS`, `env/active-ns`,
 | Sprint 10 | `5a89477` | 139/431 | ~P optional, @N cursor, CONJ P&Q, *expr deferred |
 | Sprint 11a | `506d66f` | 151/447 | TABLE: atom-backed, subscript read/write <>/[], ITEM, PROTOTYPE |
 | Sprint 11b | `d75986c` | 166/467 | ARRAY: SnobolArray, multi-dim, bounds-checked, default value, PROTOTYPE |
-| Sprint 14  | `f98f779`  | 220/548 | SPITBOL harness, SEQ concat fix, divide guard, trace removal |
+| Sprint 12 | `3af1ffb` | 206/529 | CONVERT, DATA/FIELD, SORT/RSORT, COPY, DATATYPE |
+| Sprint 13 | `1d88587` | 220/548 | RETURN/FRETURN/END, DEFINE locals, APPLY, uppercase-only rule |
+| Sprint 14 | `8b75205` | 220/548 | Harness, CSNOBOL4 oracle, worm generator, 4 operator bugs fixed |
 
-**Current baseline**: 220 tests / 548 assertions / 0 failures
+**Current baseline**: 220 tests / 548 assertions / 0 failures  
+**Harness baseline**: 80/80 generated programs passing
 
 ---
 
@@ -150,6 +163,26 @@ variable operations. Tests call it in a `:each` fixture:
 (use-fixtures :each (fn [f] (GLOBALS (find-ns 'my.test.ns)) (f)))
 ```
 
+### IMPORTANT: clojure.core/= inside operators.clj
+`operators.clj` has `(:refer-clojure :exclude [= ...])`. Bare `=` inside that
+file refers to the SNOBOL4 `=` defn, which **builds an IR list** rather than
+testing equality. Any equality check on Clojure values inside operators.clj
+**must use `clojure.core/=` explicitly** or use the `equal` alias (which wraps
+`clojure.core/=`). This tripped us up badly in Sprint 14 — `(= x 'SEQ)` built
+the list `(= x SEQ)` (truthy!) instead of returning false.
+
+### Division by zero
+`INVOKE /` throws `ExceptionInfo {:snobol/error 14}` on integer or real
+divide-by-zero. This matches SPITBOL's fatal error 014. The harness classifies
+both sides erroring as `:pass-class`.
+
+### Pattern variables and double-EVAL trap
+When EVAL! dispatches a list `(op ...)` through the `true` branch, it
+pre-evaluates args with `(map EVAL! parms)` before calling INVOKE. So INVOKE
+receives **already-evaluated** values. Do NOT call `EVAL!` again inside INVOKE
+on values that came from args. The `?=` handler learned this the hard way —
+calling `(EVAL! p)` on an already-evaluated pattern destroyed it.
+
 ---
 
 ## Open Issues / Known Gaps
@@ -161,80 +194,192 @@ variable operations. Tests call it in a `:each` fixture:
 | 3 | File I/O — DETACH, REWIND, ENDFILE are stubs | functions.clj |
 | 4 | Charset range expansion — `ANY("A-Z")` treats `-` as literal | primitives.clj |
 | 6 | PDD field write when accessor name shadows Clojure fn (e.g. REAL) | operators.clj |
-| 7 | `1 / 0` — integer divide by zero hangs in harness (zero? on non-numeric) | operators.clj |
-| 8 | Pattern replace `S PAT = R` drops unmatched prefix of S | operators.clj / match.clj |
+
+Issues 7 and 8 (div-by-zero, pattern replace prefix) were fixed in Sprint 14.
+
+---
+
+## Datatype Convention (Clojure → SNOBOL4)
+
+| Clojure type | SNOBOL4 DATATYPE | Notes |
+|---|---|---|
+| `java.lang.String` / `Character` | `"STRING"` | all text values |
+| `java.lang.Long` | `"INTEGER"` | integer arithmetic |
+| `java.lang.Double` | `"REAL"` | floating point |
+| `clojure.lang.Atom` (wrapping a map) | `"TABLE"` | mutable associative table |
+| `SNOBOL4clojure.env.SnobolArray` | `"ARRAY"` | multi-dim integer-subscripted |
+| `clojure.lang.Symbol` | `"NAME"` | indirect reference (`.` operator result) |
+| `SNOBOL4clojure.env.NAME` deftype | `"NAME"` | mutable named reference |
+| `PersistentList` whose `first` is a pattern op | `"PATTERN"` | `(SEQ ...)`, `(ALT ...)`, `(LEN# ...)`, etc. |
+| `PersistentList` whose `first` is NOT a pattern op | `"EXPRESSION"` | unevaluated IR |
+| `PersistentVector` | `"PATTERN"` | SEQ of pattern nodes |
+| `PersistentTreeMap` / `Keyword` | `"CODE"` | compiled statement table entries |
+| `PersistentHashSet` / `TreeSet` | `"SET"` | character sets (ANY, SPAN etc.) |
+| `java.util.regex.Pattern` | `"REGEX"` | Java regex (internal) |
+| `java.lang.Class` | `"DATA"` | type descriptor |
+| map with `:__type__` key | user-defined type name | PDD instances from `DATA` |
+
+Pattern op suffixes:
+- `!` suffix (`FENCE!`, `ARBNO!`) — ops with side effects / special backtrack
+- `#` suffix (`LEN#`, `POS#`) — numeric-argument primitives
+- `$` suffix (`ANY$`, `SPAN$`) — character-set primitives
 
 ---
 
 ## Sprint 12 — Data Types & Conversion  ✅ COMPLETE (206/529)
 
-### 12.1  CONVERT  ✅
-Full coercion matrix: STRING/INTEGER/REAL/NAME → STRING/INTEGER/REAL/PATTERN/NAME,
-ARRAY(Nx2) ↔ TABLE, same-type identity, all others return nil (failure).
-Overflow/parse failures → nil → :F branch.
-
-### 12.2  DATA / FIELD  ✅
-PDD instances are maps `{:__type__ "TYPE", "F1" v1, ...}` — no defrecord needed.
-DATA registers type in `data-type-registry`, installs constructor+accessor fns
-via `snobol-set!` into the active SNOBOL namespace.
-FIELD(type, n) returns nth field name. Accessor write `F(X) = val` handled via
-INVOKE `=` branch detecting fn container and rebinding the instance variable.
-DATATYPE :default updated to recognise `:__type__` maps.
-
-### 12.3  SORT / RSORT  ✅
-TABLE → sorted Nx2 ARRAY (ascending/descending by value string representation).
+CONVERT, DATA/FIELD, SORT/RSORT, COPY, DATATYPE. PDD instances are maps
+`{:__type__ "TYPE", "F1" v1, ...}`. Full coercion matrix in CONVERT.
 
 ---
 
-## Sprint 13 — I/O & Runtime  ✅ COMPLETE (220/548)
+## Sprint 13 — Control Flow  ✅ COMPLETE (220/548)
 
-### Design decision (this sprint)
-**All SNOBOL4 language keywords are UPPERCASE. No case folding. Ever.**
-`:(RETURN)` `:(FRETURN)` `:(NRETURN)` `:(END)` `:S(x)` `:F(x)` — uppercase only.
-Variable names are case-sensitive (`x` ≠ `X`) but that is the user's concern.
-This was a deliberate simplification that removes an entire class of ambiguity.
-
-### What was done
-- `:(RETURN)` / `:(FRETURN)` / `:(NRETURN)` — exception-based signals
-  (`snobol-return!` / `snobol-freturn!` / `snobol-nreturn!` in `env.clj`)
-- DEFINE — full local variable save/restore; parses `'F(params)locals'`
-- APPLY — call any function (built-in or DEFINE'd) by name-string
-- `:(END)` / bare `end` label — halts execution cleanly
-- `num` guarded against nil input (→ `##NaN`) — fixes NPE on wrong-arity calls
-- Reverted grammar case-insensitive change (uppercase-only is the rule)
+RETURN/FRETURN/NRETURN/END signals, DEFINE with local save/restore,
+APPLY, uppercase-only keyword rule.
 
 ---
 
-## Sprint 14 — SPITBOL Harness  ✅ COMPLETE (220/548)
+## Sprint 14 — Harness, Oracles, Generator  ✅ COMPLETE (220/548, 80/80)
 
-### What was done
-- `harness.clj`: `run-spitbol` / `run-clojure` / `diff-run` / `save-corpus!` / `load-corpus`
-- `run-spitbol`: shells to `/usr/local/bin/spitbol -b -`; error output (exit≠0) goes to `:stderr`
-- `run-clojure`: `with-out-str` + `future`/`deref` wall-clock timeout (5s); `reset-runtime!` clears compiler state between runs
-- Status classification: `:pass` `:pass-class` `:fail` `:timeout` `:skip`
-- SEQ concat fixed: `(SEQ "foo" "bar")` → `"foobar"` in expression context
-- Removed spurious `(trace r)` from `?=` handler
-- `divide` guarded against zero → nil (statement failure, matches SPITBOL)
-- `num` guarded against nil → `##NaN`
+### Three-oracle harness (`harness.clj`)
 
-### Smoke test results (8 cases)
-| Program | Status |
-|---------|--------|
-| `OUTPUT = 'hello world'` | ✅ :pass |
-| `OUTPUT = 3 + 4` | ✅ :pass |
-| `OUTPUT = 'foo' 'bar'` | ✅ :pass |
-| `GT(1,5)` (silent fail) | ✅ :pass |
-| `OUTPUT = 'a' / OUTPUT = 'b'` | ✅ :pass |
-| `DEFINE SQ / OUTPUT = SQ(7)` | ✅ :pass |
-| Loop 1..5 | ✅ :pass |
-| `OUTPUT = 1 / 0` | ⚠️ :timeout (div-by-zero hangs — bug #7) |
-| `S 'world' = 'SNOBOL4'` | ❌ :fail (replace drops prefix — bug #8) |
+```
+SPITBOL v4.0f  (/usr/local/bin/spitbol -b -)   ← primary oracle
+CSNOBOL4 2.3.3 (/usr/local/bin/snobol4 -)      ← secondary oracle
+SNOBOL4clojure                                  ← our implementation
+```
 
-### New bugs found by harness
-| # | Issue | File |
-|---|-------|------|
-| 7 | `1 / 0` — integer divide by zero hangs (zero? fails on non-numeric result) | operators.clj |
-| 8 | Pattern replace `S PAT = R` drops unmatched prefix of S | operators.clj / match.clj |
+**Triangulation logic** (`oracle-stdout`):
+- Both agree → `:oracle :both` — use agreed stdout as reference
+- Both agree but both errored → `:oracle :both-error` — classify as `:pass-class` if we also error
+- Only SPITBOL succeeded → `:oracle :spitbol`
+- Only CSNOBOL4 succeeded → `:oracle :csnobol4`
+- Both succeeded but disagree → `:oracle :disagree` — use SPITBOL, flag for human review
+
+**Status classes**:
+- `:pass` — stdout identical to oracle
+- `:pass-class` — both errored (messages may differ)
+- `:fail` — genuine divergence
+- `:timeout` — wall-clock timeout (5s, via `future`/`deref`)
+- `:skip` — both oracles crashed (bad input — discard)
+
+**Corpus record schema**:
+```clojure
+{:src      "...snobol4 source..."
+ :spitbol  {:stdout "" :stderr "" :exit 0}
+ :csnobol4 {:stdout "" :stderr "" :exit 0}
+ :clojure  {:stdout "" :stderr "" :exit :ok/:error/:timeout :thrown "..."}
+ :oracle   :both | :spitbol | :csnobol4 | :disagree | :both-error
+ :status   :pass | :pass-class | :fail | :timeout | :skip
+ :length   (count src)
+ :depth    nil}
+```
+
+**`reset-runtime!`** — must be called between harness runs; clears:
+`env/STNO`, `env/<STNO>`, `env/<LABL>`, `env/<CODE>` — the compiler
+accumulates into these atoms across runs if not reset.
+
+**Key API**:
+- `(run-spitbol src)` → outcome map
+- `(run-csnobol4 src)` → outcome map
+- `(run-clojure src)` → outcome map (with wall-clock timeout)
+- `(diff-run src)` → full corpus record
+- `(diff-run src depth)` → same, with depth tag
+- `(save-corpus! records)` → appends to `resources/golden-corpus.edn`
+- `(load-corpus)` → vector of all records
+
+### Worm generator (`generator.clj`)
+
+**Typed variable pools** — programs look idiomatic, not random:
+
+| Pool | Variables | Literals |
+|------|-----------|---------|
+| Integers | `I J K L M N` | `1 2 3 4 5 6 7 8 9 10 25 100` |
+| Reals | `A B C D E F` | `1.0 1.5 2.0 2.5 3.0 3.14 0.5 10.0` |
+| Strings | `S T X Y Z` | `'alpha' 'beta' 'gamma' 'hello' 'world' 'foo' 'bar' 'baz' 'SNOBOL' 'test'` |
+| Patterns | `P Q R` | `'a' ANY('aeiou') SPAN('abc...z') LEN(1) LEN(2) LEN(3)` |
+| Labels | `L1 L2 L3 …` | (generated sequentially, never reused) |
+
+**Worm state** — threads through program generation:
+```clojure
+{:lines    []     ; accumulated source lines
+ :live-int #{}    ; int vars that have been assigned (safe to reference)
+ :live-str #{}    ; string vars assigned
+ :live-pat #{}    ; pattern vars assigned
+ :labels   #{}    ; labels that exist (safe to branch to)
+ :next-lbl 1}     ; counter for L1, L2, ...
+```
+
+**14 weighted move types** (weight = relative sampling frequency):
+
+| Move | Weight | Needs | What it emits |
+|------|--------|-------|---------------|
+| `move-assign-int` | 10 | nothing | `I = 42` |
+| `move-assign-real` | 8 | nothing | `A = 3.14` |
+| `move-assign-str` | 10 | nothing | `S = 'hello'` |
+| `move-output-lit` | 6 | nothing | `OUTPUT = 'foo'` |
+| `move-pat-assign` | 5 | nothing | `P = LEN(3)` |
+| `move-arith` | 8 | live int | `I = I + 3` |
+| `move-concat` | 8 | live str | `S = S 'world'` |
+| `move-output-int` | 7 | live int | `OUTPUT = I` |
+| `move-output-str` | 7 | live str | `OUTPUT = S` |
+| `move-cmp-branch` | 5 | live int | `GT(I,5) :S(L1)F(L2)` + both label stubs converging to L3 |
+| `move-pat-match` | 4 | live str | `S LEN(2) :S(L1)F(L2)` + label stubs |
+| `move-pat-replace` | 4 | live str | `S LEN(2) = 'x'` then `OUTPUT = S` |
+| `move-size` | 3 | live str | `OUTPUT = SIZE(S)` |
+| `move-loop` | 3 | nothing | full counted loop `I=1 / LOOP OUTPUT=I / I=I+1 / LE(I,5):S(LOOP)` |
+
+**Tier 1 — `rand-*` probabilistic**:
+```clojure
+(rand-program)        ; 3–8 moves, weighted random
+(rand-program n)      ; exactly n moves
+(rand-batch n)        ; n independent programs
+```
+
+**Tier 2 — `gen-*` exhaustive lazy sequences**:
+```clojure
+(gen-assign-int)   ; all (var = lit) for every int-var × int-lit
+(gen-assign-str)   ; all (var = lit) for every str-var × str-lit
+(gen-arith)        ; all (var = lhs op rhs) for every combo
+(gen-concat)       ; all (var = s1 s2) for every str-lit pair
+(gen-cmp)          ; all (OP(lhs,rhs) :S(YES)F(NO)) programs
+(gen-pat-match)    ; all (S pat :S(HIT)F(MISS)) programs
+(systematic-batch) ; lazy concat of all gen-* sequences
+```
+
+### Ideas for future generator expansion
+
+**More move types to add:**
+- `move-define-call` — emit a DEFINE + call in the same program (exercises RETURN/FRETURN/locals)
+- `move-table-ops` — `T = TABLE()`, `T<'key'> = val`, `OUTPUT = T<'key'>`
+- `move-array-ops` — `A = ARRAY(5)`, `A<3> = val`, `OUTPUT = A<3>`
+- `move-convert` — `OUTPUT = INTEGER(S)`, `OUTPUT = REAL(I)`, `OUTPUT = STRING(I)`
+- `move-size-arith` — `OUTPUT = SIZE(S) + I` (exercises cross-type arithmetic)
+- `move-input-loop` — loop reading INPUT (needs harness stdin injection)
+- `move-anchored-match` — pattern with `POS(0)` or `RPOS(0)` anchors
+
+**Generator enhancements:**
+- Depth parameter — `(rand-program :depth 3)` recurses expressions to depth 3
+- Shrinking — when a program fails, systematically reduce it to minimal failing case
+- Seeded runs — `(rand-program :seed 42)` for reproducible corpus
+- Length-band sampling — `(sample-programs {:depth 1-4 :length 10-50 :n 1000})`
+- Mutation — take a passing program, mutate one statement, re-test (finds boundary cases)
+- Template programs — hand-written programs with `{{EXPR}}` holes filled by generator
+- Coverage tracking — which move types and literal combinations have been exercised
+
+**Corpus ideas:**
+- Regression corpus — every `:fail` that gets fixed becomes a permanent `:pass` entry
+- Oracle-disagree corpus — programs where SPITBOL and CSNOBOL4 differ (edge cases to study)
+- Depth-stratified corpus — separate edn files per depth band for targeted runs
+- Auto-minimizer — for each `:fail`, binary-search the program down to fewest statements
+
+**Harness enhancements:**
+- Parallel runner — `pmap` over programs with thread-local compiler state
+- stdin injection — pass `INPUT` lines to programs that read them
+- `&STLIMIT` injection once the keyword-assignment syntax is fixed
+- Diff display — coloured unified diff of oracle vs clojure stdout for `:fail` records
+- HTML report — `(generate-report corpus)` → `report.html` with pass/fail table
 
 ---
 
@@ -252,145 +397,55 @@ pass/fail; fix regressions found.
   expected and should be recorded as known-skip, not regression
 
 ### Tasks
-- [ ] 15.1  Include inliner — `tools/inline-includes.sh` or Clojure fn
-      that recursively expands `-INCLUDE 'file'` directives
-- [ ] 15.2  Batch runner — iterate all `*.SPT` files; run harness; write
-      `reports/gimpel-results.edn` with `{:file :spitbol-out :clojure-out :status}`
-- [ ] 15.3  Triage results — categorise each failure:
-      (a) missing built-in, (b) I/O, (c) OPSYN/LOAD, (d) genuine bug
-- [ ] 15.4  Fix category (d) bugs; re-run; iterate
-- [ ] 15.5  Simple standalone programs that pass become permanent regression tests
-- [ ] 15.6  Commit corpus results + any fixes
+- [ ] 15.1  Include inliner — Clojure fn that recursively expands `-INCLUDE 'file'`
+- [ ] 15.2  Batch runner — iterate all `*.SPT`; run harness; write `reports/gimpel-results.edn`
+- [ ] 15.3  Triage — (a) missing built-in, (b) I/O, (c) OPSYN/LOAD, (d) genuine bug
+- [ ] 15.4  Fix category (d) bugs; iterate
+- [ ] 15.5  Simple standalones that pass → permanent regression tests
+- [ ] 15.6  Commit
 
-### Programs most likely to work early (no I/O, no OPSYN)
+### Programs most likely to work (no I/O, no OPSYN)
 `HSORT.INC`, `BSORT.INC`, `MSORT.INC`, `SSORT.INC`, `LSORT.INC`,
 `TSORT.INC`, `FRSORT.INC`, `REVERSE.INC`, `ROMAN.INC`, `HEX.INC`,
-`BASE10.INC`, `BASEB.INC`, `COMB.INC`, `PERM.INC`, `FACTORIAL` variants
+`BASE10.INC`, `BASEB.INC`, `COMB.INC`, `PERM.INC`, factorial variants
 
 ---
 
 ## Sprint 16 — Shafto AI Corpus  ⬜ PLANNED
 
-### Goal
-Run the Shafto AI programs (SNOLISPIST, Wang, ATN, Kalah, HSORT) through
-the harness with sample input files.
-
-### Context
-- Source: `/tmp/aisnobol/*.SPT`
-- Input files: `*.IN` (e.g. `WANG.IN`, `ATN.IN`, `HSORT.IN`)
-- These are larger, more complex programs; many use SNOLISPIST core/library
-- SPITBOL versions (`.SPT`) are the ones to target
-
-### Tasks
-- [ ] 16.1  Run `WANG.SPT` + `WANG.IN` through harness (theorem prover — pure computation)
-- [ ] 16.2  Run `HSORT.SPT` + `HSORT.IN` (standalone sort — simplest)
-- [ ] 16.3  Run `ENDING.SPT` + `ENDING.IN` (word endings — string manipulation)
-- [ ] 16.4  Attempt `TEST.SPT` (SNOLISPIST test suite — needs core + lib inlined)
-- [ ] 16.5  Fix regressions found; commit
+`/tmp/aisnobol/` — Wang theorem prover, ATN parser, Kalah, SNOLISPIST.
+Target `WANG.SPT`, `HSORT.SPT`, `ENDING.SPT` first (pure computation).
 
 ---
 
-## Sprint 17 — Grammar-Based Test Generator  ⬜ PLANNED
+## Sprint 17 — Generator Depth Expansion  ⬜ PLANNED
 
-### Design — two-tier (from Expressions.py reference)
-
-The generator mirrors the structure of `Expressions.py` (L. Cherryholmes):
-
-**Tier 1 — `rand-*` probabilistic sampling** (weighted toward terminals):
-```clojure
-(rand-expr)    ; random expression, biased 70% terminal / 30% recurse
-(rand-stmt)    ; random statement
-(rand-program) ; 1..N statements + "end"
-```
-
-**Tier 2 — `gen-*` exhaustive lazy sequences** (systematic, every form):
-```clojure
-(gen-literal)  ; "42", "3.14", "'hello'", "''"
-(gen-varname)  ; "A", "B", "X", "Y"  (short uppercase names)
-(gen-expr)     ; lazy-seq of all expressions at increasing depth
-(gen-pattern)  ; LEN(n), ANY('abc'), literal, concatenation
-(gen-stmt)     ; assignment | match | match-replace | bare subject
-(gen-program)  ; lazy-seq of complete programs
-```
-
-**Outcome schema** — captures ALL possible outcomes, not just pass/value:
-```clojure
-{:src        "        X = 1/0\nend"
- :spitbol    {:stdout "" :stderr "...division by zero..." :exit 1}
- :clojure    {:stdout "" :thrown "ArithmeticException" :exit :error}
- :status     :pass          ; :pass :pass-class :fail :timeout :skip
- :length     7
- :depth      2}
-```
-
-**Status classes:**
-- `:pass`       — stdout identical
-- `:pass-class` — both errored (messages may differ)
-- `:fail`       — one succeeded, one failed (or different output)
-- `:timeout`    — either side exceeded `&STLIMIT` (recorded, not a failure)
-- `:skip`       — SPITBOL itself crashed (discard from corpus)
-
-**Termination guard**: inject `&STLIMIT = 10000` at top of every generated program.
-
-### Tasks
-- [ ] 17.1  `src/SNOBOL4clojure/generator.clj` — `rand-*` + `gen-*` fns
-- [ ] 17.2  `src/SNOBOL4clojure/harness.clj` — `run-spitbol` / `run-clojure` / `diff-run`
-- [ ] 17.3  Length-filtered sampler — `(sample-programs depth-range length-bands K)`
-- [ ] 17.4  Corpus store — `resources/golden-corpus.edn`
-- [ ] 17.5  Corpus test loader — auto-generates `deftest` per golden entry
-- [ ] 17.6  Initial run: depth 1-4, all length bands, K=50 → ~1000 programs
-- [ ] 17.7  Commit corpus + generator
+- Depth parameter on `rand-program`
+- `move-define-call`, `move-table-ops`, `move-array-ops`, `move-convert`
+- Shrinking / minimizer for failing programs
+- Seeded runs for reproducible corpus
+- Target: depth 1–6, corpus ≥ 5000 programs all green
 
 ---
 
-## Sprint 18 — I/O & File Channels  ⬜ PLANNED
+## Sprint 18 — File I/O  ⬜ PLANNED
 
-### Goal
-Real file I/O: INPUT/OUTPUT channel association, ENDFILE, REWIND, DETACH.
-Required before many Gimpel programs can run end-to-end.
-
-### Tasks
-- [ ] 18.1  `INPUT(varname, channel, filename)` — associate var with file read
-- [ ] 18.2  `OUTPUT(varname, channel, filename)` — associate var with file write
-- [ ] 18.3  Channel read — on `$$ 'varname'` for an input-associated var,
-      read next line from file
-- [ ] 18.4  `ENDFILE(channel)` — close + signal EOF
-- [ ] 18.5  `REWIND(channel)` — seek to start of file
-- [ ] 18.6  `DETACH(varname)` — disassociate variable from channel
-- [ ] 18.7  Re-run Gimpel batch; record new pass count
-- [ ] 18.8  Commit
+`INPUT(var,channel,file)`, `OUTPUT(var,channel,file)`, `ENDFILE`, `REWIND`, `DETACH`.
+Required before Gimpel programs that read input files can run.
 
 ---
 
 ## Sprint 19 — OPSYN & LOAD  ⬜ PLANNED
 
-### Goal
-`OPSYN` (operator/function aliasing) and `LOAD` (external function load).
-Required for several Gimpel programs that redefine operators.
-
-### Tasks
-- [ ] 19.1  `OPSYN(new, old, nargs)` — create alias in INVOKE dispatch table
-- [ ] 19.2  `LOAD(spec, libpath)` — stub that fails gracefully (real DL load
-      is out of scope; many Gimpel SPT versions avoid OPSYN already)
-- [ ] 19.3  Re-run Gimpel batch; record improvement
-- [ ] 19.4  Commit
+`OPSYN(new,old,nargs)` — alias in INVOKE dispatch table.
+`LOAD` — graceful stub (real DL load out of scope).
 
 ---
 
 ## Sprint 20 — Full Validation & Release  ⬜ PLANNED
 
-### Goal
-Passing rate ≥ 80% of Gimpel programs that don't require LOAD.
-Golden corpus ≥ 5 000 programs, all green.
-PLAN.md complete. README written. Tag v1.0.
-
-### Tasks
-- [ ] 20.1  Final Gimpel batch run; triage all remaining failures
-- [ ] 20.2  Final Shafto batch run
-- [ ] 20.3  Generator: depth 5-6, expand corpus to ~6 000
-- [ ] 20.4  All open issues resolved or explicitly deferred with rationale
-- [ ] 20.5  README.md written: what it is, how to run, known limitations
-- [ ] 20.6  Tag v1.0, push
+≥80% Gimpel pass rate (excluding LOAD programs).
+Golden corpus ≥ 5000, all green. README written. Tag v1.0.
 
 ---
 
@@ -398,35 +453,31 @@ PLAN.md complete. README written. Tag v1.0.
 
 > **Read this before every design decision.**
 
-This codebase makes consistent choices that future sessions must honour:
-
-**1. Single-file structure is intentional.**
-`match.clj` contains the entire engine in one loop/case. The `engine`
-function cannot be split across files because `recur` requires all targets
-to be in the same function body. An attempt to refactor was made in Sprint 10
-and immediately reverted. Do not attempt to split the engine again.
+**1. Single-file engine.**
+`match.clj` is one loop/case. Cannot be split — `recur` requires all targets
+in the same function body. Do not attempt to refactor.
 
 **2. Immutable-by-default, mutable-by-atom.**
-Clojure values are immutable. SNOBOL4 mutable containers (TABLE, ARRAY) use
-`atom` as the single point of mutation. All other values (strings, integers,
-patterns) are passed by value. This is correct and intentional.
+TABLE and ARRAY use `atom`. All other values passed by value.
 
 **3. The label/body whitespace contract.**
-SNOBOL4 source is whitespace-sensitive at the statement level: labels are
-flush-left (or at column 1), bodies are indented. Our compiler does NOT strip
-leading whitespace before passing to `parse-statement`. This means subscript
-expressions like `A<3>` only parse as statement subjects when indented.
+Labels flush-left, bodies indented. Compiler does NOT strip leading whitespace.
 Tests must always indent statement bodies.
 
 **4. INVOKE is the single dispatch point.**
-All SNOBOL4 built-in functions go through INVOKE's case table. If you add
-a new function to functions.clj, you must also add a case (both lowercase
-and uppercase) in operators.clj's INVOKE. Do not rely on the default
-`($$ op)` fallthrough for built-ins -- it looks in the user namespace, not
-the library.
+All built-in functions go through INVOKE's case table. Add both lowercase and
+uppercase entries for every new function. Do not rely on `($$ op)` fallthrough.
 
 **5. nil means failure; epsilon means empty string.**
-Throughout the engine and runtime, nil signals pattern match failure or
-statement failure. epsilon (empty string "") is a valid SNOBOL4 value.
-Never confuse the two. array-get returning nil means out-of-bounds;
-table-get returning epsilon means key-not-found.
+nil = match/statement failure. epsilon (`""`) = valid empty SNOBOL4 value.
+
+**6. ALL keywords UPPERCASE.**
+`:S(LABEL)` `:F(LABEL)` `:(RETURN)` `:(END)` — uppercase only, no case folding.
+
+**7. clojure.core/= inside operators.clj.**
+`operators.clj` excludes `clojure.core/=`. Always use `clojure.core/=` or the
+`equal` alias for value comparisons. Bare `=` builds IR lists.
+
+**8. INVOKE args are pre-evaluated.**
+The EVAL! `true` branch calls `(map EVAL! parms)` before `(apply INVOKE op args)`.
+Args arriving in INVOKE are already evaluated. Never call `EVAL!` on them again.
