@@ -293,8 +293,15 @@ on values that came from args.
 | 4 | Charset range expansion — `ANY("A-Z")` treats `-` as literal | primitives.clj |
 | 5 | PDD field write when accessor name shadows Clojure fn (e.g. REAL) | operators.clj |
 | 6 | Goto case folding — Snobol4.Net uses lowercase `:s(label)` which fails our parser | grammar.clj |
+| 7 | DEFINE return value wrong — `square(6)` returns 5, oracle 36; function call succeeds but value is corrupted | operators.clj / runtime.clj |
+| 8 | `~` negation operator broken — `~EQ(5,5)` takes S branch; oracle takes F | operators.clj |
+| 9 | RTAB/RPOS return empty string — `'hello' RTAB(0) . T` captures `""` not `"hello"` | primitives.clj |
+| 10 | Loop fallthrough wrong — `LT(I,5)` after body with I=11 loops instead of falling through | runtime.clj |
 
 Issues 7 and 8 (div-by-zero, pattern replace prefix) were fixed in Sprint 14.
+Session 10 fixes: `divide` now uses `quot` (integer truncation toward zero), verified against v311.sil;
+IDENT/DIFFER now use value equality not reference identity; TRIM now trims trailing only (not leading).
+Operator precedence confirmed from v311.sil DESCR table: `*` (42/41) > `+` (30/29), full table in Key Semantic Notes.
 
 ---
 
@@ -1075,3 +1082,31 @@ it first before doing the subscript read/write.
 ```
 
 This is **Sprint 18C.7** — fix NAME-dereference in subscript operations.
+
+---
+
+## Session 10 Summary (2026-03-08)
+
+**Baseline entering**: 1538 tests / 3360 assertions / 0 failures (commit `c9257af`)
+
+**What happened**:
+1. Completed `test_worm_micro.clj` — 211 tests / 426 assertions, tiered T0–T5
+2. Confirmed operator precedence from **v311.sil DESCR table** (first principles):
+   - Each operator stores `DESCR left-prec, 0, right-prec` at offset `2*DESCR`
+   - `*` = 42/41, `/` = 40/39, `+`/`-` = 30/29, `|` = 10/9, concat = 20/19
+   - Left-prec > right-prec for all binary ops = **left-associative**
+   - `**` = 50/50 = **right-associative**
+   - Grammar was already correct — `2+3*4=14` is RIGHT
+3. **Fixed `divide`**: was `clojure.core//` (returns ratio); now `quot` for integers, verified against oracle
+4. **Fixed IDENT/DIFFER**: was `identical?` (reference); now `equal`/`not=` (value)
+5. **Fixed TRIM**: was `clojure.string/trim` (both sides); now `trimr` (trailing only), verified against oracle
+6. **Token-budget generator design agreed** — tokens count semantic complexity better than chars
+
+**Final state**: 1749 tests / 3786 assertions / **9 failures** (all DEFINE-related, known issue #7)
+
+**Remaining failures** (all DEFINE engine bug):
+- `micro_t4_define_simple_fn`, `micro_t4_define_fn_two_args`, `micro_t4_define_string_fn`
+- `micro_t4_define_with_local` (returns 5 instead of 36)
+- `micro_t4_freturn_on_failure`, `micro_t4_freturn_on_zero_div`
+- `micro_t5_recursive_factorial`
+- Plus issues 8 (~ negation), 9 (RTAB/RPOS), 10 (loop fallthrough) found but not yet fixed
