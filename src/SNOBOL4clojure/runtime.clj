@@ -68,13 +68,13 @@
                   body   (if (map? ferst) seqond ferst)
                   goto   (if (map? ferst) ferst  seqond)]
               (if (EVAL! body)
-                ;; success branch
-                (let [tgt (or (:G goto) (when (contains? goto :S) (:S goto)))]
+                ;; success branch — goto is nil or a map; guard contains? against non-maps
+                (let [tgt (or (when (map? goto) (or (:G goto) (:S goto))))]
                   (if tgt
                     (do (goto! tgt) (recur (saddr tgt)))
                     (recur (saddr (inc (current 0))))))
                 ;; failure branch
-                (let [tgt (or (:G goto) (when (contains? goto :F) (:F goto)))]
+                (let [tgt (or (when (map? goto) (or (:G goto) (:F goto))))]
                   (if tgt
                     (do (goto! tgt) (recur (saddr tgt)))
                     (recur (saddr (inc (current 0)))))))))))

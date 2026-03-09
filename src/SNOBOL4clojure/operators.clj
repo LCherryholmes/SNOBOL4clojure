@@ -314,7 +314,7 @@
                   new-name (clojure.string/upper-case (str new-arg))
                   old-name (clojure.string/upper-case (str old-arg))
                   old-sym  (symbol (str old-arg))
-                  n        (when n-arg (long n-arg))
+                  n        (when (and n-arg (not= n-arg ε)) (long n-arg))
                   old-fn   (or (get @<FUNS> old-name)
                                (if (and n (pos? n))
                                  (if (clojure.core/= n 1)
