@@ -3,7 +3,8 @@
   ;; Stubs are marked clearly; implemented ones are complete.
   (:require [SNOBOL4clojure.env :refer [ε equal out subtract
                                         DATATYPE table? array? table-get table-set
-                                        ARRAY ->SnobolArray array-get array-set]])
+                                        ARRAY ->SnobolArray array-get array-set
+                                        <CHANNELS>]])
   (:refer-clojure :exclude [= + - * / num]))
 
 ;; ── String functions ──────────────────────────────────────────────────────────
@@ -251,19 +252,107 @@
 (defn TIME   []    (System/currentTimeMillis))
 
 ;; ── I/O ───────────────────────────────────────────────────────────────────────
-;; INPUT variable: reading it calls read-line on *in*.
-;; Returns the next line (without newline), or ε at EOF.
+;; Bare INPUT() call (no args): read one line from stdin.
 (defn READ-LINE! []
   (let [line (try (read-line) (catch Exception _ nil))]
     (if (nil? line) ε (str line))))
 
+;; ── Named I/O channel management (Sprint 25D) ────────────────────────────────
+;; SNOBOL4 syntax:
+;;   INPUT(.VAR, unit)              — associate VAR with stdin on unit
+;;   INPUT(.VAR, unit,, 'file')     — open file for input on unit
+;;   OUTPUT(.VAR, unit)             — associate VAR with stdout on unit
+;;   OUTPUT(.VAR, unit,, 'file')    — open file for output on unit
+;;
+;; After association:  reading  $VAR  reads a line from the channel.
+;;                     writing  VAR = val  writes val to the channel.
+;; ENDFILE(unit)  — signal EOF / close channel
+;; DETACH(var)    — disassociate var from its channel
+
+(defn open-input-channel!
+  "Register var-sym as an input channel on unit.
+   filename nil or empty → stdin sentinel (reads via read-line, :file stored as nil).
+   filename provided     → open file as BufferedReader.
+   Returns ε on success, nil on error."
+  [var-sym unit filename]
+  (let [file-str (when (and filename (not (clojure.string/blank? (str filename))))
+                   (str filename))
+        rdr (if file-str
+              (try (java.io.BufferedReader. (java.io.FileReader. file-str))
+                   (catch Exception _ nil))
+              ;; stdin: wrap *in* but mark :file nil so close-channel! won't close it
+              (java.io.BufferedReader. *in*))]
+    (when rdr
+      (let [ch {:type :input :unit unit :var var-sym :reader rdr :file file-str}]
+        (swap! <CHANNELS> assoc var-sym ch)
+        (swap! <CHANNELS> assoc unit    ch)
+        ε))))
+
+(defn open-output-channel!
+  "Register var-sym as an output channel on unit.
+   filename nil or empty → stdout (writes via PrintWriter, :file stored as nil).
+   filename provided     → open file as PrintWriter.
+   Returns ε on success, nil on error."
+  [var-sym unit filename]
+  (let [file-str (when (and filename (not (clojure.string/blank? (str filename))))
+                   (str filename))
+        wtr (if file-str
+              (try (java.io.PrintWriter. (java.io.FileWriter. file-str))
+                   (catch Exception _ nil))
+              ;; stdout: wrap *out* but mark :file nil so close-channel! won't close it
+              (java.io.PrintWriter. *out* true))]
+    (when wtr
+      (let [ch {:type :output :unit unit :var var-sym :writer wtr :file file-str}]
+        (swap! <CHANNELS> assoc var-sym ch)
+        (swap! <CHANNELS> assoc unit    ch)
+        ε))))
+
+(defn close-channel!
+  "Close and deregister a channel by unit number or var symbol."
+  [key]
+  (when-let [ch (get @<CHANNELS> key)]
+    (try
+      (when-let [rdr (:reader ch)] (.close ^java.io.BufferedReader rdr))
+      (when-let [wtr (:writer ch)] (.close ^java.io.PrintWriter    wtr))
+      (catch Exception _ nil))
+    (swap! <CHANNELS> dissoc (:var ch))
+    (swap! <CHANNELS> dissoc (:unit ch))
+    ε))
+
+(defn write-to-channel!
+  "Write val to the output channel registered for var-sym.
+   Returns val on success, nil if no channel registered."
+  [var-sym val]
+  (when-let [ch (get @<CHANNELS> var-sym)]
+    (when (clojure.core/= :output (:type ch))
+      (let [wtr ^java.io.PrintWriter (:writer ch)]
+        (.println wtr (str val))
+        (.flush   wtr)
+        val))))
+
 (defn BACKSPACE [] ε)
-(defn DETACH    [] ε)
+(defn DETACH
+  "DETACH(var) — disassociate var from its I/O channel."
+  ([] ε)
+  ([var-sym]
+   (close-channel! (symbol (str var-sym)))))
+
 (defn EJECT     [] ε)
-(defn ENDFILE   [] ε)
-(defn INPUT     [] (READ-LINE!))   ; bare INPUT() call reads one line
+(defn ENDFILE
+  "ENDFILE(unit) — signal EOF and close the channel on unit."
+  ([] ε)
+  ([unit] (close-channel! unit)))
+
+(defn INPUT     [] (READ-LINE!))   ; bare INPUT() — reads stdin
 (defn OUTPUT    [] ε)
-(defn REWIND    [] ε)
+(defn REWIND
+  "REWIND(unit) — rewind file channel to beginning."
+  ([] ε)
+  ([unit]
+   (when-let [ch (get @<CHANNELS> unit)]
+     (when-let [rdr ^java.io.BufferedReader (:reader ch)]
+       (try (.reset rdr) (catch Exception _ nil)))
+     ε)))
 
 ;; ── Memory stubs ──────────────────────────────────────────────────────────────
 (defn CLEAR   [] ε)

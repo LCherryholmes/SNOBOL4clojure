@@ -9,10 +9,11 @@
               table? table-get table-set
               array? array-get array-set array-prototype
               snobol-return! snobol-freturn! snobol-nreturn!
-              <FUNS> <FDEFS>]]
+              <FUNS> <FDEFS> <CHANNELS>]]
             [SNOBOL4clojure.functions :refer
              [ASCII CHAR DATE TIME REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE SUBSTR
-              ITEM PROTOTYPE CONVERT COPY FIELD SORT RSORT DATA]]
+              ITEM PROTOTYPE CONVERT COPY FIELD SORT RSORT DATA
+              open-input-channel! open-output-channel! close-channel! write-to-channel!]]
             [SNOBOL4clojure.match     :refer [MATCH SEARCH FULLMATCH]]
             [SNOBOL4clojure.patterns  :refer
              [ANY BREAK BREAKX NOTANY SPAN ARBNO FENCE
@@ -208,6 +209,13 @@
                   (when (clojure.core/= N 'OUTPUT)   (println out-val))
                   (when (clojure.core/= N 'TERMINAL) (binding [*out* *err*] (println out-val)))
                   out-val)
+                ;; Named output channel: var is registered as :output → write to channel writer
+                (clojure.core/= :output (:type (get @<CHANNELS> N)))
+                (let [out-val (if (and (list? r) (clojure.core/= (first r) 'SEQ))
+                                (apply str (map #(if (nil? %) "" (str %)) (rest r)))
+                                r)]
+                  (write-to-channel! N out-val)
+                  out-val)
                 :else
                 (let [v (if (and (list? r) (clojure.core/= (first r) 'SEQ))
                           (apply str (map #(if (nil? %) "" (str %)) (rest r)))
@@ -364,6 +372,72 @@
                     meta (get @<FDEFS> (clojure.string/upper-case (str fname)))]
                 (when meta (nth (:locals meta) (dec (long n)) nil)))
     local     (apply INVOKE 'LOCAL args)
+    ;; ── Named I/O channel registration (Sprint 25D) ──────────────────────────
+    ;; Argument conventions across SNOBOL4 implementations (researched 2026-03-08):
+    ;;
+    ;;  Original SNOBOL4 (Green Book / mainframe):
+    ;;    INPUT('name', unit, length)      — 3 args; length=max record len; filename via JCL
+    ;;
+    ;;  Catspaw SNOBOL4+ / Minnesota SNOBOL4 / Burks tutorial (de facto modern standard):
+    ;;    INPUT('name', unit, length, 'file') — 4 args; length=record len (default 80)
+    ;;    INPUT('name', unit,, 'file')        — 4 args, empty length = use default
+    ;;
+    ;;  CSNOBOL4 / SPITBOL (our primary target — Gimpel/AI-SNOBOL corpora):
+    ;;    INPUT('name', unit, options, 'file') — 4 args; arg3 = I/O option string
+    ;;    INPUT(.name, unit,, 'file')          — NAME indirect first arg
+    ;;    INPUT(.name, unit, 'file')           — 3 args (grammar drops empty slot)
+    ;;
+    ;;  SITBOL20 / PDP-10:
+    ;;    INPUT('name', 'device/file', 'format') — 3 args; NO unit number; arg2 = device
+    ;;
+    ;; Our strategy: Catspaw/CSNOBOL4/SPITBOL 4-arg form is the primary target.
+    ;; arg3 (length/options) is stored but currently ignored (safe for Gimpel corpus).
+    ;; Grammar collapses INPUT(.VAR, 5,, 'file') → 3 args by dropping empty arg3 slot.
+    ;; We detect file position by arg count: 2→stdin, 3→file=args[2], 4→file=args[3].
+    ;; A future &IOCOMPAT keyword can switch arg2=device (SITBOL) vs arg2=unit (modern).
+    INPUT     (let [name-arg (first args)
+                    unit     (second args)
+                    filename (case (count args)
+                               2 nil          ; INPUT(.VAR, unit) — stdin
+                               3 (nth args 2) ; INPUT(.VAR, unit, 'file')
+                               4 (nth args 3) ; INPUT(.VAR, unit, reclen, 'file')
+                               nil)
+                    var-sym  (cond
+                               (symbol? name-arg) name-arg
+                               (instance? SNOBOL4clojure.env.NAME name-arg)
+                               (symbol (str (.n ^SNOBOL4clojure.env.NAME name-arg)))
+                               :else (symbol (str name-arg)))]
+                (open-input-channel! var-sym (long (or unit 0)) filename))
+    input     (apply INVOKE 'INPUT args)
+    OUTPUT    (let [name-arg (first args)
+                    unit     (second args)
+                    filename (case (count args)
+                               2 nil
+                               3 (nth args 2)
+                               4 (nth args 3)
+                               nil)
+                    var-sym  (cond
+                               (symbol? name-arg) name-arg
+                               (instance? SNOBOL4clojure.env.NAME name-arg)
+                               (symbol (str (.n ^SNOBOL4clojure.env.NAME name-arg)))
+                               :else (symbol (str name-arg)))]
+                (open-output-channel! var-sym (long (or unit 0)) filename))
+    output    (apply INVOKE 'OUTPUT args)
+    ENDFILE   (close-channel! (first args))
+    endfile   (apply INVOKE 'ENDFILE args)
+    DETACH    (let [v (first args)
+                    sym (cond
+                          (symbol? v) v
+                          (instance? SNOBOL4clojure.env.NAME v) (symbol (str (.n ^SNOBOL4clojure.env.NAME v)))
+                          :else (symbol (str v)))]
+                (close-channel! sym))
+    detach    (apply INVOKE 'DETACH args)
+    REWIND    (let [ch (get @<CHANNELS> (first args))]
+                (when ch
+                  (try (.reset ^java.io.BufferedReader (:reader ch))
+                       (catch Exception _ nil))
+                  ε))
+    rewind    (apply INVOKE 'REWIND args)
     ;; CODE(src) — compile and execute a SNOBOL4 source fragment in the current env.
     ;; Returns nil on success; :F branch taken on compile/runtime error.
     ;; Uses resolve to avoid circular dependency (runtime → operators → compiler).
@@ -428,7 +502,14 @@
       (list? E)
       (let [[op & parms] E]
         (cond
-          (equal op '.)     (let [[P N]   parms] (INVOKE '. (EVAL! P) N))
+          (equal op '.)
+          (let [n (count parms)]
+            (if (clojure.core/= n 1)
+              ;; Unary .VAR — NAME reference (indirect). Return a NAME wrapping the symbol.
+              ;; Do NOT evaluate the arg — we want the symbol itself, not its current value.
+              (NAME. (first parms))
+              ;; Binary P . V — CAPTURE-COND (conditional assignment on match success).
+              (let [[P N] parms] (INVOKE '. (EVAL! P) N))))
           (equal op '$)     (let [[P N]   parms] (INVOKE '$ (EVAL! P) N))
           (equal op '=)     (let [[N R]   parms
                                   ;; If N is a subscript call (container key...),

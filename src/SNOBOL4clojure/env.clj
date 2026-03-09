@@ -40,12 +40,29 @@
 (def  &TRIM      (atom 0))
 (def  &STCOUNT   (atom 0))
 (def  &STLIMIT   (atom 2147483647))
+;; &IOCOMPAT: I/O argument convention selector (Sprint 25D).
+;;   :catspaw  — INPUT('name', unit, length, 'file') — Catspaw/CSNOBOL4/SPITBOL (default)
+;;   :sitbol   — INPUT('name', 'device', 'format')   — SITBOL/PDP-10 (no unit number)
+(def  &IOCOMPAT  (atom :catspaw))
 (def  &UCASE     "ABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 ;; ── I/O channel atoms ────────────────────────────────────────────────────────
 (def  INPUT$     (atom ε))
 (def  OUTPUT$    (atom ε))
 (def  TERMINAL$  (atom ε))
+
+;; ── Named I/O channel registry (Sprint 25D) ──────────────────────────────────
+;; Maps variable symbol → channel descriptor map:
+;;   {:type    :input | :output
+;;    :unit    integer unit number
+;;    :reader  java.io.BufferedReader  (input channels)
+;;    :writer  java.io.PrintWriter     (output channels)
+;;    :file    string filename or nil (nil = stdin/stdout)}
+;;
+;; Also maps unit integer → same descriptor (for ENDFILE/REWIND by unit).
+;;
+;; Cleared by reset-runtime! between test runs.
+(def <CHANNELS> (atom {}))
 
 ;; ── Runtime statement table (used by compiler + runtime) ─────────────────────
 (def  STNO   (atom 0))
@@ -115,10 +132,22 @@
   (ns-resolve (active-ns) (symbol (name N))))
 
 (defn $$ [N]
-  (if (clojure.core/= (symbol (name N)) 'INPUT)
-    (let [line (try (read-line) (catch Exception _ nil))]
-      (if (nil? line) ε (str line)))
-    (if-let [V (reference N)] (var-get V) ε)))
+  (let [sym (symbol (name N))]
+    (cond
+      ;; Named input channel: var registered → read from its BufferedReader
+      (clojure.core/= :input (:type (get @<CHANNELS> sym)))
+      (let [ch  (get @<CHANNELS> sym)
+            rdr ^java.io.BufferedReader (:reader ch)
+            line (try (.readLine rdr) (catch Exception _ nil))]
+        (if (nil? line) nil (str line)))   ; nil = EOF = statement fails (:F branch)
+
+      ;; Plain INPUT variable (no channel): read from *in* (stdin)
+      (clojure.core/= sym 'INPUT)
+      (let [line (try (read-line) (catch Exception _ nil))]
+        (if (nil? line) ε (str line)))
+
+      :else
+      (if-let [V (reference N)] (var-get V) ε))))
 
 ;; ── Variable snapshot ────────────────────────────────────────────────────────
 (defn snapshot!

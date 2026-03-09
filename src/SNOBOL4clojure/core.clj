@@ -42,6 +42,7 @@
 (def  &TRIM      env/&TRIM)
 (def  &STCOUNT   env/&STCOUNT)
 (def  &STLIMIT   env/&STLIMIT)
+(def  &IOCOMPAT  env/&IOCOMPAT)
 (def  &UCASE     env/&UCASE)
 (def  INPUT$     env/INPUT$)
 (def  OUTPUT$    env/OUTPUT$)
@@ -216,3 +217,4 @@
 
 ;; ── Re-export debug/probe API ─────────────────────────────────────────────────
 (def snapshot!  env/snapshot!)
+(def <CHANNELS> env/<CHANNELS>)
