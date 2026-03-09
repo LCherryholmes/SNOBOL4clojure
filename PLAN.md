@@ -27,7 +27,8 @@ compiler from SNOBOL4 source text to a labeled statement table.
 |------|----------|---------------|
 | 2026-03-08 | 220/548/0 | Repo cloned fresh; lein installed; baseline confirmed. PLAN.md rewritten. SPITBOL x64-main.zip and CSNOBOL4 snobol4-2.3.3.tar.gz uploaded and extracted to `/home/claude/spitbol-src/` and `/home/claude/csnobol4-src/`. Eureka grammar-worm harness design documented. |
 | 2026-03-08 (session 4) | 967/2161/0 (after fixes) | Two operator bugs fixed to clear the last test failure. **Bug 1 — SEQ nil-propagation**: vector replacement like `[J+1, LT(J,N)]` was converting nil (LT failure) to `""` via SEQ, so the assignment always succeeded. Fixed in `EVAL!` vector case: `(some nil? evaled)` → return nil. Also guarded `INVOKE '='` with `when-not (nil? r)`. This fixes the canonical SNOBOL4 idiom `J = J + 1  LT(J,N) :F(RETURN)`. **Bug 2 — NAME indirect subscript dereference**: `BSORT(.ARR,1,5)` passes `.ARR` (a NAME); inside BSORT, `A<J>` was subscripting the NAME wrapper instead of `ARR`. Fixed in both subscript read and write dispatch: detect `NAME` instance, call `(.n raw-container)` to get real symbol, `$$` that. Both fixes in `operators.clj`. Commit `fbcde8e`. Full suite: **967 tests / 2161 assertions / 0 failures**. *(Note: test count dropped from 968→967 due to removal of a stale probe_test.clj artifact.)* |
-| 2026-03-08 (Sprint 19) | 2017/4375/0 | **Sprint 19 — Variable shadowing fix.** Root cause 1: `snobol-set!` called `intern()` into the Clojure namespace, mutating engine Vars like `INTEGER`/`REAL` when user programs used those as variable names. Root cause 2: `ns-resolve` on `SNOBOL4clojure.core` for `NAME` returns the `NAME` class (imported deftype), not a Var; `var-get` on a Class throws `ClassCastException`, silently killing function calls with a `NAME` parameter. Fix: `<VARS>` atom (plain `{symbol → value}` map) replaces namespace interning in `env.clj`. `$$` lookup chain: `<VARS>` first, then engine namespace read-only, guarded by `instance? clojure.lang.Var`. `GLOBALS` now takes optional ns arg for API compat but ignores it. `harness.clj` reset-runtime! simplified. `core_test.clj`/`test_env.clj` test fixtures updated to use `snobol-set!` instead of `def`. `t_spitbol.clj` t4 tests unstubbed — now run `testpgms-test4.spt` for real and pass. Origin story traced to `src/snobol4/core.clj` commit `73f1e52` — original design used Clojure `binding` for function parameters, which was always the right model. Commit `9811f5e`. **2017 tests / 4375 assertions / 0 failures.** | **25B** (commit `28db14b`): `LGT`/`lgt` wired into INVOKE case table; 3 catalog tests in `t_missing.clj`. **25A** (commit `41eea5d`): `-INCLUDE` preprocessor — `preprocess-includes` fn in `compiler.clj`; recursive, cycle-safe, case-insensitive; `CODE!`/`CODE`/`CODE-memo`/`compile-to-file`/`CODE-cached` all accept optional `include-path` param (default `["."]`); `prog-include` macro in `test_helpers.clj`; `preprocess-includes` exported from `core.clj`; 5 catalog tests in `t_include.clj`. **25C** (commit `5bd8a38`): `TERMINAL` assignment now writes to `*err*` via `(binding [*out* *err*] ...)`; `run-with-timeout` captures `*err*` into `StringWriter` and returns it as `:stderr` in the result map; 2 catalog tests in `t_terminal.clj`. **25F** (commit `5fbc8ea`): `CODE`/`code` arms added to INVOKE; uses `ns-resolve` to load `compiler/CODE` and `runtime/RUN` at call-time to avoid circular dependency; `:end` signal treated as success; 4 catalog tests in `t_code.clj`. **25D** (named I/O channels): in progress — `<CHANNELS>` atom and updated `$$` in `env.clj`, `open-input-channel!`/`open-output-channel!`/`close-channel!` in `functions.clj`, `INPUT`/`OUTPUT`/`ENDFILE`/`DETACH` arms in INVOKE — but channel registration is not firing correctly during `RUN`; debugging paused to preserve clean baseline. **Stable baseline pushed**: `5fbc8ea`, **1920 tests / 4130 assertions / 0 failures**. |
+| 2026-03-08 (Sprint 19) | 2017/4375/0 | **Sprint 19 — Variable shadowing fix.** Root cause 1: `snobol-set!` called `intern()` into the Clojure namespace, mutating engine Vars like `INTEGER`/`REAL` when user programs used those as variable names. Root cause 2: `ns-resolve` on `SNOBOL4clojure.core` for `NAME` returns the `NAME` class (imported deftype), not a Var; `var-get` on a Class throws `ClassCastException`, silently killing function calls with a `NAME` parameter. Fix: `<VARS>` atom (plain `{symbol → value}` map) replaces namespace interning in `env.clj`. `$$` lookup chain: `<VARS>` first, then engine namespace read-only, guarded by `instance? clojure.lang.Var`. `GLOBALS` now takes optional ns arg for API compat but ignores it. `harness.clj` reset-runtime! simplified. `core_test.clj`/`test_env.clj` test fixtures updated to use `snobol-set!` instead of `def`. `t_spitbol.clj` t4 tests unstubbed — now run `testpgms-test4.spt` for real and pass. Origin story traced to `src/snobol4/core.clj` commit `73f1e52` — original design used Clojure `binding` for function parameters, which was always the right model. Commit `9811f5e`. **2017 tests / 4375 assertions / 0 failures.** | **25B** (commit `28db14b`): `LGT`/`lgt` wired into INVOKE case table; 3 catalog tests in `t_missing.clj`. **25A** (commit `41eea5d`): `-INCLUDE` preprocessor — `preprocess-includes` fn in `compiler.clj`; recursive, cycle-safe, case-insensitive; `CODE!`/`CODE`/`CODE-memo`/`compile-to-file`/`CODE-cached` all accept optional `include-path` param (default `["."]`); `prog-include` macro in `test_helpers.clj`; `preprocess-includes` exported from `core.clj`; 5 catalog tests in `t_include.clj`. **25C** (commit `5bd8a38`): `TERMINAL` assignment now writes to `*err*` via `(binding [*out* *err*] ...)`; `run-with-timeout` captures `*err*` into `StringWriter` and returns it as `:stderr` in the result map; 2 catalog tests in `t_terminal.clj`. **25F** (commit `5fbc8ea`): `CODE`/`code` arms added to INVOKE; uses `ns-resolve` to load `compiler/CODE` and `runtime/RUN` at call-time to avoid circular dependency; `:end` signal treated as success; 4 catalog tests in `t_code.clj`. **25D** (commit `29e3b64`): Named I/O channels complete. `<CHANNELS>` atom in `env.clj`; `open-input-channel!`/`open-output-channel!`/`close-channel!`/`write-to-channel!` in `functions.clj`; `INPUT`/`OUTPUT`/`ENDFILE`/`DETACH`/`REWIND` arms in INVOKE all working. 13 catalog tests in `t_io.clj`. Baseline: **2030 tests / 4403 assertions / 0 failures**. **25E** (commit `e697056`): OPSYN complete. Fixed EVAL! catch-all to check `<FUNS>` for operator overrides before dispatching to built-in INVOKE case table. Binary operator redefinition (`OPSYN('+','SADD',2)`) works. 11 catalog tests in `t_opsyn.clj`. **Stable baseline**: `e697056`, **2033 tests / 4417 assertions / 0 failures**. |
+| 2026-03-09 (session 15) | 2033/4417/0 | **Snapshot & PLAN.md sync.** Container warm. 25D (named I/O) and 25E (OPSYN) confirmed complete from previous session. PLAN.md updated to reflect true baseline. Sprint 21 marked done. Priority order updated. Next: 23E (inline EVAL! in JVM codegen) or remaining Gimpel programs (now unblocked by I/O). |
 
 ---
 
@@ -159,8 +160,8 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Session 13c | `d9e4203` | 1865/4018/0 | **Stage 23B + 23C: Transpiler and Stack Machine.** `transpiler.clj` (335 lines): SNOBOL4 IR → Clojure source; each program becomes a `loop/case` fn in a generated namespace; JVM JIT compiles hot paths to native. Fixed label-slot redirect bug (integer slot 2 missing from case). Validated 500/500 worm programs. Benchmark: 3.5x (loop), 6x (arithmetic). `vm.clj` (326 lines): flat bytecode vector with 7 integer opcodes (HALT/EXEC/EXEC-S/EXEC-F/EXEC-SF/JUMP/SIGNAL), two-pass compiler (PC assignment + instruction emission), `run-vm!` dispatch loop. Validated 1000/1000 worm programs. Benchmark: 5.7x (simple), 2.5x (loop), 4x (branch). All Stage 23B+23C API exported from `core.clj`. Cumulative speedup from cold start: ~190x. |
 | Session 13d | `c185893` | 1865/4018/0 | **Stage 23D: JVM Bytecode Generation.** `jvm_codegen.clj` (366 lines): ASM-generated JVM `.class` bytecode. Each program → one Java class with static `run()` method. JVM Labels + IFNULL/GOTO for branching. Key design: EVAL! stored as IFn field (avoids SNOBOL4clojure.operators in constant pool). `DynamicClassLoader` for loading. class-cache for compile-once semantics. Validated 1000/1000 worm programs. Benchmarks: 7.6x (simple), 3.8x (branch), 1.7x (loop). Bottleneck analysis: loop overhead entirely in EVAL! — Stage 23E will inline arithmetic/assign/cmp to eliminate it. |
 
-**Current baseline**: 1920 tests / 4130 assertions / 0 failures
-**Last confirmed**: 2026-03-08 (session 14)
+**Current baseline**: 2033 tests / 4417 assertions / 0 failures
+**Last confirmed**: 2026-03-09 (session 15)
 
 ### Sprint 18C (step-probe) complete
 
@@ -673,9 +674,9 @@ Required before Gimpel programs that read input files can run.
 
 ---
 
-## Sprint 21 — OPSYN & LOAD  PLANNED
+## Sprint 21 — OPSYN & LOAD  ✅ DONE  commit `e697056`
 
-`OPSYN(new,old,nargs)` — alias in INVOKE dispatch table.
+`OPSYN(new,old,nargs)` — complete. EVAL! catch-all checks `<FUNS>` for operator overrides before built-in INVOKE dispatch. Binary redefinition working. 11 tests in `t_opsyn.clj`.
 `LOAD` — graceful stub (real DL load out of scope).
 
 ---
@@ -1700,10 +1701,10 @@ The AI-SNOBOL programs use `SNOCORE.INC` which introduces several SNOBOL4+ exten
 |---------|-----------|--------|
 | `-PLUSOPS 1` | Enable `+`/`-`/`~` as continuation chars | Partially handled |
 | `-CASE 0` | Case-insensitive matching mode | Stub |
-| `OPSYN(op, fn, n)` | Redefine operator to call function | Error messages exist, not implemented |
+| `OPSYN(op, fn, n)` | Redefine operator to call function | ✅ implemented — commit `e697056` |
 | `CODE(src)` | Compile and execute a string as SNOBOL4 | Stub — most critical |
 | `DATA('CONS(CAR,CDR)')` | User-defined datatype | ✅ implemented |
-| `INPUT(.VAR, unit)` | Named I/O channel (no filename = stdin) | Partial |
+| `INPUT(.VAR, unit)` | Named I/O channel (no filename = stdin) | ✅ implemented — commit `29e3b64` |
 | `TERMINAL` variable | Write to stderr/console bypassing OUTPUT | Stub |
 | `LGT(s1,s2)` | String greater-than | Defined via primitive but **missing from INVOKE** |
 
@@ -1750,15 +1751,14 @@ Beauty.sno itself is complete and self-contained *except* for its 19 `-INCLUDE` 
 - [x] 25F.4 4 catalog tests in `t_code.clj`: output, sees outer env, sets outer env, DEFINE callable.
 - **Implementation note**: uses `ns-resolve` for `compiler/CODE` and `runtime/RUN` at call-time to avoid circular dependency (runtime → operators → compiler).
 
-#### 25D — Named I/O channels: `INPUT(.VAR, unit)` / `INPUT(.VAR, unit,, 'file')`  🔧 IN PROGRESS
-- [ ] 25D.1 Add I/O channel registry (`<CHANNELS>` atom, var-sym → channel map) to `env.clj`. **Done in working branch.**
-- [ ] 25D.2 Implement `INPUT(.VAR, unit)` — assigns VAR as a readable that draws from unit. When unit not opened, defaults to stdin.
-- [ ] 25D.3 Implement `INPUT(.VAR, unit,, 'filename')` — opens file for reading, registers on unit.
-- [ ] 25D.4 `OUTPUT(.VAR, unit)` / `OUTPUT(.VAR, unit,, 'filename')` — output channels.
-- [ ] 25D.5 Reading `$VAR` then reads a line from the associated channel.
-- [ ] 25D.6 `ENDFILE(unit)` / `REWIND(unit)` / `BACKSPACE(unit)` implement properly.
-- [ ] 25D.7 Tests: file read/write, ENDFILE closes channel.
-- **Known bug**: channel registration via `INPUT(.VAR,...)` INVOKE arm is not taking effect during `RUN` — programs timeout. The IR is correct (`(INPUT (. READER) 5 "file")`), `$$` dispatch is correct, but the `<CHANNELS>` atom is empty after the statement runs. Root cause not yet isolated. **Next session: add targeted probe to confirm whether INVOKE `INPUT` arm is reached at runtime, or whether the fallthrough `($$ 'INPUT)` is reading stdin instead.**
+#### 25D — Named I/O channels: `INPUT(.VAR, unit)` / `INPUT(.VAR, unit,, 'file')`  ✅ DONE  commit `29e3b64`
+- [x] 25D.1 `<CHANNELS>` atom (var-sym → channel map) in `env.clj`.
+- [x] 25D.2 `INPUT(.VAR, unit)` — unit defaults to stdin when not opened.
+- [x] 25D.3 `INPUT(.VAR, unit,, 'filename')` — opens file for reading, registers on unit.
+- [x] 25D.4 `OUTPUT(.VAR, unit)` / `OUTPUT(.VAR, unit,, 'filename')` — output channels.
+- [x] 25D.5 `$VAR` reads a line from the associated channel.
+- [x] 25D.6 `ENDFILE(unit)` / `REWIND(unit)` / `DETACH` all working.
+- [x] 25D.7 13 catalog tests in `t_io.clj`. Baseline: **2030 / 4403 / 0**.
 
 ### Priority order for next session
 
@@ -1766,8 +1766,10 @@ Beauty.sno itself is complete and self-contained *except* for its 19 `-INCLUDE` 
 2. ~~**25A**~~ ✅ done  
 3. ~~**25C**~~ ✅ done  
 4. ~~**25F**~~ ✅ done  
-5. **25D** (named I/O) — **start here next session**; fix the channel-registration bug (see Known bug note above), then unlock remaining 6 Gimpel programs
-6. **25E** (OPSYN) — needed for full AI-SNOBOL SNOLISPIST library
+5. ~~**25D**~~ ✅ done — Named I/O channels complete, commit `29e3b64`
+6. ~~**25E**~~ ✅ done — OPSYN complete, commit `e697056`
+
+**Next session**: **23E** (inline EVAL! in JVM codegen) or remaining Gimpel programs now unblocked by I/O.
 
 ### README flagship sequence (once beauty.sno runs)
 
