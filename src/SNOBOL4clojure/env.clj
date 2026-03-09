@@ -98,14 +98,16 @@
 ;; ── Numeric conversion ────────────────────────────────────────────────────────
 (defn num [x]
   (cond
-    (nil? x)     ##NaN
+    (nil? x)     0                        ; unset variable = 0 in arithmetic context
     (double? x)  x
-    (integer? x) x                       ; preserve integer type
-    true (let [s (str x)]
-           (or (try (Long/parseLong s)    ; try integer parse first
-                 (catch NumberFormatException _ nil))
-               (try (Double/parseDouble s)
-                 (catch NumberFormatException _ ##NaN))))))
+    (integer? x) x                        ; preserve integer type
+    true (let [s (clojure.string/trim (str x))]
+           (if (clojure.core/= s "")
+             0                            ; empty string = 0 in arithmetic context
+             (or (try (Long/parseLong s)  ; try integer parse first
+                   (catch NumberFormatException _ nil))
+                 (try (Double/parseDouble s)
+                   (catch NumberFormatException _ ##NaN)))))))
 
 (defn  ncvt [x] (list 'num x))
 (defn  scvt [x] (list 'str x))
@@ -127,13 +129,25 @@
 (def <VARS> (atom {}))
 
 (defn GLOBALS
-  "Reset all SNOBOL4 runtime state for a fresh program run.
-   The ns argument is accepted for API compatibility but ignored —
-   user variables now live in <VARS>, not in any Clojure namespace."
+  "Reset ALL SNOBOL4 runtime state for a fresh program run.
+   Clears variables, functions, code/label tables, I/O channels, and operator synonyms.
+   The ns argument is accepted for API compatibility but ignored."
   ([]
-   (reset! <VARS>  {})
-   (reset! <FUNS>  {})
-   (reset! <FDEFS> {}))
+   (reset! <VARS>    {})
+   (reset! <FUNS>    {})
+   (reset! <FDEFS>   {})
+   ;; Close open file channels before discarding them
+   (doseq [[_ ch] @<CHANNELS>]
+     (try
+       (when-let [rdr (:reader ch)] (.close ^java.io.BufferedReader rdr))
+       (when-let [wtr (:writer ch)] (.close ^java.io.PrintWriter    wtr))
+       (catch Exception _ nil)))
+   (reset! <CHANNELS> {})
+   (reset! <OPSYN>    {})
+   (reset! STNO    0)
+   (reset! <STNO>  {})
+   (reset! <LABL>  {})
+   (reset! <CODE>  {}))
   ([_ns] (GLOBALS)))
 
 ;; ── Variable write / read ─────────────────────────────────────────────────────

@@ -36,9 +36,31 @@
 (defn RUN [at]
   (letfn
     [(skey  [address] (let [[no label] address] (if label label no)))
+     ;; Resolve a goto target to a [stmt-no label] address pair.
+     ;; Target can be:
+     ;;   keyword  :FOO  — label name (from emitter); may actually be a variable
+     ;;                    holding a label name at runtime — try both
+     ;;   string   "FOO" — label name as string (returned by CODE() at runtime)
+     ;;   integer  N     — direct statement number
      (saddr [at]      (cond
-                        (keyword? at) [(@<STNO> at) at]
-                        (string?  at) [(@<STNO> at) at]
+                        (keyword? at)
+                          (or (when-let [n (@<STNO> at)] [n at])
+                              ;; Not a known label — treat as variable name
+                              (let [varname  (name at)
+                                    resolved (EVAL! (symbol varname))]
+                                (cond
+                                  (string?  resolved) (or (when-let [n (@<STNO> (keyword resolved))] [n (keyword resolved)])
+                                                          (when (re-matches #"[0-9]+" resolved)
+                                                            (let [n (Long/parseLong resolved)] [n (@<LABL> n)])))
+                                  (keyword? resolved) [(@<STNO> resolved) resolved]
+                                  (integer? resolved) [resolved (@<LABL> resolved)]
+                                  :else               nil)))
+                        (string?  at) (or (when-let [n (@<STNO> (keyword at))] [n (keyword at)])
+                                          ;; Numeric string (e.g. CODE() returned stmt# as integer, stored as str)
+                                          (when (re-matches #"[0-9]+" at)
+                                            (let [n (Long/parseLong at)]
+                                              [n (@<LABL> n)]))
+                                          [(@<STNO> at) at])
                         (integer? at) [at (@<LABL> at)]))
      (goto! [tgt]
        (if (special-targets tgt)
@@ -67,8 +89,9 @@
                   seqond (second stmt)
                   body   (if (map? ferst) seqond ferst)
                   goto   (if (map? ferst) ferst  seqond)]
-              (if (EVAL! body)
+              (if (or (nil? body) (EVAL! body))
                 ;; success branch — goto is nil or a map; guard contains? against non-maps
+                ;; nil body = no operation = unconditional success (pure-goto statement)
                 (let [tgt (or (when (map? goto) (or (:G goto) (:S goto))))]
                   (if tgt
                     (do (goto! tgt) (recur (saddr tgt)))

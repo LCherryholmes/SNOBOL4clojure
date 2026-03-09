@@ -18,7 +18,7 @@
   jmp       ::=  target
   sjmp      ::=  <'S' | 's'> target
   fjmp      ::=  <'F' | 'f'> target
- <target>   ::=  <'('> expr <')'>
+ <target>   ::=  <'('> expr <')'> | <'<'> expr <'>'>
   comment   ::=  <'*'> #'.*' <eol>
   control   ::=  <'-'> #'[^;\\n]*' <eos>
   eos       ::=  '\\n' | ';'

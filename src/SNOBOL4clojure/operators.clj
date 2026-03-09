@@ -471,19 +471,16 @@
     ;; Returns nil on success; :F branch taken on compile/runtime error.
     ;; Uses resolve to avoid circular dependency (runtime → operators → compiler).
     ;; Sprint 25F.
-    CODE      (let [src     (str (first args))
-                    compile (ns-resolve 'SNOBOL4clojure.compiler 'CODE)
-                    run     (ns-resolve 'SNOBOL4clojure.runtime  'RUN)]
-                (when-not (and compile run)
-                  (throw (ex-info "CODE: compiler/runtime not loaded"
+    CODE      (let [src       (str (first args))
+                    compile-f (ns-resolve 'SNOBOL4clojure.compiler 'CODE)]
+                (when-not compile-f
+                  (throw (ex-info "CODE: compiler not loaded"
                                   {:snobol/signal :error})))
+                ;; Compile src and load statements into the running label/code tables.
+                ;; Returns the entry-point label string (success) or nil (failure).
+                ;; Does NOT execute — caller uses a computed goto to invoke it.
                 (try
-                  (run (compile src))
-                  nil
-                  (catch clojure.lang.ExceptionInfo e
-                    (case (get (ex-data e) :snobol/signal)
-                      :end nil
-                      (throw e)))
+                  (compile-f src)
                   (catch Exception e
                     (throw (ex-info (.getMessage e) {:snobol/signal :error})))))
     code      (apply INVOKE 'CODE args)
