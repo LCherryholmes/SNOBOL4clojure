@@ -91,7 +91,7 @@
      :N         (fn [n]      (symbol n))
      :S         (fn [s]      (subs s 1 (subtract (count s) 1)))
      :I         edn/read-string
-     :R         edn/read-string}
+     :R         (fn [s] (Double/parseDouble s))}
     ast))
 
 (defn parse+emit

@@ -91,9 +91,10 @@
             ([x y & zs] (n-n multiply x y zs)))
 (defn %     ([_x]       η)
             ([_x _y]    η))
+(defn pow-fn [x y] (Math/pow (ncvt x) (ncvt y)))
 (defn !     ([_x]       η)
-            ([x y]      (n-2 'Math/pow x y)))
-(defn **    ([x y]      (n-2 'Math/pow x y)))
+            ([x y]      (pow-fn x y)))
+(defn **    ([x y]      (pow-fn x y)))
 (defn $     ([n]        ($$ n))                       ; unary  — indirection
             ([x y]      (x-2 'CAPTURE-IMM x y))       ; binary — immediate capture
             ([x y & zs] (x-n 'CAPTURE-IMM x y zs)))
@@ -172,6 +173,8 @@
                 (if (every? integer? ns)
                   (apply quot ns)
                   (apply clojure.core// ns))))
+    **      (let [[x y] (map num args)]
+              (Math/pow x y))
     ?       (let [[s p] args] (SEARCH (str s) p))
     =       (let [[N r] args]
               ;; nil replacement = sub-expression failure → statement fails
