@@ -591,12 +591,36 @@ Clojure `deftest` entries from each `.cs` test class.
 
 ---
 
-## Sprint 17 — Shafto AI Corpus  PLANNED
+## Sprint 17 — Shafto AI Corpus  ✅ DONE  commit `7ee7bc1`
 
-`/tmp/aisnobol/` — Wang theorem prover, ATN parser, Kalah, SNOLISPIST.
-Target `WANG.SPT`, `HSORT.SPT`, `ENDING.SPT` first (pure computation).
+### Result
+12 tests / 42 assertions in `test/SNOBOL4clojure/catalog/t_aisnobol.clj`.
+Baseline after: **1973 tests / 4284 assertions / 0 failures**.
+All 12 tests passed on first run. No engine bugs required.
 
-**Prerequisites**: Upload `aisnobol.zip` at session start.
+### Corpus credit
+*Artificial Intelligence Programming in SNOBOL4* by **Michael G. Shafto**.
+Report OCR scanned at Arizona State University by Mark Olsen.
+Edited and corrected by Mark Emmer of Catspaw, Inc.
+SNOLISPIST library typed in by Martin Rice, University of Tennessee.
+Converted to SNOBOL4+ / Macro SPITBOL by Mark Emmer, Catspaw, Inc.
+Distributed with the kind permission of Michael G. Shafto.
+
+### Programs tested
+**HSORT.SNO** — C.A.R. Hoare Quicksort with APPLY-based predicate.
+Shafto's version dispatches comparison via `APPLY(P,V1,V2)` at runtime.
+Tests: lexical ascending (`.LLE`), numeric ascending (`.LE`), two-element
+base case (special path).
+
+**WANG.SNO** — Wang's algorithm for propositional logic theorem proving.
+Adapted from Griswold, Poage & Polonsky, *The SNOBOL4 Programming Language*, pp. 183–185.
+Tests: valid tautology `IMP(NOT(OR(P,Q)),NOT(P))`, its invalid negation,
+trivial `P=>P` axiom, AND-elimination.
+
+**ENDING.SNO** — English word-ending morphology (Winograd 1972 flowchart).
+Tests: -S plurals (DOGS, ROLLS, KISSES), -ING (DANCING, LEAVING, CURLING,
+ROTTING), -ED (DENTED, CURVED, PALED), -EST/-ER (PRETTIEST, NOBLEST),
+identity base forms (LEAN, BASH, PATROL).
 
 ---
 
