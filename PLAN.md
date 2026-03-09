@@ -540,26 +540,37 @@ every grammatical path systematically, running fast enough for CI.
 
 ---
 
-## Sprint 15 — Gimpel Corpus  PARTIAL
+## Sprint 15 — Gimpel Corpus  ✅ DONE  commit `3b86c2c`
 
-### Goal
-Run the ~100 Gimpel SPITBOL algorithms through the harness; record
-pass/fail; fix regressions found.
+### Result
+24 tests / 78 assertions in `test/SNOBOL4clojure/catalog/t_gimpel.clj`.
+Baseline after: **1962 tests / 4243 assertions / 0 failures**.
 
-**Prerequisites**: Upload `gimpel.zip` at session start.
+### Corpus credit
+*Algorithms in SNOBOL4* by **James F. Gimpel**.
+(c) 1976 Bell Telephone Laboratories, Inc.
+(c) 1986, 1998 Catspaw, Inc.
+Program material provided courtesy of Dr. James F. Gimpel.
+Distributed by Catspaw, Inc. — http://www.SNOBOL4.com
 
-### Tasks
-- [ ] 15.1  Include inliner — Clojure fn that recursively expands `-INCLUDE 'file'`
-- [ ] 15.2  Batch runner — iterate all `*.SPT`; run harness; write `reports/gimpel-results.edn`
-- [ ] 15.3  Triage — (a) missing built-in, (b) I/O, (c) OPSYN/LOAD, (d) genuine bug
-- [ ] 15.4  Fix category (d) bugs; iterate
-- [ ] 15.5  Simple standalones that pass -> permanent regression tests
-- [ ] 15.6  Commit
+### Algorithms tested
+Chapters 2–16: UPLO, ROMAN, BASEB, BASE10, SPELL, ORDER, ROTATER,
+COUNT, DIFF, SKIM, AGT, SWAP, REPL, QUOTE, CRACK,
+COMB, PERMUTATION, BSORT, HSORT, FLOOR, SQRT, DECOMB, RANDOM.
 
-### Programs most likely to work (no I/O, no OPSYN)
-`HSORT.INC`, `BSORT.INC`, `MSORT.INC`, `SSORT.INC`, `LSORT.INC`,
-`TSORT.INC`, `FRSORT.INC`, `REVERSE.INC`, `ROMAN.INC`, `HEX.INC`,
-`BASE10.INC`, `BASEB.INC`, `COMB.INC`, `PERM.INC`, factorial variants
+### Engine bugs fixed
+**Bug 1 — `**` (exponentiation) missing from INVOKE dispatch**:
+`operators.clj` defined `**` via `n-2 'Math/pow` which builds a list, but
+the INVOKE case table had no `**` arm.  SQRT.INC uses `Y ** 0.5` and was
+returning unevaluated IR (PersistentList) as the result.
+Fix: add `**` arm to INVOKE; compute via `(Math/pow x y)` directly.
+
+**Bug 2 — Real literals with trailing dot (e.g. `4676.`) not parsed**:
+Grammar rule `R ::= #'[0-9]+\\.[0-9]+'` required ≥1 digit after the decimal.
+SNOBOL4 allows trailing-dot reals like `4676.` and `414971.`; RANDOM.INC
+uses these throughout and was silently returning empty string.
+Fix: grammar.clj — change R regex to `[0-9]+\\.[0-9]*`.
+emitter.clj — use `Double/parseDouble` instead of `edn/read-string`.
 
 ---
 
