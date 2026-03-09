@@ -79,3 +79,22 @@ Needed for full AI-SNOBOL SNOLISPIST library.
 2. **Sprint 25D** — named I/O channels: fix channel-registration bug in `env.clj`/`operators.clj`. See PLAN.md Sprint 25D notes. Unlocks remaining 6 Gimpel programs.
 3. **Sprint 25E** — OPSYN — needed for full AI-SNOBOL SNOLISPIST library.
 4. **beauty.sno** — the flagship. Needs `-INCLUDE` files from Lon + Sprint 25D I/O.
+
+---
+
+## Backend acceleration — planned stages
+
+Four backends exist (23A–23D). Five more are planned. See PLAN.md Stage 23F–23J for full design notes.
+
+| Stage | What | Status |
+|-------|------|--------|
+| 23E — Inline EVAL! | Emit arithmetic/assign/cmp directly into JVM bytecode; eliminate IFn.invoke overhead on hot loops | **NEXT after corpus work** |
+| 23F — Compiled pattern engine | Compile specific pattern objects to Java methods; short-circuit the 405-line `engine` loop | PLANNED |
+| 23G — Integer unboxing | Emit `long` primitives for provably-integer variables; eliminate boxing/GC pressure | PLANNED |
+| 23H — AOT .jar corpus cache | Write transpiled programs as `.clj` files, AOT-compile to `.class`; skip re-transpile on repeated runs | PLANNED |
+| 23I — Parallel worm runner | `pmap` across worm batch and test suite; near-linear core scaling | PLANNED |
+| 23J — GraalVM native-image | Standalone binary, 10ms startup, no JVM; Truffle AST as ultimate vision | VISION |
+
+**Key insight not captured before**: all of 23A–23D are execution-layer
+optimisations. None touch `match.clj`. For pattern-heavy SNOBOL4 the `engine`
+loop is the real ceiling — 23F addresses this.

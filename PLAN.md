@@ -934,10 +934,141 @@ performance optimisation that must produce identical output on every test.
 | 23C — Stack machine | 2 sessions | 2-5x + clean IR | Transpiler working | **DONE** commit `d9e4203` — 2-6x, 1000/1000 worm validation |
 | 23D — JVM bytecode gen | 3-4 sessions | 10-100x | Stack machine working | **DONE** commit `c185893` — 7.6x dispatch, 1.3-7.6x programs; EVAL! still bottleneck |
 | 23E — Inline EVAL! (AOT expr codegen) | 2-3 sessions | 10-50x on loops | JVM codegen working | **NEXT** — eliminate EVAL! for arith/assign/cmp |
+| 23F — Compiled pattern engine | 3-4 sessions | 5-20x pattern-heavy | 23E working | **PLANNED** — see below |
+| 23G — Integer unboxing | 1-2 sessions | 2-5x numeric loops | 23F working | **PLANNED** — see below |
+| 23H — AOT .jar corpus cache | 1 session | eliminate re-transpile | 23E working | **PLANNED** — see below |
+| 23I — Parallel worm/test runner | 1 session | Nx wall-clock test speed | any backend | **PLANNED** — see below |
+| 23J — GraalVM native-image | 2-3 sessions | 10ms startup, no JVM | 23E working | **VISION** — see below |
 
 **Start with 23A** — it is pure mechanical work (add serialisation to existing
 IR), delivers immediate speedup to every test run, and exercises the full IR
 structure as a validation step before building the compiler.
+
+---
+
+### Stage 23F — Compiled Pattern Engine  PLANNED
+
+**The gap**: all four existing backends (23A–23D) are execution-layer
+optimisations. None of them touch `match.clj`. Every SNOBOL4 program that
+does real pattern matching still drives the 405-line `engine` loop — a
+generic state machine that interprets every pattern node at runtime via a
+`case` on keyword tags.
+
+For pattern-heavy SNOBOL4 (which is most real SNOBOL4), the `engine` loop
+is the ceiling. 23E inlines arithmetic; 23F inlines pattern matching.
+
+**The idea**: a specific pattern object — say `(SEQ (LEN# 3) (ANY$ "aeiou"))` —
+is currently interpreted node-by-node on every `MATCH` call. Instead, compile
+that pattern *once* to a Java method that directly advances the cursor, checks
+characters, and returns a match position. The method is a real JVM method —
+JIT-compiled, inlined, branch-predicted.
+
+**What changes**:
+- New `pattern_codegen.clj`: walks a pattern IR tree, emits JVM bytecode for
+  a `boolean match(String subject, int pos)` method.
+- Simple primitives first: `LEN#`, `LIT$`, `ANY$`, `SPAN$`, `BREAK$` —
+  these are tight character loops, ideal for JIT.
+- Composites: `SEQ`, `ALT` — emit sequential / branching bytecode.
+- Complex nodes (`ARBNO`, `FENCE`, `BAL`) keep falling back to the interpreter.
+- `match.clj` `engine` unchanged — compiled patterns short-circuit to their
+  Java method; uncompiled patterns fall through to the existing loop.
+
+**Gate condition**: 23E (inline EVAL!) must be working first — otherwise the
+bottleneck remains in `EVAL!`, not in pattern matching.
+
+**Acceptance criterion**: `gimpel-bsort`, `t_patterns_adv`, and `t_spitbol`
+test2 run through the compiled pattern path and produce identical output.
+Benchmark target: 5× improvement on pattern-dominated programs.
+
+---
+
+### Stage 23G — Integer Unboxing  PLANNED
+
+**The gap**: SNOBOL4 variables are dynamically typed but most real loops
+(`I = I + 1 / LT(I,N) :S(LOOP)`) use integers exclusively. Every backend
+today stores integers as boxed `java.lang.Long` objects — heap-allocated,
+GC pressure, cache misses.
+
+**The idea**: at the JVM codegen level (23D/23E), detect when a variable is
+provably integer throughout a loop — either by type inference over the IR, or
+by a simple declaration hint from the programmer (`&INTEGER I J K`). Emit
+`long` local variables and `LLOAD`/`LSTORE`/`LADD` bytecodes instead of
+`ALOAD`/`INVOKEVIRTUAL Long.intValue`.
+
+**Effort**: type inference over SNOBOL4 IR is hard in general (dynamic
+assignment from INPUT, CONVERT, etc.). A simpler approach: opt-in annotation,
+or infer only within a single basic block. Either gives most of the win.
+
+**Benchmark target**: integer-only counting loops approach Java `for` loop speed.
+
+---
+
+### Stage 23H — AOT .jar Corpus Cache  PLANNED
+
+**The gap**: the transpiler (23B) emits Clojure source that is `eval`'d at
+runtime into a fresh namespace. This work is discarded on JVM exit. Every
+`lein test` re-transpiles every test program from scratch.
+
+**The idea**: wire `transpile-ir` to also write `.clj` files under
+`target/snobol-cache/`, named by content hash. `lein compile` AOT-compiles
+them to `.class` files. On the next run, if the hash matches, load the `.class`
+directly — no parse, no emit, no transpile, no `eval`.
+
+**Synergy with 23A**: 23A caches the IR (skip grammar+emitter). 23H caches the
+compiled class (skip transpiler+eval). Together they make repeated test runs
+essentially free for unchanged programs.
+
+**Implementation**: `compiler.clj` `CODE-cached` extended with a `:class` tier
+above the existing `:edn` tier.
+
+---
+
+### Stage 23I — Parallel Worm / Test Runner  PLANNED
+
+**The gap**: `run-worm-batch`, `run-systematic-batch`, and `lein test` are
+entirely sequential. The machine has multiple cores; we use one.
+
+**The idea**: `pmap` (or `core.async` pipeline) across the worm corpus. Each
+program is independent — no shared mutable state between runs (each calls
+`GLOBALS` in its own thread). The harness already has per-run timeout via
+`future`; parallelism is safe.
+
+**Expected gain**: near-linear with core count for batch runs. A 4-core machine
+runs the 4,705-program systematic batch in ~¼ the wall-clock time.
+
+**One caveat**: `lein test` itself is not trivially parallelised (Clojure test
+runner is sequential by default). Use `eftest` or `kaocha` with parallel runner
+for the deftest suite.
+
+---
+
+### Stage 23J — GraalVM Native Image  VISION
+
+**The idea**: compile the entire SNOBOL4clojure engine — Clojure runtime,
+pattern engine, all backends — to a standalone native binary via
+`native-image`. No JVM startup (10ms vs 500ms), no JIT warmup, no
+classloader. The binary is a self-contained SNOBOL4 interpreter.
+
+**Why this matters**: `echo "program" | snobol4clojure` today takes ~500ms
+before the first statement executes. A native binary makes SNOBOL4clojure
+usable as a Unix filter — the same use case as `awk` or `sed`.
+
+**Challenges**:
+- Clojure's heavy use of reflection and dynamic class loading requires
+  GraalVM `reflect-config.json` and `resource-config.json` metadata.
+- The `eval`-based transpiler (23B) and `DynamicClassLoader` (23D) are
+  fundamentally incompatible with native-image's closed-world assumption.
+  Those backends would be disabled in the native build; only the interpreter
+  (23A) and possibly the VM (23C) would be included.
+- instaparse (grammar.clj) uses reflection — needs native-image config.
+
+**Gate condition**: not worth attempting until the interpreter is feature-complete
+(beauty.sno runs). Native-image is a packaging concern, not a correctness concern.
+
+**Truffle alternative**: rewrite `match.clj` engine as a Truffle AST interpreter.
+GraalVM's partial evaluator then auto-generates a JIT compiler for it — this is
+the path TruffleRuby / FastR / Graal.js took. Very high effort, very high payoff.
+Noted here as the ultimate vision; not a near-term sprint.
 
 ---
 
