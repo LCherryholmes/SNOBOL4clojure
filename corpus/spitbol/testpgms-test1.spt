@@ -1,6 +1,8 @@
 -TITLE SPITBOL TEST PROGRAM #1 -- DIAGNOSTICS PHASE ONE
+*
 *        THIS IS A STANDARD TEST PROGRAM FOR SPITBOL WHICH TESTS
 *        OUT FUNCTIONS, OPERATORS AND DATATYPE MANIPULATIONS
+*
          &DUMP = 2
          TRACE(.TEST)
          &TRACE = 1000000
@@ -14,11 +16,15 @@
          OUTPUT = '****  ANY TRACE OUTPUT INDICATES AN ERROR   ****'
          OUTPUT = '************************************************'
 -EJECT
+*
 *        TEST REPLACE FUNCTION
+*
          TEST = DIFFER(REPLACE('AXXBYYY','XY','01'),'A00B111') STARS
          A = REPLACE(&ALPHABET,'XY','AB')
          TEST = DIFFER(REPLACE('AXY',&ALPHABET,A),'AAB') STARS
+*
 *        TEST LPAD,RPAD FUNCTIONS
+*
          TEST = DIFFER(LPAD('ABC',5,'X'),'XXABC') STARS
          TEST = DIFFER(RPAD('ABC',5,'X'),'ABCXX') STARS
          TEST = DIFFER(LPAD(12,5),'   12') STARS
@@ -28,23 +34,31 @@
          TEST = DIFFER(LPAD('AB',2),'AB') STARS
          TEST = DIFFER(LPAD()) STARS
          TEST = DIFFER(LPAD(,5),'     ') STARS
+*
 *        TEST CONVERT FUNCTION
+*
          TEST = DIFFER(CONVERT('12','INTEGER') , 12) STARS
          TEST = DIFFER(CONVERT(2.5,'INTEGER'),2)       STARS
          TEST = DIFFER(CONVERT(2,'REAL'),2.0) STARS
          TEST = DIFFER(CONVERT('.2','REAL'),0.2) STARS
 -EJECT
+*
 *        TEST REVERSE FUNCTION
+*
          TEST = DIFFER(REVERSE('123'),'321') STARS
          TEST = DIFFER(REVERSE()) STARS
          TEST = DIFFER(REVERSE(12),'21') STARS
+*
 *        TEST DATATYPE FUNCTION
+*
          TEST = DIFFER(DATATYPE('JKL'),'STRING') STARS
          TEST = DIFFER(DATATYPE(12),'INTEGER') STARS
          TEST = DIFFER(DATATYPE(1.33),'REAL') STARS
          TEST = DIFFER(DATATYPE(NULL),'STRING') STARS
 -EJECT
+*
 *        TEST ARITHMETIC OPERATORS
+*
          TEST = DIFFER(3 + 2,5) STARS
          TEST = DIFFER(3 - 2,1) STARS
          TEST = DIFFER(3 * 2,6) STARS
@@ -64,31 +78,42 @@
          TEST = DIFFER(3.0 / 2.0,1.5) STARS
          TEST = DIFFER(3.0 ** 3,27.0) STARS
          TEST = DIFFER(-1.0,0.0 - 1.0) STARS
+*
 *        TEST MIXED MODE
+*
          TEST = DIFFER(1 + 2.0,3.0) STARS
          TEST = DIFFER(3.0 / 2,1.5) STARS
 -EJECT
+*
 *        TEST FUNCTIONS
+*
 *        FIRST, A SIMPLE TEST OF A FACTORIAL FUNCTION
+*
          DEFINE('FACT(N)')                  :(FACTEND)
 FACT     FACT = EQ(N,1) 1         :S(RETURN)
          FACT = N * FACT(N - 1)             :(RETURN)
 FACTEND  TEST = NE(FACT(5),120) STARS
          TEST = DIFFER(OPSYN(.FACTO,'FACT')) STARS
          TEST = DIFFER(FACTO(4),24) STARS
+*
 *        SEE IF ALTERNATE ENTRY POINT WORKS OK
+*
          DEFINE('FACT2(N)',.FACT2ENT)       :(FACT2ENDF)
 FACT2ENT FACT2 = EQ(N,1) 1        :S(RETURN)
          FACT2 = N * FACT2(N - 1) :(RETURN)
 FACT2ENDF OUTPUT = NE(FACT(6),720) STARS
+*
 *        TEST FUNCTION REDEFINITION AND CASE OF ARGUMENT = FUNC NAME
+*
          TEST = DIFFER(DEFINE('FACT(FACT)','FACT3')) STARS
 .                                           :(FACT2END)
 FACT3    FACT = NE(FACT,1) FACT * FACT(FACT - 1)
 .                                           :(RETURN)
 FACT2END
          TEST = NE(FACT(4),24) STARS
+*
 *        TEST OUT LOCALS
+*
          DEFINE('LFUNC(A,B,C)D,E,F')        :(LFUNCEND)
 LFUNC    TEST = !(IDENT(A,'A') IDENT(B,'B') IDENT(C,'C')) STARS
          TEST = !(IDENT(D) IDENT(E) IDENT(F)) STARS
@@ -101,7 +126,9 @@ LFUNCEND AA = 'A' ; BB = 'B' ; CC = 'C'
          TEST = !(IDENT(A,'X') IDENT(B,'Y') IDENT(C,'Z')) STARS
          TEST = !(IDENT(AA,'A') IDENT(BB,'B') IDENT(CC,'C')) STARS
          TEST = !(IDENT(D,'D') IDENT(E,'E') IDENT(F,'F')) STARS
+*
 *        TEST NRETURN
+*
          DEFINE('NTEST()')                  :(ENDNTEST)
 NTEST    NTEST = .A                         :(NRETURN)
 ENDNTEST A = 27
@@ -111,18 +138,26 @@ ENDNTEST A = 27
 .              :F(ST60)            ;ST60
          TEST = DIFFER(A,26) STARS
 -EJECT
+*
 *        CONTINUE TEST OF FUNCTIONS
+*
+*
 *        TEST FAILURE RETURN
+*
          DEFINE('FAILURE()')                :(FAILEND)
 FAILURE                           :(FRETURN)
 FAILEND  TEST = FAILURE() STARS
 -EJECT
+*
 *        TEST OPSYN FOR OPERATORS
+*
          OPSYN('@',.DUPL,2)
          OPSYN('|',.SIZE,1)
          TEST = DIFFER('A' @ 4,'AAAA') STARS
          TEST = DIFFER(|'STRING',6) STARS
+*
 *        TEST OUT ARRAY FACILITY
+*
          A = ARRAY(3)
          TEST = DIFFER(A<1>) STARS
          A<2> = 4.5
@@ -145,7 +180,9 @@ FAILEND  TEST = FAILURE() STARS
          TEST = ?D<-2,1> STARS
          TEST = ?D<2,1> STARS
 -EJECT
+*
 *        TEST PROGRAM DEFINED DATATYPE FUNCTIONS
+*
          DATA('NODE(VAL,LSON,RSON)')
          A = NODE('X','Y','Z')
          TEST = DIFFER(DATATYPE(A),'NODE') STARS
@@ -155,14 +192,18 @@ FAILEND  TEST = FAILURE() STARS
          LSON(B) = A
          TEST = DIFFER(RSON(LSON(B)),'Z') STARS
          TEST = DIFFER(VALUE('B'),B) STARS
+*
 *        TEST MULTIPLE USE OF FIELD FUNCTION NAME
+*
          DATA('CLUNK(VALUE,LSON)')
          TEST = DIFFER(RSON(LSON(B)),'Z') STARS
          TEST = DIFFER(VALUE('B'),B) STARS
          C = CLUNK('A','B')
          TEST = DIFFER(LSON(C),'B') STARS
 -EJECT
+*
 *        TEST NUMERICAL PREDICATES
+*
          TEST = LT(5,4) STARS
          TEST = LT(4,4) STARS
          TEST = !LT(4,5) STARS
@@ -191,21 +232,29 @@ FAILEND  TEST = FAILURE() STARS
          TEST = NE('12',12.0) STARS
          TEST = !CONVERT(BAL,'PATTERN') STARS
 -EJECT
+*
 *        TEST INTEGER
+*
          TEST = INTEGER('ABC') STARS
          TEST = !INTEGER(12) STARS
          TEST = !INTEGER('12') STARS
+*
 *        TEST SIZE
+*
          TEST = NE(SIZE('ABC'),3) STARS
          TEST = NE(SIZE(12),2) STARS
          TEST = NE(SIZE(NULL),0) STARS
+*
 *        TEST LGT
+*
          TEST = LGT('ABC','XYZ') STARS
          TEST = LGT('ABC','ABC') STARS
          TEST = !LGT('XYZ','ABC') STARS
          TEST = LGT(NULL,'ABC') STARS
          TEST = !LGT('ABC',NULL) STARS
+*
 *        TEST INDIRECT ADDRESSING
+*
          TEST = DIFFER($'BAL',BAL) STARS
          TEST = DIFFER($.BAL,BAL) STARS
          $'QQ' = 'X'
@@ -215,7 +264,9 @@ FAILEND  TEST = FAILURE() STARS
          A<2> = 'X'
          TEST = DIFFER($.A<2>,'X') STARS
 -EJECT
+*
 *        TEST CONCATENATION
+*
          TEST = DIFFER('A' 'B','AB')        STARS
          TEST = DIFFER('A' 'B' 'C','ABC') STARS
          TEST = DIFFER(1 2,'12') STARS
@@ -223,7 +274,9 @@ FAILEND  TEST = FAILURE() STARS
          TEST = DIFFER(1 3.4,'13.4') STARS
          TEST = DIFFER(BAL NULL,BAL)        STARS
          TEST = DIFFER(NULL BAL,BAL) STARS
+*
 *        TEST DREALS
+*
          TEST = DIFFER(1.0D2 + 2.0D2,3.0D2) STARS
          TEST = DIFFER(2.5D0 * 2.0D0,5.00D0) STARS
          TEST = DIFFER(3.0D0 / 3.0D0,1.0D0) STARS
@@ -234,15 +287,21 @@ FAILEND  TEST = FAILURE() STARS
          TEST = DIFFER(3 + 1.0D0,4.0D0) STARS
          TEST = DIFFER(3.0D0 ** 3,27.0D0) STARS
 -EJECT
+*
 *        TEST REMDR
+*
          TEST = DIFFER(REMDR(10,3),1) STARS
          TEST = DIFFER(REMDR(11,10),1) STARS
+*
 *        TEST DUPL
+*
          TEST = DIFFER(DUPL('ABC',2),'ABCABC') STARS
          TEST = DIFFER(DUPL(NULL,10),NULL) STARS
          TEST = DIFFER(DUPL('ABCDEFG',0),NULL) STARS
          TEST = DIFFER(DUPL(1,10),'1111111111')  STARS
+*
 *        TEST TABLE FACILITY
+*
          T = TABLE(10)
          TEST = DIFFER(T<'CAT'>) STARS
          T<'CAT'> = 'DOG'
@@ -255,7 +314,9 @@ FAILEND  TEST = FAILURE() STARS
          ATA = CONVERT(TA,'TABLE')
          TEST = DIFFER(ATA<7>,45) STARS
          TEST = DIFFER(ATA<'CAT'>,'DOG') STARS
+*
 *        TEST ITEM FUNCTION
+*
          AAA = ARRAY(10)
          ITEM(AAA,1) = 5
          TEST = DIFFER(ITEM(AAA,1),5) STARS
@@ -269,7 +330,9 @@ FAILEND  TEST = FAILURE() STARS
          AMA<2,1,2,1> = 2121
          TEST = DIFFER(ITEM(AMA,2,1,2,1),2121) STARS
 -EJECT
+*
 *        TEST EVAL
+*
          EXPR = *('ABC' 'DEF')
          TEST = DIFFER(EVAL(EXPR),'ABCDEF') STARS
          Q = 'QQQ'
@@ -277,31 +340,41 @@ FAILEND  TEST = FAILURE() STARS
          TEST = DIFFER(EVAL(SEXP),'QQQ') STARS
          FEXP = *IDENT(1,2)
          TEST = EVAL(FEXP) STARS
+*
 *        TEST SUBSTR
+*
          TEST = DIFFER(SUBSTR('ABC',2,1),'B') STARS
          TEST = DIFFER(SUBSTR('ABCDEF',1,5),'ABCDE') STARS
          TEST = SUBSTR('ABC',50,1) STARS
          TEST = SUBSTR('ABC',81,50) STARS
          TEST = SUBSTR(NULL,1,1) STARS
+*
 *        TEST ARG
+*
 JLAB     DEFINE('JLAB(A,B,C)D,E,F')
          TEST = DIFFER(ARG(.JLAB,1),'A') STARS
          TEST = DIFFER(ARG(.JLAB,3),'C') STARS
          TEST = ARG(.JLAB,0) STARS
          TEST = ARG(.JLAB,4) STARS
+*
 *        TEST LOCAL
+*
          TEST = DIFFER(LOCAL(.JLAB,1),'D') STARS
          TEST = DIFFER(LOCAL(.JLAB,3),'F') STARS
          TEST = LOCAL(.JLAB,0) STARS
          TEST = LOCAL(.JLAB,4) STARS
+*
 *        TEST APPLY
+*
          TEST = APPLY(.EQ,1,2) STARS
          TEST = !APPLY(.EQ,1,1) STARS
          TEST = !APPLY(.EQ,0) STARS
          TEST = !APPLY(.EQ,1,1,1) STARS
          TEST = !IDENT(APPLY(.TRIM,'ABC '),'ABC') STARS
 -EJECT
+*
 *        FINAL PROCESSING
+*
          OUTPUT = '************************************************'
          DIAGNOSTICS = 1000000 - &TRACE
          EQ(DIAGNOSTICS,0)        :S(TERMINATE)
@@ -315,9 +388,12 @@ TERMINATE OUTPUT = '**** N O     E R R O R S    D E T E C T E D ****'
          OUTPUT = '**** E N D    O F     D I A G N O S T I C S ****'
          OUTPUT = '************************************************'
  :(END)
+*
 *        ERROR HANDLING ROUTINE
+*
 ERRORS   OUTPUT = '****  ERROR AT '
 .        LPAD(&LASTNO,4)   '      &ERRTYPE = ' LPAD(&ERRTYPE,7,' ')
 .                                           ' ****'
          &TRACE = &TRACE - 1
          SETEXIT(.ERRORS)                   :(CONTINUE)
+END

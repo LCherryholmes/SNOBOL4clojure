@@ -1,14 +1,22 @@
+./*
 -TITLE SPITBOL TEST PROGRAM #4 -- SYNTACTIC RECOGNIZER FOR SPITBOL
+*
 *        THIS PROGRAM IS A SYNTACTIC RECOGNIZER FOR SPITBOL STATEMENTS
+*
 *      FIRST A SERIES OF PATTERNS IS BUILD CULMINATING IN A PATTERN
 *      WHICH MATCHES ONLY SYNTACTICALLY CORRECT STATEMENTS.  CARD IMAGES
 *      ARE THEN READ IN AND PROCESSED.  INCORRECT STATEMENTS ARE
 *      IDENTIFIED BY AN ERROR MESSAGE.
+*
 *      THE FUNCTION OPT FORMS A PATTERN THAT MATCHES EITHER NULL OR ITS
 *      ARGUMENT.
+*
          DEFINE('OPT(PATTERN)')
+*
          LETTERS   =   'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+*
 *      ON THE IBM SYSTEM/360 LETTERS INCLUDE LOWER CASE AS WELL.
+*
          DIGITS   =   '0123456789'
          ALPHANUMERICS   =   LETTERS DIGITS
          BLANKS   =   SPAN(' ')
@@ -46,18 +54,24 @@
          EOS   =   RPOS(0) | ';'
          STATEMENT   =   LABEL_FIELD RULE GOTO_FIELD EOS
 -EJECT
+*
 *      THE PATTERN FOR RECOGNIZING STATEMENTS IS NOW FORMED.  THE
 *      PROGRAM TO ANALYZE INPUT CARDS FOLLOWS.
+*
          COMMENT   =   ANY('*-')
          CONTINUE   =   ANY('.+') . CC
          &ANCHOR   =   1
          &FULLSCAN   =   1
          EOF   =
          INPUT(.INPUT,,72)
+*
 *      INITIALIZE PROCESS FROM FIRST CARD.
+*
 READI    IMAGE   =   TRIM(INPUT)                       :F(END)
          OUTPUT   =   '     ' IMAGE
+*
 *        DO NOT PROCESS COMMENT OR CONTINUE CARDS.
+*
          IMAGE   COMMENT                               :F(READC)S(READI)
 NEXTST   IDENT(EOF)                                    :F(END)
          OUTPUT   =   '     ' LINE
@@ -71,10 +85,16 @@ ANALYZE  IMAGE   STATEMENT   =                         :F(ERROR)
          DIFFER(IMAGE)                                 :S(ANALYZE)
          OUTPUT   =   '<<< NO SYNTACTIC ERROR >>>'
 SKIP     OUTPUT   =                                    :(NEXTST)
+*
 *      IF AN ERRONEOUS STATEMENT IS  ENCOUNTERED IN A STRING OF
 *      STATEMENTS SEPARATED BY SEMICOLONS, SUBSEQUENT STATEMENTS ARE
 *      NOT PROCESSED.
+*
 ERROR    OUTPUT   =   '<<< SYNTACTIC ERROR >>>'        :(SKIP)
+*
 PRINT    OUTPUT   =   '     ' LINE                     :(READC)
 ENDGAME  EOF   =   1                                   :(ANALYZE)
+*
+*
 OPT      OPT   =   NULL | PATTERN                      :(RETURN)
+END
