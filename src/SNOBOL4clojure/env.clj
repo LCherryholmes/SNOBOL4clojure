@@ -64,6 +64,13 @@
 ;; Cleared by reset-runtime! between test runs.
 (def <CHANNELS> (atom {}))
 
+;; <OPSYN>: operator/function synonym table (Sprint 25E).
+;; Maps new-sym → {:target old-sym :arity n}
+;;   :arity 0 = function synonym (no-op on arity, just alias)
+;;   :arity 1 = unary operator redefinition
+;;   :arity 2 = binary operator redefinition
+(def <OPSYN> (atom {}))
+
 ;; ── Runtime statement table (used by compiler + runtime) ─────────────────────
 (def  STNO   (atom 0))
 (def <STNO>  (atom {}))

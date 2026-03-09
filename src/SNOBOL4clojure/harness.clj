@@ -96,7 +96,8 @@
   (reset! env/<LABL> {})
   (reset! env/<CODE> {})
   (reset! env/<FUNS> {})
-  (reset! env/<CHANNELS> {}))
+  (reset! env/<CHANNELS> {})
+  (reset! env/<OPSYN>    {}))
 
 (defn run-clojure
   "Run src through SNOBOL4clojure. Returns {:stdout :stderr :exit :thrown}.

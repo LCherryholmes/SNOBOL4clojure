@@ -9,7 +9,7 @@
               table? table-get table-set
               array? array-get array-set array-prototype
               snobol-return! snobol-freturn! snobol-nreturn!
-              <FUNS> <FDEFS> <CHANNELS>]]
+              <FUNS> <FDEFS> <CHANNELS> <OPSYN>]]
             [SNOBOL4clojure.functions :refer
              [ASCII CHAR DATE TIME REMDR INTEGER REAL STRING SIZE TRIM DUPL REVERSE LPAD RPAD REPLACE SUBSTR
               ITEM PROTOTYPE CONVERT COPY FIELD SORT RSORT DATA
@@ -301,6 +301,32 @@
                                {:params params :locals locals})
                 ε))
     define  (apply INVOKE 'DEFINE args)
+    ;; ── OPSYN(new, old, n) ── Sprint 25E ─────────────────────────────────────────────
+    ;; Makes 'new' a synonym for 'old'.  n omitted/0=function, 1=unary op, 2=binary op.
+    ;; Stores a wrapper fn in <FUNS> under uppercase new-name so the INVOKE fallthrough
+    ;; arm dispatches to it automatically (it already checks <FUNS> by upper-case key).
+    ;; For operator synonyms (n=1/2), also index under the raw symbol string.
+    ;; Always succeeds (even if old is unknown — wraps to no-op fn).
+    OPSYN   (let [[new-arg old-arg n-arg] args
+                  new-name (clojure.string/upper-case (str new-arg))
+                  old-name (clojure.string/upper-case (str old-arg))
+                  old-sym  (symbol (str old-arg))
+                  n        (when n-arg (long n-arg))
+                  old-fn   (or (get @<FUNS> old-name)
+                               (if (and n (pos? n))
+                                 (if (clojure.core/= n 1)
+                                   (fn [a]   (INVOKE old-sym a))
+                                   (fn [a b] (INVOKE old-sym a b)))
+                                 (fn [& a] (apply INVOKE old-sym (vec a)))))]
+              (swap! <FUNS> assoc new-name old-fn)
+              (when (and n (pos? n))
+                (swap! <FUNS> assoc (str new-arg) old-fn))
+              ε)
+    opsyn   (apply INVOKE 'OPSYN args)
+    ;; ── LOAD(fnname, externalname) — stub ─────────────────────────────────────
+    ;; Dynamic library loading is out of scope; return nil (failure) gracefully.
+    LOAD    nil
+    load    nil
     APPLY   (apply APPLY (first args) (rest args))
     apply   (apply APPLY (first args) (rest args))
     REPLACE (let [[s1 s2 s3] args] (REPLACE s1 s2 s3))

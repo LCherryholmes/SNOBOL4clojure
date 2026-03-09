@@ -218,3 +218,4 @@
 ;; ── Re-export debug/probe API ─────────────────────────────────────────────────
 (def snapshot!  env/snapshot!)
 (def <CHANNELS> env/<CHANNELS>)
+(def <OPSYN>    env/<OPSYN>)
