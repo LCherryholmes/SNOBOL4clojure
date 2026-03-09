@@ -110,33 +110,43 @@
 (defn  ncvt [x] (list 'num x))
 (defn  scvt [x] (list 'str x))
 
-;; ── SNOBOL4 global namespace — set once by GLOBALS, used everywhere ───────────
-;; This is the direct analog of _env._g in SNOBOL4python: one authoritative
-;; namespace where all user SNOBOL4 variables live.  The runtime never searches
-;; multiple namespaces; it always interns into and resolves from this one ns.
-(def ^:private snobol-ns (atom nil))
+;; ── User variable store — Scope 1: SNOBOL4 program variables ─────────────────
+;;
+;; SNOBOL4 has four distinct namespaces:
+;;   1. Variables  — stored here in <VARS>   (atom: symbol → value)
+;;   2. Functions  — stored in <FUNS>        (atom: string → fn)
+;;   3. Labels     — stored in <LABL>/<STNO> (atom: keyword/string → int)
+;;   4. &-Keywords — defs in env.clj         (looked up directly by symbol)
+;;
+;; Using a plain Clojure map atom means user variables like INTEGER or REAL
+;; can NEVER collide with Clojure or engine symbols — they live in their own
+;; scope, not in any Clojure namespace.  This is the natural Lisp approach.
+;;
+;; GLOBALS now only resets the runtime state atoms — no namespace arg needed.
+;; The ns argument is accepted for backwards compatibility but ignored.
+(def <VARS> (atom {}))
 
 (defn GLOBALS
-  "Point the SNOBOL4 runtime at the user's namespace.
-   Call once at the top of every user script:  (GLOBALS *ns*)
-   Mirrors GLOBALS(globals()) in SNOBOL4python."
-  [ns]
-  (reset! snobol-ns ns)
-  (reset! <FUNS>  {})
-  (reset! <FDEFS> {}))
-
-(defn- active-ns
-  "Return the authoritative SNOBOL4 namespace.
-   Falls back to SNOBOL4clojure.env if GLOBALS has not been called."
-  []
-  (or @snobol-ns (find-ns 'SNOBOL4clojure.env)))
+  "Reset all SNOBOL4 runtime state for a fresh program run.
+   The ns argument is accepted for API compatibility but ignored —
+   user variables now live in <VARS>, not in any Clojure namespace."
+  ([]
+   (reset! <VARS>  {})
+   (reset! <FUNS>  {})
+   (reset! <FDEFS> {}))
+  ([_ns] (GLOBALS)))
 
 ;; ── Variable write / read ─────────────────────────────────────────────────────
-(defn snobol-set! [sym val]
-  (intern (active-ns) sym val))
+(defn snobol-set!
+  "Assign val to the SNOBOL4 user variable named by sym."
+  [sym val]
+  (swap! <VARS> assoc (symbol (name sym)) val)
+  val)
 
-(defn reference [N]
-  (ns-resolve (active-ns) (symbol (name N))))
+(defn reference
+  "Return the current value of SNOBOL4 user variable N, or nil if unbound."
+  [N]
+  (get @<VARS> (symbol (name N))))
 
 (defn $$ [N]
   (let [sym (symbol (name N))]
@@ -154,23 +164,23 @@
         (if (nil? line) ε (str line)))
 
       :else
-      (if-let [V (reference N)] (var-get V) ε))))
+      ;; Scope chain: user <VARS> first, then engine builtins (read-only).
+      ;; A user variable named INTEGER shadows the built-in INTEGER predicate —
+      ;; correct SNOBOL4 semantics.  Engine builtins are never written here.
+      (if-let [v (find @<VARS> sym)]
+        (val v)
+        (let [resolved (ns-resolve (find-ns 'SNOBOL4clojure.core) sym)]
+          (if (instance? clojure.lang.Var resolved)
+            (var-get resolved)
+            ε))))))
 
 ;; ── Variable snapshot ────────────────────────────────────────────────────────
 (defn snapshot!
-  "Return a map of all currently-bound user SNOBOL4 variables -> values.
-   Excludes internal symbols (those starting with < & or containing /).
+  "Return a sorted map of all currently-set SNOBOL4 user variables → values.
    Call after a :step-limit stop to inspect full program state.
    Also useful for post-mortem debugging: (snapshot!) after any RUN."
   []
-  (into (sorted-map)
-        (keep (fn [[sym var]]
-                (let [n (name sym)]
-                  (when (and (not (re-find #"^[<&]" n))
-                             (not (re-find #"/" n))
-                             (not (re-find #"^__" n)))
-                    [sym (var-get var)])))
-              (ns-interns (active-ns)))))
+  (into (sorted-map) @<VARS>))
 
 ;; ── Arrays and Tables ─────────────────────────────────────────────────────────
 

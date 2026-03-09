@@ -56,10 +56,9 @@
   (is (Double/isNaN (num "abc"))))
 
 ;; ── $$ lookup ────────────────────────────────────────────────────────────────
-;; Point SNOBOL runtime at this namespace so $$ can find test vars.
-(GLOBALS *ns*)
-(use-fixtures :each (fn [t] (GLOBALS (find-ns 'SNOBOL4clojure.test-env)) (t)))
-(def test-$$-sentinel "hello")
+(GLOBALS)
+(use-fixtures :each (fn [t] (GLOBALS) (t)))
 (deftest test-$$
+  (snobol-set! 'test-$$-sentinel "hello")
   (is (= "hello" ($$ 'test-$$-sentinel)))
   (is (= ""      ($$ 'no-such-var-xyz))))

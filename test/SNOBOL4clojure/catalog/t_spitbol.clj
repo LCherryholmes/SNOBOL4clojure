@@ -682,18 +682,22 @@
 ;; The recogniser prints <<< NO SYNTACTIC ERROR >>> / <<< SYNTACTIC ERROR >>>
 ;; to OUTPUT for each statement it reads.
 
-;; t4 uses INTEGER, REAL, LITERAL as variable names — these shadow built-in
-;; functions in our namespace and cause a compiler-level conflict.  The program
-;; is also highly SPITBOL-specific (INPUT channel + complex deferred pattern
-;; ARBNO/BAL/FENCE/FUNCTION_CALL mutual recursion).  Skipped pending a
-;; variable-shadowing fix in the compiler.  Oracle output is preserved above.
-
 (deftest t4_syntactic_recogniser_no_errors
-  "SKIP — test4 uses INTEGER/REAL as variable names, shadowing engine built-ins."
-  #_"Oracle: ELEMENT<I><J><K>=..., A<X,Y,Z+1>=..., NEWONE_TRIAL X=... → NO SYNTACTIC ERROR"
-  (is true "skipped: test4 requires compiler variable-shadowing fix"))
+  "test4: syntactic recogniser correctly accepts valid SPITBOL statements.
+   Uses INTEGER, REAL, LITERAL as variable names (formerly shadowed built-ins)."
+  (let [src (str "-INCLUDE '" SDIR "/testpgms-test4.spt'")
+        r   (SNOBOL4clojure.test-helpers/run-with-timeout src 15000)
+        out (:stdout r "")
+        lines (str/split-lines out)]
+    (is (some #(= "<<< NO SYNTACTIC ERROR >>>" %) lines)
+        "at least one valid statement accepted")))
 
 (deftest t4_syntactic_recogniser_detects_errors
-  "SKIP — test4 uses INTEGER/REAL as variable names, shadowing engine built-ins."
-  #_"Oracle: DEFINE('F(X,Y)), L=LT(N,B<J> L+1, TRIM(INPUT) PAT1 :S(OK):F(BAD) → SYNTACTIC ERROR"
-  (is true "skipped: test4 requires compiler variable-shadowing fix"))
+  "test4: syntactic recogniser correctly rejects invalid SPITBOL statements.
+   Uses INTEGER, REAL, LITERAL as variable names (formerly shadowed built-ins)."
+  (let [src (str "-INCLUDE '" SDIR "/testpgms-test4.spt'")
+        r   (SNOBOL4clojure.test-helpers/run-with-timeout src 15000)
+        out (:stdout r "")
+        lines (str/split-lines out)]
+    (is (some #(= "<<< SYNTACTIC ERROR >>>" %) lines)
+        "at least one invalid statement rejected")))

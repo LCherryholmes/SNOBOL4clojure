@@ -83,19 +83,14 @@
       {:stdout "" :stderr (.getMessage e) :exit :crashed})))
 
 ;; ── SNOBOL4clojure side ───────────────────────────────────────────────────────
-;; Fixed namespace for harness runs — created once
-(defonce ^:private harness-ns
-  (create-ns 'SNOBOL4clojure.harness-run))
-
 (defn- reset-runtime!
   "Clear all compiler + runtime state for a fresh run."
   []
-  (env/GLOBALS harness-ns)
+  (env/GLOBALS)
   (reset! env/STNO  0)
   (reset! env/<STNO> {})
   (reset! env/<LABL> {})
   (reset! env/<CODE> {})
-  (reset! env/<FUNS> {})
   (reset! env/<CHANNELS> {})
   (reset! env/<OPSYN>    {}))
 

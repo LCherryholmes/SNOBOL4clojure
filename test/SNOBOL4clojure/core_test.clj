@@ -2,13 +2,16 @@
   (:require [clojure.test :refer :all]
             [SNOBOL4clojure.core :refer :all :exclude [= + - * / num]]))
 
-;; Point the SNOBOL runtime at this namespace so that $$ resolves
-;; vars like `digits`, `epsilon`, `ROOT` etc. defined here.
+;; Point the SNOBOL runtime at this namespace so that $$ resolves vars.
 (GLOBALS *ns*)
 
-;; Re-establish GLOBALS before each test to guard against other test namespaces
-;; calling GLOBALS and changing the active namespace.
-(use-fixtures :each (fn [t] (GLOBALS (find-ns 'SNOBOL4clojure.core-test)) (t)))
+;; Re-establish GLOBALS before each test and re-bind SNOBOL4 vars.
+(defn- reset-test-vars! []
+  (GLOBALS)
+  (snobol-set! 'digits  "0123456789")
+  (snobol-set! 'epsilon ""))
+
+(use-fixtures :each (fn [t] (reset-test-vars!) (t)))
 
 ;; ── match-1 : literal concatenation with alternation ─────────────────────────
 (deftest match-1
@@ -73,9 +76,9 @@
 ;; parse -> emitter -> MATCH pipeline.
 ;; digits/epsilon are top-level defs so $$ can resolve them via the
 ;; core-test namespace (established by the GLOBALS call above).
-(def digits  "0123456789")
-(def epsilon "")
-;; Build the pattern at load time while GLOBALS points at this namespace.
+;; Build the pattern at load time — digits/epsilon must be in <VARS> first.
+(snobol-set! 'digits  "0123456789")
+(snobol-set! 'epsilon "")
 (def real-number-pat
   (EVAL (str "POS(0)"
              " SPAN(digits)"
