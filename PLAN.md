@@ -946,6 +946,42 @@ structure as a validation step before building the compiler.
 
 ---
 
+### Benchmark Methodology Note
+
+**Process-spawn overhead must be reported separately.**
+
+When comparing SPITBOL/CSNOBOL4 against Clojure backends, each oracle run
+incurs ~15ms of fixed process-spawn overhead (fork + exec + interpreter init).
+This overhead is real and matters for short programs, but it is not execution
+time — it conflates startup cost with runtime performance.
+
+**Required reporting format for all benchmark grids:**
+
+| Column | What it shows |
+|--------|--------------|
+| Raw ms | Wall-clock time including spawn overhead (what the user experiences) |
+| Net ms | Raw minus measured spawn baseline (~15ms for SPITBOL/CSNOBOL4; 0 for Clojure in-process) |
+| Ratio  | Net ms relative to Clojure interpreter net ms |
+
+**How to measure spawn baseline:** run a minimal no-op program 30 times, take
+the median. Subtract from all oracle timings before computing ratios.
+
+```snobol4
+* minimal-noop.spt — measures spawn overhead
+END
+```
+
+**Why this matters:** on `fact45`, SPITBOL raw = 16.6ms, Clojure JVM codegen
+raw = 0.89ms. Naively that looks like 18×. But SPITBOL net ≈ 1.6ms, so the
+true execution ratio is ~1.8× in our favour — a much more honest number.
+
+**The benchmark runner (`src/SNOBOL4clojure/bench.clj`) should be updated**
+to: (1) measure spawn baseline at startup, (2) report both raw and net columns,
+(3) compute ratios from net times only. This is tracked as a bench improvement
+for the next session that touches benchmark infrastructure.
+
+---
+
 ### Stage 23F — Compiled Pattern Engine  PLANNED
 
 **The gap**: all four existing backends (23A–23D) are execution-layer
