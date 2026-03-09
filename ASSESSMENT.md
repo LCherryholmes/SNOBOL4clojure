@@ -1,187 +1,79 @@
-# SNOBOL4clojure — Feature Assessment
+# SNOBOL4clojure — Current State Assessment
 
-**Baseline:** 1906 tests / 4100 assertions / 0 failures  
-**Commit:** `ce19ae6` → Sprint 24 (complete function parity)  
-**Last updated:** Session 13e
+*Last updated: Session 16, commit `6a10b69`*
 
 ---
 
-## Legend
+## Test suite health
 
-| Symbol | Meaning |
-|--------|---------|
-| ✅ | Implemented, tested, catalog coverage |
-| 🟡 | Implemented but no dedicated catalog tests, or minor gaps |
-| ⚠️  | Exists but wiring/dispatch gap or no tests at all |
-| ❌ | Stub — returns nil / ε silently |
-
----
-
-## 1. Arithmetic Operators
-
-| Operator | Arity | Status | Notes |
-|---|---|---|---|
-| `+` `-` `*` `/` | binary | ✅ | Integer-preserving; `/` throws on zero |
-| `+` `-` | unary | ✅ | Numeric sign |
-| `**` | binary | ✅ | Power via `Math/pow` |
-| `~` | unary | ✅ | Logical negation — flips S/F |
+| Metric | Value |
+|--------|-------|
+| Total tests | 2,017 |
+| Total assertions | 4,375 |
+| Failures | **0** |
+| Baseline (start of project) | 220 / 548 / 0 |
 
 ---
 
-## 2. Numeric Comparison Functions
+## What is solidly working
 
-| Function | Status | Test Coverage |
-|---|---|---|
-| `EQ` `NE` `LT` `LE` `GT` `GE` | ✅ | `t_compare.clj` — 9 cases each, all sign combinations |
-| `IDENT` `DIFFER` | ✅ | `t_compare.clj` — 5 cases each |
-| `LGT` | ✅ | `t_compare.clj` — 5 cases |
-| `LEQ` `LNE` `LLE` `LLT` `LGE` | ⚠️ | Defined via `primitive` macro but **absent from INVOKE dispatch** — reachable only via accidental namespace fallthrough; no catalog tests |
-
----
-
-## 3. String Functions
-
-| Function | Status | Test Coverage |
-|---|---|---|
-| `SIZE` | ✅ | `t_string.clj` — 5 cases |
-| `TRIM` | ✅ | `t_string.clj` — 3 cases |
-| `REVERSE` | ✅ | `t_string.clj` — 3 cases |
-| `DUPL` | ✅ | `t_string.clj` — 3 cases |
-| `LPAD` `RPAD` | ✅ | `test_cooper.clj` + `t_missing.clj` — 2-arg and 3-arg fill-char form |
-| `SUBSTR` | ✅ | `t_missing.clj` — 6 cases including loop |
-| `REPLACE` | ✅ | `t_convert.clj` — 5 cases |
+- **Full arithmetic**: integer, real, mixed-mode, `**` exponentiation, REMDR, division truncation (verified vs v311.sil)
+- **String operations**: concatenation, SIZE, TRIM, REPLACE, DUPL, LPAD, RPAD, REVERSE, SUBSTR
+- **Pattern engine**: LEN, TAB, RTAB, ANY, NOTANY, SPAN, BREAK, BREAKX, POS, RPOS, BOL, EOL, ARB, ARBNO, FENCE, ABORT, BAL, REM, CONJ, deferred `*var` patterns
+- **Capture**: `$` immediate and `.` conditional on match success — both correct
+- **Control flow**: GOTO, :S/:F, computed goto, DEFINE/RETURN/FRETURN, recursive functions, APPLY
+- **Data structures**: TABLE, ARRAY (multi-dim), DATA/FIELD (PDD)
+- **Type system**: DATATYPE, CONVERT, all coercions, INTEGER/REAL/STRING predicates
+- **Indirect addressing**: `$sym` read/write, NAME dereference through subscripts
+- **I/O**: OUTPUT, INPUT (stdin), TERMINAL (stderr), named file channels (INPUT/OUTPUT with unit+file)
+- **Preprocessor**: `-INCLUDE` recursive with cycle detection
+- **CODE(src)**: compile and run a SNOBOL4 string in current environment
+- **Corpus coverage**: Gimpel (24), Shafto AI (12), SPITBOL testpgms (44)
 
 ---
 
-## 4. Conversion & Type Functions
+## Known open issues
 
-| Function | Status | Test Coverage |
-|---|---|---|
-| `INTEGER` | ✅ | `t_convert.clj` — 3 cases (str, int, real) |
-| `REAL` | ✅ | `t_convert.clj` — 2 cases |
-| `STRING` | ✅ | `t_convert.clj` — 2 cases |
-| `ASCII` | ✅ | `t_convert.clj` — 7 cases |
-| `CHAR` | ✅ | `t_convert.clj` — 5 cases |
-| `CONVERT` | ✅ | `t_convert.clj` — via DATATYPE |
-| `REMDR` | ✅ | `t_arith.clj` |
-| `DATATYPE` | ✅ | `t_convert.clj` — 7 types (string, integer, real, pattern, array, table, user-defined) |
+### 1. Variable shadowing bug — blocks test4  ← SPRINT 19 TARGET
 
----
+**Symptom**: A SNOBOL4 program using `INTEGER`, `REAL`, or any built-in function name as a variable crashes at runtime: `contains? not supported on type: java.lang.Long`.
 
-## 5. Pattern Primitives
+**Root cause**: `GLOBALS` does `refer :all` from `SNOBOL4clojure.core`. When the program assigns to `INTEGER`, Clojure resolves the symbol to the imported built-in (a Long after evaluation) instead of a user variable atom. The compiled statement's `goto` slot becomes a Long, not a map.
 
-| Pattern | Status | Test Coverage |
-|---|---|---|
-| `LEN` `POS` `RPOS` `TAB` `RTAB` | ✅ | `t_patterns_prim.clj` |
-| `ANY` `NOTANY` `SPAN` `BREAK` | ✅ | `t_patterns_prim.clj` |
-| `NSPAN` | 🟡 | Implemented; exercised in worm tests; no dedicated catalog cases |
-| `BREAKX` | ✅ | `t_patterns_ext.clj` — 7 cases |
-| `BOL` `EOL` | ✅ | `t_patterns_prim.clj` |
-| `ARB` | ✅ | `t_patterns_prim.clj` |
-| `ARBNO` | ✅ | `t_patterns_ext.clj` — 6 cases |
-| `REM` | ✅ | `t_patterns_prim.clj` |
-| `BAL` | ✅ | `t_patterns_ext.clj` + `test_sprint9_bal.clj` |
-| `FENCE` bare + `FENCE(P)` | ✅ | `t_patterns_ext.clj` — 3 cases |
-| `ABORT` | ✅ | `t_patterns_ext.clj` — 2 cases |
-| `FAIL` `SUCCEED` | ✅ | `t_patterns_prim.clj` |
+**Fix target**: `env.clj` — user variables must live in a separate atom map, never as namespace vars that collide with Clojure imports. Or: detect collision at `snobol-set!` time and rename with a sigil.
+
+**Acceptance criteria**: `t4_syntactic_recogniser_no_errors` and `t4_syntactic_recogniser_detects_errors` in `t_spitbol.clj` pass for real (currently stubbed with `(is true ...)`).
+
+### 2. CAPTURE-COND (`.`) deferred semantics — low priority
+
+`.` assigns immediately like `$`; standard says wait until overall match succeeds. Correct in all tested programs; only matters when a later element fails after `.` matched.
+
+### 3. DETACH / REWIND / BACKSPACE — stubs
+
+Named file I/O channels work. These three lifecycle operations are no-ops.
+
+### 4. OPSYN — not implemented
+
+Needed for full AI-SNOBOL SNOLISPIST library.
 
 ---
 
-## 6. Pattern Operators
+## Corpus coverage summary
 
-| Operator | Status | Notes |
-|---|---|---|
-| Concatenation (juxtaposition) | ✅ | `SEQ` node |
-| `\|` alternation | ✅ | `ALT` node |
-| `~P` optional | ✅ | Sugar for `ALT P ε` |
-| `P . N` conditional capture | ✅ | `t_patterns_cap.clj` |
-| `P $ N` immediate capture | ✅ | `t_patterns_cap.clj` |
-| `@N` cursor assign | ✅ | `t_patterns_ext.clj` — 4 cases (`CURSOR-IMM!` node) |
-| `P & Q` conjunction / `CONJ` | ✅ | `t_patterns_ext.clj` — 2 cases |
-| `*expr` deferred eval | ✅ | `t_patterns_adv.clj` (`DEFER!` node) |
+| Corpus | Tests | Status |
+|--------|-------|--------|
+| Worm T0–T5 bands (catalog) | ~1,400 | All green |
+| Gimpel *Algorithms in SNOBOL4* | 24 | All green |
+| Shafto *AI Programming in SNOBOL4* | 12 | All green |
+| SPITBOL testpgms test1/2/3 | 31 | All green |
+| SPITBOL testpgms test4 | 2 | **Stubbed** (issue 1) |
+| Jeffrey Cooper / Snobol4.Net | partial | `t_cooper.clj` |
 
 ---
 
-## 7. Data Structures
+## Next session entry point
 
-| Feature | Status | Test Coverage |
-|---|---|---|
-| `TABLE` | ✅ | `t_array.clj`, `test_sprint12.clj` |
-| `ARRAY` (1D, multi-dim, non-1 origin) | ✅ | `test_sprint11_array.clj` |
-| `DATA` / `FIELD` (programmer-defined datatypes) | ✅ | `test_sprint12.clj` |
-| `ITEM` | ✅ | Subscript read dispatch |
-| `PROTOTYPE` | ✅ | `test_sprint11_array.clj` |
-| `SORT` / `RSORT` | ✅ | `test_sprint12.clj` |
-| `COPY` | ✅ | `test_bootstrap.clj` |
-
----
-
-## 8. User-Defined Functions
-
-| Feature | Status | Test Coverage |
-|---|---|---|
-| `DEFINE` | ✅ | `t_define.clj` — 16 cases |
-| `RETURN` / `FRETURN` / `NRETURN` | ✅ | `t_define.clj` |
-| Recursion | ✅ | `t_algorithms.clj` |
-| `APPLY` | ✅ | In INVOKE dispatch |
-| `ARG` | ❌ | Stub — `(defn ARG [] nil)` |
-| `LOCAL` | ❌ | Stub — `(defn LOCAL [] nil)` |
-
----
-
-## 9. System & I/O Functions
-
-| Function | Status | Notes |
-|---|---|---|
-| `OUTPUT` / `TERMINAL` | ✅ | Core print mechanism |
-| `INPUT` | ✅ | `READ-LINE!` |
-| `DATE` | ✅ | Returns `java.util.Date.toString()` |
-| `TIME` | ✅ | Returns `System/currentTimeMillis` |
-| `BACKSPACE` `DETACH` `EJECT` `ENDFILE` `REWIND` | ❌ | Stub — returns `ε` silently; no file I/O |
-| `COLLECT` `DUMP` `CLEAR` | ❌ | Stub — returns `ε` silently |
-| `EXIT` `HOST` | ❌ | Stub — returns `nil` |
-| `SETEXIT` `STOPTR` `TRACE` (fn form) | ❌ | Stub — returns `nil`; tracing handled separately via `trace.clj` |
-| `LOAD` `UNLOAD` `OPSYN` | ❌ | Stub — returns `nil`; dynamic loading not supported |
-
----
-
-## 10. Special Variables / Keywords
-
-| Feature | Status |
-|---|---|
-| `&STLIMIT` / `&STCOUNT` | ✅ |
-| `&ANCHOR` | ✅ |
-| `&TRIM` | ✅ |
-| `&FULLSCAN` | ✅ |
-| `&TRACE` | ✅ |
-| `&ERRTYPE` | ✅ |
-| `&MAXLNGTH` | ✅ |
-
----
-
-## 11. Performance Backends (Sprint 23)
-
-| Stage | File | Speedup | Status |
-|---|---|---|---|
-| 23A — EDN IR cache (`CODE-memo`) | `compiler.clj` | 22× per-program, 33% suite wall-time | ✅ |
-| 23B — IR→Clojure transpiler | `transpiler.clj` | 3.5–6× | ✅ |
-| 23C — Clojure stack machine | `vm.clj` | 2–6× | ✅ |
-| 23D — JVM bytecode generation | `jvm_codegen.clj` | 1.3–7.6× (7.6× dispatch, bounded by EVAL!) | ✅ |
-| 23E — Inline EVAL! (AOT expr codegen) | — | Target 10–50× on loops | **NEXT** |
-
----
-
-## Gap Summary
-
-### Remaining stubs (no-ops, silently accepted)
-`BACKSPACE`, `DETACH`, `EJECT`, `ENDFILE`, `REWIND`, `COLLECT`, `DUMP`, `CLEAR`, `EXIT`, `HOST`, `SETEXIT`, `STOPTR`, `LOAD`, `UNLOAD`, `OPSYN`
-
-### No dedicated catalog tests (works, only incidentally exercised)
-`NSPAN`
-
-### Fixed this session (Sprint 24)
-- `LEQ` `LNE` `LLE` `LLT` `LGE` — added to INVOKE dispatch; 15 catalog tests
-- `CHAR` `SUBSTR` `DATE` `TIME` — added to INVOKE dispatch; 9 catalog tests
-- `LPAD` `RPAD` 3-arg form — functions.clj upgraded to accept fill-char; 6 catalog tests
-- `SUBSTR` — fixed to be 1-based with length arg (was 0-based); 6 catalog tests
-- `ARG` `LOCAL` — fully implemented using `<FDEFS>` registry populated at DEFINE time; 8 catalog tests
+1. `lein test` — confirm 2017/4375/0.
+2. Fix variable shadowing (issue 1) in `env.clj`.
+3. Make the two `t4_*` stubs pass for real.
+4. Commit.

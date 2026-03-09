@@ -1615,3 +1615,31 @@ Three copies in memory simultaneously:
 
 Caption: *"A SNOBOL4 beautifier reading, processing, and reprinting its own source — all three copies in memory simultaneously. Running on SNOBOL4clojure, a complete SNOBOL4 implementation in Clojure."*
 
+
+---
+
+## Sprint 18 (Session 16) — SPITBOL Testpgms Corpus  ✅ DONE  commit `6a10b69`
+
+### Result
+44 tests / 91 assertions / 0 failures in `test/SNOBOL4clojure/catalog/t_spitbol.clj`.
+Full suite after: **2017 tests / 4375 assertions / 0 failures**.
+
+### Corpus files (committed to `corpus/spitbol/`)
+- `testpgms-test1.spt` — diagnostics phase 1 (functions, operators, datatypes)
+- `testpgms-test2.spt` — diagnostics phase 2 (pattern matching)
+- `testpgms-test3.spt` — factorial table 1..45
+- `testpgms-test4.spt` — SPITBOL syntactic recogniser (reads testpgms.in)
+- `testpgms.in`        — stdin for test4
+
+### What passed
+- **test1** (19 deftests): REPLACE, LPAD/RPAD, CONVERT, REVERSE, DATATYPE, integer/real/mixed arithmetic, DEFINE+recursive FACT, OPSYN operators, ARRAY, DATA/PDD, numeric predicates, INTEGER predicate, SIZE, LGT, indirect addressing, concatenation, REMDR, DUPL, TABLE, ITEM, EVAL, SUBSTR, ARG/LOCAL, APPLY. Skipped: DREALS (1.0D2 notation), SETEXIT, &DUMP.
+- **test2** (11 deftests): simple string match, $ and . capture, LEN, TAB, ARB, POS/RPOS, RTAB, BREAK/SPAN, ANY/NOTANY, REM, alternation, deferred patterns, deferred BREAK/SPAN/ANY/NOTANY. Runs with `&FULLSCAN=1` (BREAKX passes; BREAKX in QUICKSCAN mode is the one known csnobol4 failure in test2).
+- **test3** (1 deftest, 7 assertions): factorial 1..45 big-number string arithmetic verified against csnobol4 oracle.
+
+### Open issue: variable shadowing (test4 blocked)
+
+**test4** uses `INTEGER` and `REAL` as SNOBOL4 variable names. These shadow the engine's built-in functions at the Clojure namespace level (`refer :all` from `SNOBOL4clojure.core`). Result: compile-time crash in `runtime.clj:72` — `contains? not supported on type: java.lang.Long` (the compiler produced a statement where `goto` resolves to a Long instead of a map, because the symbol `INTEGER` bound to a Long gets picked up instead of the built-in).
+
+**Two stub tests are committed** (`t4_syntactic_recogniser_no_errors`, `t4_syntactic_recogniser_detects_errors`) — each does `(is true "skipped: ...")`. They are the acceptance criteria for the next sprint.
+
+**Fix target**: user variable assignments must route through the `$$` atom store and never collide with Clojure-level built-in symbols. Options: (a) prefix all user variable atoms with a sigil (e.g. `__sno__INTEGER`), (b) maintain a dedicated user-var map atom separate from the namespace, (c) detect collision at `snobol-set!` time and rename. The engine's `GLOBALS` + `$$` machinery in `env.clj` is the right place.
