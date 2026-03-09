@@ -572,8 +572,14 @@
           (and (equal op '*) (clojure.core/= (count parms) 1))
           (let [sym (first parms)]
             (list 'DEFER! (fn [] (EVAL! sym))))
-          true (let [args (apply vector (map EVAL! parms))]
-                 (apply INVOKE op args))))
+          true (let [args     (apply vector (map EVAL! parms))
+                     ;; OPSYN: operator symbols ('+' '-' '*' etc.) may be redirected.
+                     ;; <FUNS> stores override under (str op), e.g. "+".
+                     ;; Check before the built-in INVOKE case table.
+                     opsyn-fn (get @<FUNS> (str op))]
+                 (if opsyn-fn
+                   (apply opsyn-fn args)
+                   (apply INVOKE op args)))))
       true "Yikes! What is E?")))
 
 (defn EVAL [X]
