@@ -1,6 +1,6 @@
 # SNOBOL4clojure — Current State Assessment
 
-*Last updated: Session 16, commit `6a10b69`*
+*Last updated: Sprint 19, commit `9811f5e`*
 
 ---
 
@@ -34,15 +34,17 @@
 
 ## Known open issues
 
-### 1. Variable shadowing bug — blocks test4  ← SPRINT 19 TARGET
+### ~~1. Variable shadowing bug~~ — FIXED Sprint 19  ✅
 
-**Symptom**: A SNOBOL4 program using `INTEGER`, `REAL`, or any built-in function name as a variable crashes at runtime: `contains? not supported on type: java.lang.Long`.
+**Was**: User programs using `INTEGER`, `REAL`, or any engine built-in name as a variable crashed at runtime.
 
-**Root cause**: `GLOBALS` does `refer :all` from `SNOBOL4clojure.core`. When the program assigns to `INTEGER`, Clojure resolves the symbol to the imported built-in (a Long after evaluation) instead of a user variable atom. The compiled statement's `goto` slot becomes a Long, not a map.
+**Root cause 1**: `snobol-set!` called `intern()` into the active Clojure namespace, mutating engine Vars like `INTEGER`/`REAL`.
 
-**Fix target**: `env.clj` — user variables must live in a separate atom map, never as namespace vars that collide with Clojure imports. Or: detect collision at `snobol-set!` time and rename with a sigil.
+**Root cause 2**: `ns-resolve` on `SNOBOL4clojure.core` for `NAME` returns the `NAME` *class* (imported deftype), not a Var. `var-get` on a Class throws `ClassCastException`, silently killing function calls with a parameter named `NAME`.
 
-**Acceptance criteria**: `t4_syntactic_recogniser_no_errors` and `t4_syntactic_recogniser_detects_errors` in `t_spitbol.clj` pass for real (currently stubbed with `(is true ...)`).
+**Fix**: `<VARS>` atom (plain `{symbol → value}` map) replaces namespace interning. `$$` lookup chain: `<VARS>` first, then engine namespace read-only, with `instance? clojure.lang.Var` guard.
+
+**Acceptance criteria met**: `t4_syntactic_recogniser_no_errors` and `t4_syntactic_recogniser_detects_errors` both pass for real. commit `9811f5e`.
 
 ### 2. CAPTURE-COND (`.`) deferred semantics — low priority
 
@@ -66,7 +68,7 @@ Needed for full AI-SNOBOL SNOLISPIST library.
 | Gimpel *Algorithms in SNOBOL4* | 24 | All green |
 | Shafto *AI Programming in SNOBOL4* | 12 | All green |
 | SPITBOL testpgms test1/2/3 | 31 | All green |
-| SPITBOL testpgms test4 | 2 | **Stubbed** (issue 1) |
+| SPITBOL testpgms test4 | 2 | **All green** (Sprint 19) |
 | Jeffrey Cooper / Snobol4.Net | partial | `t_cooper.clj` |
 
 ---
@@ -74,6 +76,6 @@ Needed for full AI-SNOBOL SNOLISPIST library.
 ## Next session entry point
 
 1. `lein test` — confirm 2017/4375/0.
-2. Fix variable shadowing (issue 1) in `env.clj`.
-3. Make the two `t4_*` stubs pass for real.
-4. Commit.
+2. **Sprint 25D** — named I/O channels: fix channel-registration bug in `env.clj`/`operators.clj`. See PLAN.md Sprint 25D notes. Unlocks remaining 6 Gimpel programs.
+3. **Sprint 25E** — OPSYN — needed for full AI-SNOBOL SNOLISPIST library.
+4. **beauty.sno** — the flagship. Needs `-INCLUDE` files from Lon + Sprint 25D I/O.
