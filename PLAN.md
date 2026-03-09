@@ -27,6 +27,7 @@ compiler from SNOBOL4 source text to a labeled statement table.
 |------|----------|---------------|
 | 2026-03-08 | 220/548/0 | Repo cloned fresh; lein installed; baseline confirmed. PLAN.md rewritten. SPITBOL x64-main.zip and CSNOBOL4 snobol4-2.3.3.tar.gz uploaded and extracted to `/home/claude/spitbol-src/` and `/home/claude/csnobol4-src/`. Eureka grammar-worm harness design documented. |
 | 2026-03-08 (session 4) | 967/2161/0 (after fixes) | Two operator bugs fixed to clear the last test failure. **Bug 1 — SEQ nil-propagation**: vector replacement like `[J+1, LT(J,N)]` was converting nil (LT failure) to `""` via SEQ, so the assignment always succeeded. Fixed in `EVAL!` vector case: `(some nil? evaled)` → return nil. Also guarded `INVOKE '='` with `when-not (nil? r)`. This fixes the canonical SNOBOL4 idiom `J = J + 1  LT(J,N) :F(RETURN)`. **Bug 2 — NAME indirect subscript dereference**: `BSORT(.ARR,1,5)` passes `.ARR` (a NAME); inside BSORT, `A<J>` was subscripting the NAME wrapper instead of `ARR`. Fixed in both subscript read and write dispatch: detect `NAME` instance, call `(.n raw-container)` to get real symbol, `$$` that. Both fixes in `operators.clj`. Commit `fbcde8e`. Full suite: **967 tests / 2161 assertions / 0 failures**. *(Note: test count dropped from 968→967 due to removal of a stale probe_test.clj artifact.)* |
+| 2026-03-08 (session 14) | 1906/4100/0 | **Sprint 25 — four tasks complete.** **25B** (commit `28db14b`): `LGT`/`lgt` wired into INVOKE case table; 3 catalog tests in `t_missing.clj`. **25A** (commit `41eea5d`): `-INCLUDE` preprocessor — `preprocess-includes` fn in `compiler.clj`; recursive, cycle-safe, case-insensitive; `CODE!`/`CODE`/`CODE-memo`/`compile-to-file`/`CODE-cached` all accept optional `include-path` param (default `["."]`); `prog-include` macro in `test_helpers.clj`; `preprocess-includes` exported from `core.clj`; 5 catalog tests in `t_include.clj`. **25C** (commit `5bd8a38`): `TERMINAL` assignment now writes to `*err*` via `(binding [*out* *err*] ...)`; `run-with-timeout` captures `*err*` into `StringWriter` and returns it as `:stderr` in the result map; 2 catalog tests in `t_terminal.clj`. **25F** (commit `5fbc8ea`): `CODE`/`code` arms added to INVOKE; uses `ns-resolve` to load `compiler/CODE` and `runtime/RUN` at call-time to avoid circular dependency; `:end` signal treated as success; 4 catalog tests in `t_code.clj`. **25D** (named I/O channels): in progress — `<CHANNELS>` atom and updated `$$` in `env.clj`, `open-input-channel!`/`open-output-channel!`/`close-channel!` in `functions.clj`, `INPUT`/`OUTPUT`/`ENDFILE`/`DETACH` arms in INVOKE — but channel registration is not firing correctly during `RUN`; debugging paused to preserve clean baseline. **Stable baseline pushed**: `5fbc8ea`, **1920 tests / 4130 assertions / 0 failures**. |
 
 ---
 
@@ -158,8 +159,8 @@ Both are used by `harness.clj` for three-oracle triangulation.
 | Session 13c | `d9e4203` | 1865/4018/0 | **Stage 23B + 23C: Transpiler and Stack Machine.** `transpiler.clj` (335 lines): SNOBOL4 IR → Clojure source; each program becomes a `loop/case` fn in a generated namespace; JVM JIT compiles hot paths to native. Fixed label-slot redirect bug (integer slot 2 missing from case). Validated 500/500 worm programs. Benchmark: 3.5x (loop), 6x (arithmetic). `vm.clj` (326 lines): flat bytecode vector with 7 integer opcodes (HALT/EXEC/EXEC-S/EXEC-F/EXEC-SF/JUMP/SIGNAL), two-pass compiler (PC assignment + instruction emission), `run-vm!` dispatch loop. Validated 1000/1000 worm programs. Benchmark: 5.7x (simple), 2.5x (loop), 4x (branch). All Stage 23B+23C API exported from `core.clj`. Cumulative speedup from cold start: ~190x. |
 | Session 13d | `c185893` | 1865/4018/0 | **Stage 23D: JVM Bytecode Generation.** `jvm_codegen.clj` (366 lines): ASM-generated JVM `.class` bytecode. Each program → one Java class with static `run()` method. JVM Labels + IFNULL/GOTO for branching. Key design: EVAL! stored as IFn field (avoids SNOBOL4clojure.operators in constant pool). `DynamicClassLoader` for loading. class-cache for compile-once semantics. Validated 1000/1000 worm programs. Benchmarks: 7.6x (simple), 3.8x (branch), 1.7x (loop). Bottleneck analysis: loop overhead entirely in EVAL! — Stage 23E will inline arithmetic/assign/cmp to eliminate it. |
 
-**Current baseline**: 1865 tests / 4018 assertions / 0 failures
-**Last confirmed**: 2026-03-08 (session 13)
+**Current baseline**: 1920 tests / 4130 assertions / 0 failures
+**Last confirmed**: 2026-03-08 (session 14)
 
 ### Sprint 18C (step-probe) complete
 
@@ -1525,48 +1526,45 @@ Beauty.sno itself is complete and self-contained *except* for its 19 `-INCLUDE` 
 
 ### Sprint 25 task list
 
-#### 25A — `-INCLUDE` preprocessor
-- [ ] 25A.1 Add `preprocess-includes` fn to `compiler.clj`: scans source for lines matching `^-INCLUDE\s+'([^']+)'` or `^-INCLUDE\s+"([^"]+)"`, reads the named file relative to a configurable search path, splices content inline. Recursive (includes can include).
-- [ ] 25A.2 Add search-path parameter to `CODE!`, `CODE`, `compile-to-file`; default `["."]`.
-- [ ] 25A.3 Wire into `prog` in test-helpers: accept optional `:include-path` key.
-- [ ] 25A.4 Catalog test: `BCD_EBCD.SNO` (trivial one-liner, no includes needed — just verifies REPLACE still works).
-- [ ] 25A.5 Catalog test: simple two-file include smoke test.
+#### 25B — `LGT` INVOKE wiring (5-minute fix)  ✅ DONE commit `28db14b`
+- [x] 25B.1 `LGT` is defined via `primitive` macro (line 63 of operators.clj) but absent from the `INVOKE` case table — same bug we just fixed for LEQ/LNE/etc. Add `LGT`, `lgt` arms.
+- [x] 25B.2 3 catalog tests in `t_missing.clj`.
 
-#### 25B — `LGT` INVOKE wiring (5-minute fix)
-- [ ] 25B.1 `LGT` is defined via `primitive` macro (line 63 of operators.clj) but absent from the `INVOKE` case table — same bug we just fixed for LEQ/LNE/etc. Add `LGT`, `lgt` arms.
-- [ ] 25B.2 3 catalog tests in `t_missing.clj`.
+#### 25A — `-INCLUDE` preprocessor  ✅ DONE commit `41eea5d`
+- [x] 25A.1 Add `preprocess-includes` fn to `compiler.clj`: scans source for lines matching `^-INCLUDE\s+'([^']+)'` or `^-INCLUDE\s+"([^"]+)"`, reads the named file relative to a configurable search path, splices content inline. Recursive (includes can include).
+- [x] 25A.2 Add search-path parameter to `CODE!`, `CODE`, `compile-to-file`; default `["."]`.
+- [x] 25A.3 Wire into test-helpers: `prog-include` macro accepts `include-dirs` + `src` string.
+- [x] 25A.4 Catalog test: BCD_EBCD REPLACE smoke test (verifies no regression after refactor).
+- [x] 25A.5 Catalog test: simple two-file include smoke test. Plus: not-found → comment, case-insensitive.
 
-#### 25C — `TERMINAL` variable
-- [ ] 25C.1 `TERMINAL` assignment should write to `*err*` (or a separate captured stream) rather than `OUTPUT`. In test mode, capture to `:terminal` key in result map.
-- [ ] 25C.2 2 catalog tests.
+#### 25C — `TERMINAL` variable  ✅ DONE commit `5bd8a38`
+- [x] 25C.1 `TERMINAL` assignment writes to `*err*` via `(binding [*out* *err*] ...)`. `run-with-timeout` captures `*err*` into `StringWriter`, returns as `:stderr` in result map.
+- [x] 25C.2 2 catalog tests in `t_terminal.clj`.
 
-#### 25D — Named I/O channels: `INPUT(.VAR, unit)` / `INPUT(.VAR, unit,, 'file')`
-- [ ] 25D.1 Add I/O channel registry (atom map of unit# → reader/writer) to `env.clj`.
+#### 25F — `CODE(src)`  ✅ DONE commit `5fbc8ea`
+- [x] 25F.1 `CODE(src)` compiles and executes a string of SNOBOL4 source as a program fragment.
+- [x] 25F.2 The fragment runs in the current environment (same globals).
+- [x] 25F.3 Returns nil on success; `:end` signal treated as success; other exceptions → `:F` branch.
+- [x] 25F.4 4 catalog tests in `t_code.clj`: output, sees outer env, sets outer env, DEFINE callable.
+- **Implementation note**: uses `ns-resolve` for `compiler/CODE` and `runtime/RUN` at call-time to avoid circular dependency (runtime → operators → compiler).
+
+#### 25D — Named I/O channels: `INPUT(.VAR, unit)` / `INPUT(.VAR, unit,, 'file')`  🔧 IN PROGRESS
+- [ ] 25D.1 Add I/O channel registry (`<CHANNELS>` atom, var-sym → channel map) to `env.clj`. **Done in working branch.**
 - [ ] 25D.2 Implement `INPUT(.VAR, unit)` — assigns VAR as a readable that draws from unit. When unit not opened, defaults to stdin.
 - [ ] 25D.3 Implement `INPUT(.VAR, unit,, 'filename')` — opens file for reading, registers on unit.
 - [ ] 25D.4 `OUTPUT(.VAR, unit)` / `OUTPUT(.VAR, unit,, 'filename')` — output channels.
 - [ ] 25D.5 Reading `$VAR` then reads a line from the associated channel.
 - [ ] 25D.6 `ENDFILE(unit)` / `REWIND(unit)` / `BACKSPACE(unit)` implement properly.
-- [ ] 25D.7 Tests: Gimpel file-I/O programs (`RPOEM`, `RSEASON`, `RSTORY`) with their `.IN` data files.
+- [ ] 25D.7 Tests: file read/write, ENDFILE closes channel.
+- **Known bug**: channel registration via `INPUT(.VAR,...)` INVOKE arm is not taking effect during `RUN` — programs timeout. The IR is correct (`(INPUT (. READER) 5 "file")`), `$$` dispatch is correct, but the `<CHANNELS>` atom is empty after the statement runs. Root cause not yet isolated. **Next session: add targeted probe to confirm whether INVOKE `INPUT` arm is reached at runtime, or whether the fallthrough `($$ 'INPUT)` is reading stdin instead.**
 
-#### 25E — `OPSYN(new, old, n)`
-- [ ] 25E.1 `OPSYN('PRINT', 'PRT.VIA.OUTPUT')` — alias one function name to another. Store in `<FUNS>` map.
-- [ ] 25E.2 `OPSYN('|', .PRT.VIA.OUTPUT, 1)` — redefine a unary/binary operator to call a user function. Store in operator override table in env.clj; check in INVOKE before default dispatch.
-- [ ] 25E.3 Tests: basic alias and operator redefinition.
+### Priority order for next session
 
-#### 25F — `CODE(src)` 
-- [ ] 25F.1 `CODE(src)` compiles and executes a string of SNOBOL4 source as a program fragment. This is essentially `(RUN (CODE! src))` — we already have all the pieces.
-- [ ] 25F.2 The fragment runs in the current environment (same globals).
-- [ ] 25F.3 Returns nil on success, signals error on compile failure.
-- [ ] 25F.4 Tests: `CODE('X = 42')`, `CODE('DEFINE(...)')`, etc.
-
-### Priority order
-
-1. **25B** (LGT, 5 min) — do first, it's embarrassingly simple
-2. **25A** (INCLUDE) — unlocks Gimpel stdin programs and beauty.sno
-3. **25C** (TERMINAL) — needed for Gimpel error messages
-4. **25F** (CODE) — needed for AI-SNOBOL TEST.SNO
-5. **25D** (named I/O) — unlocks remaining 6 Gimpel programs
+1. ~~**25B**~~ ✅ done  
+2. ~~**25A**~~ ✅ done  
+3. ~~**25C**~~ ✅ done  
+4. ~~**25F**~~ ✅ done  
+5. **25D** (named I/O) — **start here next session**; fix the channel-registration bug (see Known bug note above), then unlock remaining 6 Gimpel programs
 6. **25E** (OPSYN) — needed for full AI-SNOBOL SNOLISPIST library
 
 ### README flagship sequence (once beauty.sno runs)
