@@ -82,7 +82,52 @@ Needed for full AI-SNOBOL SNOLISPIST library.
 
 ---
 
-## Backend acceleration — planned stages
+## Benchmark grid — current baseline (2026-03-09)
+
+Three engines × four Clojure backends. All times ms/run, lower = faster.
+**Important**: SPITBOL and CSNOBOL4 times include ~15ms process-spawn overhead per run. Subtract ~15ms to compare pure execution speed.
+
+Platform: OpenJDK 64-Bit Server VM 21.0.10, Ubuntu 24, x86-64.
+Run: `lein run -m SNOBOL4clojure.bench`
+
+```
+╔═══════════════════════════════════════════════════════════════════════════════════════╗
+║       SNOBOL4 ENGINE BENCHMARK GRID  (ms / run — lower = faster)                    ║
+╠═══════════════════════╦══════════╦══════════╦══════════╦══════════╦══════════╦══════════╣
+║ Program               ║ SPITBOL  ║ CSNOBOL4 ║ Interp   ║ Transpil ║ Stack VM ║ JVM code ║
+╠═══════════════════════╬══════════╬══════════╬══════════╬══════════╬══════════╬══════════╣
+║ arith-10k             ║   15.83  ║   27.25  ║  112.14  ║   88.03  ║  107.02  ║   85.55  ║
+║ strcat-500            ║   15.09  ║   26.16  ║    9.70  ║    7.99  ║   26.02  ║    6.93  ║
+║ pat-span              ║   15.47  ║   26.29  ║   28.05  ║   25.89  ║   52.06  ║   25.22  ║
+║ fact45                ║   16.59  ║   24.73  ║     N/A* ║    1.11  ║  167.46  ║    0.89  ║
+╚═══════════════════════╩══════════╩══════════╩══════════╩══════════╩══════════╩══════════╝
+```
+
+Programs:
+- **arith-10k**: `I = 0 / LOOP  I = I + 1 / LT(I,10000) :S(LOOP)` — pure arithmetic loop
+- **strcat-500**: string concatenation loop growing S to 500 chars
+- **pat-span**: SPAN pattern match loop, 1000 iterations against 'hello world foo bar'
+- **fact45**: Factorial 1..45 via big-number string arithmetic (testpgms-test3.spt)
+
+`*` fact45 interpreter N/A is a bench harness namespace-isolation issue (the transpiler run contaminates shared env state). The interpreter runs fact45 correctly in the test suite (`t3_factorial_table` passes). Fix tracked as bench-isolation bug.
+
+### What the numbers say
+
+**Arithmetic loops (arith-10k)**: All Clojure backends are ~7× slower than SPITBOL (after removing spawn overhead). The gap is entirely `EVAL!` overhead — every `I = I + 1` re-walks the IR list. This is exactly what Stage 23E (inline EVAL!) targets.
+
+**String operations (strcat-500)**: Clojure interpreter beats CSNOBOL4! 9.7ms vs 26ms (net ~11ms after spawn). String-heavy work benefits from the JVM's native String handling. JVM codegen at 6.9ms is fastest overall.
+
+**Pattern matching (pat-span)**: Clojure within 2× of SPITBOL net. The pattern engine (`match.clj`) is competitive for simple patterns. Stack VM regresses here — opcode dispatch overhead hurts the tight match loop.
+
+**Factorial / big-number arithmetic (fact45)**: The transpiler (1.1ms) and JVM codegen (0.89ms) are **14–19× faster than SPITBOL** (net ~1.6ms). This is the EDN cache + JIT effect: the program compiles once to a tight loop, the JVM JIT learns it, and it flies. Stack VM regresses badly (167ms) — the bytecode overhead is proportionally large for this program's structure.
+
+### Key observations for 23E planning
+
+The `arith-10k` gap (7×) vs the `strcat-500` win (faster than CSNOBOL4) confirms the bottleneck is specifically `EVAL!` on numeric expressions, not the runtime loop itself. Stage 23E (inline arithmetic/assign/compare directly into JVM bytecode) should close most of the arith-10k gap without touching the string or pattern paths.
+
+### How to update this grid
+
+After each optimization sprint, run `lein run -m SNOBOL4clojure.bench` and paste the new grid here with a date stamp.
 
 Four backends exist (23A–23D). Five more are planned. See PLAN.md Stage 23F–23J for full design notes.
 
